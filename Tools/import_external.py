@@ -47,6 +47,11 @@ for name, source in sources.items():
             continue
         settings = asset.get_editor_property("nanite_settings")
         settings.set_editor_property("enabled", True)
+        if name.startswith("terrain_"):
+            # Collision comes from the fallback mesh: keep all of it, or things placed on the land by
+            # traces float above (or sink into) the surface that is drawn
+            settings.set_editor_property("fallback_target", unreal.NaniteFallbackTarget.PERCENT_TRIANGLES)
+            settings.set_editor_property("fallback_percent_triangles", 1.0)
         asset.set_editor_property("nanite_settings", settings)
         # Walk on the land and bump into rocks as they look; plants are not solid
         body = asset.get_editor_property("body_setup")

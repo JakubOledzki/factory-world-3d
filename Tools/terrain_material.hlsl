@@ -46,6 +46,8 @@ float cliff = smoothstep(0.09, 0.24, slope + (patches - 0.5) * 0.08);
 float grass = saturate(smoothstep(0.35, 0.75, patches + baseD.g * 0.4) * GrassAmount) * (1 - cliff);
 float snow = smoothstep(SnowHeight, SnowHeight + 8000, WP.z + (patches - 0.5) * 3000) * (1 - cliff * 0.8);
 
+// Far away the photographed grass averages out to beige: keep the meadow green at a distance
+grassD *= lerp(float3(1, 1, 1), float3(0.72, 1.0, 0.55), farMix);
 float3 color = lerp(baseD, grassD, grass);
 float3 normal = lerp(baseN, grassN, grass);
 float3 arm = lerp(baseM, grassM, grass);
