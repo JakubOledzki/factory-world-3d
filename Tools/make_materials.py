@@ -371,3 +371,140 @@ lib.connect_material_property(custom, "RoughOut", unreal.MaterialProperty.MP_ROU
 lib.recompile_material(m)
 unreal.EditorAssetLibrary.save_asset(m.get_path_name())
 unreal.log("FW character material saved")
+
+
+# Clothes made in Blender (Tools/blender/make_character_gear.py): a CC0 fabric (Diffuse, Normal, ARM) seen
+# from three sides in the bind pose (no seams from the mannequin's UVs), its own colour taken out and the
+# server's colour put in (Color); Scale = cm per texture repeat
+m = fresh("M_FWCloth")
+m.set_editor_property("used_with_skeletal_mesh", True)
+cloth = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 0)
+cloth.set_editor_property("code", "float3 n = abs(normalize(N)); n = pow(n, 4.0); n /= (n.x + n.y + n.z); "
+                                 "float2 ux = P.yz / Scale, uy = P.xz / Scale, uz = P.xy / Scale; "
+                                 "float3 d = Texture2DSample(D, DSampler, ux).rgb * n.x + Texture2DSample(D, DSampler, uy).rgb * n.y + Texture2DSample(D, DSampler, uz).rgb * n.z; "
+                                 "float3 a = Texture2DSample(A, ASampler, ux).rgb * n.x + Texture2DSample(A, ASampler, uy).rgb * n.y + Texture2DSample(A, ASampler, uz).rgb * n.z; "
+                                 "float3 t = Texture2DSample(T, TSampler, ux).rgb * n.x + Texture2DSample(T, TSampler, uy).rgb * n.y + Texture2DSample(T, TSampler, uz).rgb * n.z; "
+                                 "NormalOut = float3((t.xy * 2 - 1) * Bump, 1); RoughOut = a.g; "
+                                 "float l = dot(d, float3(0.3, 0.59, 0.11)); return Color * lerp(0.55, 1.25, saturate(l * 2.2)) * a.r;")
+cloth.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+inputs = []
+for name in ("P", "N", "Color", "Scale", "Bump", "D", "A", "T"):
+    item = unreal.CustomInput()
+    item.set_editor_property("input_name", name)
+    inputs.append(item)
+cloth.set_editor_property("inputs", inputs)
+outs = []
+for name, kind in (("NormalOut", unreal.CustomMaterialOutputType.CMOT_FLOAT3), ("RoughOut", unreal.CustomMaterialOutputType.CMOT_FLOAT1)):
+    item = unreal.CustomOutput()
+    item.set_editor_property("output_name", name)
+    item.set_editor_property("output_type", kind)
+    outs.append(item)
+cloth.set_editor_property("additional_outputs", outs)
+
+
+def bind_pose_position(material, x, y):
+    """The bind-pose position (cm), carried from the vertices to the pixels."""
+    pre = lib.create_material_expression(material, unreal.MaterialExpressionPreSkinnedPosition, x - 200, y)
+    carry = lib.create_material_expression(material, unreal.MaterialExpressionVertexInterpolator, x, y)
+    lib.connect_material_expressions(pre, "", carry, "")
+    return carry
+
+
+lib.connect_material_expressions(bind_pose_position(m, -900, -700), "", cloth, "P")
+pre_normal = lib.create_material_expression(m, unreal.MaterialExpressionPreSkinnedNormal, -1100, -620)
+carry_normal = lib.create_material_expression(m, unreal.MaterialExpressionVertexInterpolator, -900, -620)
+lib.connect_material_expressions(pre_normal, "", carry_normal, "")
+lib.connect_material_expressions(carry_normal, "", cloth, "N")
+lib.connect_material_expressions(vector_param(m, "Color", (0.5, 0.5, 0.5, 1), -900, -540), "", cloth, "Color")
+lib.connect_material_expressions(scalar_param(m, "Scale", 18.0, -900, -460), "", cloth, "Scale")
+lib.connect_material_expressions(scalar_param(m, "Bump", 1.0, -900, -380), "", cloth, "Bump")
+for i, (name, default, sampler) in enumerate((
+        ("D", "/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture", unreal.MaterialSamplerType.SAMPLERTYPE_COLOR),
+        ("A", "/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS),
+        ("T", "/Engine/EngineMaterials/DefaultNormal.DefaultNormal", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL))):
+    node = lib.create_material_expression(m, unreal.MaterialExpressionTextureObjectParameter, -900, -280 + i * 100)
+    node.set_editor_property("parameter_name", {"D": "Diffuse", "A": "ARM", "T": "NormalMap"}[name])
+    node.set_editor_property("texture", unreal.load_asset(default))
+    node.set_editor_property("sampler_type", sampler)
+    lib.connect_material_expressions(node, "", cloth, name)
+lib.connect_material_property(cloth, "", unreal.MaterialProperty.MP_BASE_COLOR)
+lib.connect_material_property(cloth, "NormalOut", unreal.MaterialProperty.MP_NORMAL)
+lib.connect_material_property(cloth, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
+lib.recompile_material(m)
+unreal.EditorAssetLibrary.save_asset(m.get_path_name())
+
+# Hair and facial hair: the server's colour broken into fine strands that run down from the crown (around the
+# head and along its height), with a darker root and a moving sheen; strand normals tilt across the strands
+m = fresh("M_FWHair")
+m.set_editor_property("used_with_skeletal_mesh", True)
+hair = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 0)
+hair.set_editor_property("code", "float3 h = P - float3(0, 2, 170); float a = atan2(h.y, h.x); "
+                                 "float s = frac(sin(floor(a * 140.0 + sin(P.z * 0.35) * 2.0) * 12.9898) * 43758.5453); "
+                                 "float s2 = frac(sin(floor(a * 420.0 + P.z * 0.2) * 78.233) * 24634.6345); "
+                                 "float strand = lerp(0.6, 1.15, s) * lerp(0.85, 1.05, s2); "
+                                 "NormalOut = normalize(float3(cos(a * 140.0) * 0.35, 0, 1)); RoughOut = lerp(0.32, 0.5, s2); "
+                                 "return Color * strand;")
+hair.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+inputs = []
+for name in ("P", "Color"):
+    item = unreal.CustomInput()
+    item.set_editor_property("input_name", name)
+    inputs.append(item)
+hair.set_editor_property("inputs", inputs)
+outs = []
+for name, kind in (("NormalOut", unreal.CustomMaterialOutputType.CMOT_FLOAT3), ("RoughOut", unreal.CustomMaterialOutputType.CMOT_FLOAT1)):
+    item = unreal.CustomOutput()
+    item.set_editor_property("output_name", name)
+    item.set_editor_property("output_type", kind)
+    outs.append(item)
+hair.set_editor_property("additional_outputs", outs)
+lib.connect_material_expressions(bind_pose_position(m, -900, -400), "", hair, "P")
+lib.connect_material_expressions(vector_param(m, "Color", (0.1, 0.07, 0.05, 1), -900, -300), "", hair, "Color")
+lib.connect_material_property(hair, "", unreal.MaterialProperty.MP_BASE_COLOR)
+lib.connect_material_property(hair, "NormalOut", unreal.MaterialProperty.MP_NORMAL)
+lib.connect_material_property(hair, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
+lib.connect_material_property(scalar_param(m, "Specular", 0.6, -900, -200), "", unreal.MaterialProperty.MP_SPECULAR)
+lib.recompile_material(m)
+unreal.EditorAssetLibrary.save_asset(m.get_path_name())
+unreal.log("FW character gear materials saved")
+
+# Hair cards (make_character_gear.py): each card cut into strands by its UVs (U across, offset by a whole number
+# per card; V root -> tip), strands of staggered length tapering to the tip, darker at the root, anisotropic
+# sheen along the strands (dithered alpha: TSR softens the strand edges)
+m = fresh("M_FWHairCard")
+m.set_editor_property("used_with_skeletal_mesh", True)
+m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+m.set_editor_property("two_sided", True)
+m.set_editor_property("dither_opacity_mask", True)
+card = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 0)
+card.set_editor_property("code", "float card = floor(UV.x); float u = frac(UV.x); float v = saturate(UV.y); "
+                                 "float n = 14.0; float i = floor(u * n) + card * 31.0; "
+                                 "float h = frac(sin(i * 12.9898) * 43758.5453); float h2 = frac(sin(i * 78.233) * 24634.6345); "
+                                 "float w = abs(frac(u * n) - 0.5) * 2.0; "
+                                 "float reach = 0.7 + 0.3 * h; float taper = 1.0 - smoothstep(reach - 0.25, reach, v); "
+                                 "OpacityOut = step(w, lerp(0.75, 0.25, v)) * taper * (h2 > 0.12 ? 1.0 : 0.0); "
+                                 "return Color * lerp(0.45, 1.1, pow(v, 0.7)) * lerp(0.8, 1.15, h);")
+card.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+inputs = []
+for name in ("UV", "Color"):
+    item = unreal.CustomInput()
+    item.set_editor_property("input_name", name)
+    inputs.append(item)
+card.set_editor_property("inputs", inputs)
+outs = []
+for name in ("OpacityOut",):
+    item = unreal.CustomOutput()
+    item.set_editor_property("output_name", name)
+    item.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
+    outs.append(item)
+card.set_editor_property("additional_outputs", outs)
+lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionTextureCoordinate, -900, -300), "", card, "UV")
+lib.connect_material_expressions(vector_param(m, "Color", (0.1, 0.07, 0.05, 1), -900, -200), "", card, "Color")
+lib.connect_material_property(card, "", unreal.MaterialProperty.MP_BASE_COLOR)
+lib.connect_material_property(card, "OpacityOut", unreal.MaterialProperty.MP_OPACITY_MASK)
+lib.connect_material_property(scalar_param(m, "Roughness", 0.38, -900, -100), "", unreal.MaterialProperty.MP_ROUGHNESS)
+lib.connect_material_property(scalar_param(m, "Specular", 0.55, -900, -20), "", unreal.MaterialProperty.MP_SPECULAR)
+lib.connect_material_property(scalar_param(m, "Anisotropy", 0.75, -900, 60), "", unreal.MaterialProperty.MP_ANISOTROPY)
+m.set_editor_property("opacity_mask_clip_value", 0.4)
+lib.recompile_material(m)
+unreal.EditorAssetLibrary.save_asset(m.get_path_name())

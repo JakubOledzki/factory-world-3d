@@ -341,3 +341,59 @@ if os.path.isdir(DECALS):
                 texture.set_editor_property("srgb", False)
                 library.save_loaded_asset(texture)
         unreal.log(f"FWIMPORT decal {decal_id}")
+
+# Character hair and clothes from Tools/blender/make_character_gear.py: skeletal meshes on the mannequin's
+# skeleton (Tools/copy_mannequins.ps1), one per style, in /Game/External/Character
+GEAR = os.path.join(MODELS, "character")
+skeleton = unreal.load_asset("/Game/Characters/Mannequins/Meshes/SK_Mannequin") if library.does_asset_exist("/Game/Characters/Mannequins/Meshes/SK_Mannequin") else None
+cloth_master = unreal.load_asset("/Game/Materials/M_FWCloth.M_FWCloth")
+hair_master = unreal.load_asset("/Game/Materials/M_FWHair.M_FWHair")
+card_master = unreal.load_asset("/Game/Materials/M_FWHairCard.M_FWHairCard")
+# Slot -> fabric (Poly Haven, CC0) and cm per repeat
+FABRICS = {"FW_Jersey": ("cotton_jersey", 12.0), "FW_Fleece": ("knitted_fleece", 16.0), "FW_Denim": ("denim_fabric_05", 22.0),
+           "FW_Leather": ("leather_white", 14.0)}
+if os.path.isdir(GEAR) and skeleton and cloth_master and hair_master:
+    destination = "/Game/External/Character"
+    if library.list_assets(destination, recursive=True):
+        library.delete_directory(destination)  # always rebuilt from the script's latest output
+    materials = {}
+    for slot in ["FW_Hair", "FW_HairCard"] + list(FABRICS):
+        instance = tools.create_asset(f"MI_{slot}", f"{destination}/Materials", unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        mel.set_material_instance_parent(instance, {"FW_Hair": hair_master, "FW_HairCard": card_master}.get(slot, cloth_master))
+        if slot in FABRICS:
+            set_id, scale = FABRICS[slot]
+            for param, kind in (("Diffuse", "diff"), ("NormalMap", "nor_gl"), ("ARM", "arm")):
+                texture = texture_set(set_id, kind)
+                if texture:
+                    mel.set_material_instance_texture_parameter_value(instance, param, texture)
+            mel.set_material_instance_scalar_parameter_value(instance, "Scale", scale)
+        library.save_loaded_asset(instance)
+        materials[slot] = instance
+    for file in sorted(os.listdir(GEAR)):
+        if not file.endswith(".fbx"):
+            continue
+        task = unreal.AssetImportTask()
+        task.set_editor_property("filename", os.path.abspath(os.path.join(GEAR, file)))
+        task.set_editor_property("destination_path", destination)
+        task.set_editor_property("automated", True)
+        task.set_editor_property("replace_existing", True)
+        task.set_editor_property("save", True)
+        options = unreal.FbxImportUI()
+        options.set_editor_property("import_mesh", True)
+        options.set_editor_property("import_as_skeletal", True)
+        options.set_editor_property("mesh_type_to_import", unreal.FBXImportType.FBXIT_SKELETAL_MESH)
+        options.set_editor_property("skeleton", skeleton)
+        options.set_editor_property("import_materials", False)
+        options.set_editor_property("import_textures", False)
+        options.set_editor_property("import_animations", False)
+        options.set_editor_property("create_physics_asset", False)
+        task.set_editor_property("options", options)
+        tools.import_asset_tasks([task])
+        name = file[:-4]
+        mesh = unreal.load_asset(f"{destination}/{name}") if library.does_asset_exist(f"{destination}/{name}") else None
+        if not mesh:
+            unreal.log_warning(f"FWIMPORT gear {name}: import failed")
+            continue
+        # The game puts MI_<slot> on each slot when it shows the piece (AFWCharacterStudio::Wear)
+        slots = mesh.get_editor_property("materials")
+        unreal.log_warning(f"FWIMPORT gear {name}: {[str(s.get_editor_property('material_slot_name')) for s in slots]}")
