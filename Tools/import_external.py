@@ -112,3 +112,68 @@ for path in library.list_assets("/Game/External/Models", recursive=True, include
         unreal.MaterialEditingLibrary.set_material_instance_vector_parameter_value(material, "BaseColorFactor", unreal.LinearColor(1.6, 1.6, 1.6, 1.0))
         library.save_loaded_asset(material)
         unreal.log(f"FWIMPORT brighter {path}")
+
+# Point every scanned model at our own plain material (M_FWScan / M_FWScanMasked): the glTF importer's
+# master lacks the Nanite and instanced-mesh usages, so -game and cooked builds drew the scans with the
+# default (flat grey) material. The importer's instances are re-parented in place, keeping their textures.
+scan = unreal.load_asset("/Game/Materials/M_FWScan.M_FWScan")
+scan_masked = unreal.load_asset("/Game/Materials/M_FWScanMasked.M_FWScanMasked")
+mel = unreal.MaterialEditingLibrary
+for path in library.list_assets("/Game/External/Models", recursive=True, include_folder=False):
+    if "/Materials/" not in path:
+        continue
+    source = unreal.load_asset(path)
+    if not isinstance(source, unreal.MaterialInstanceConstant):
+        continue
+    parent = source.get_editor_property("parent")
+    if parent in (scan, scan_masked):
+        continue
+    textures = {name: mel.get_material_instance_texture_parameter_value(source, name)
+                for name in ("BaseColorTexture", "NormalTexture", "MetallicRoughnessTexture")}
+    if not textures["BaseColorTexture"]:
+        continue
+    lower = path.lower()
+    masked = any(k in lower for k in ("twig", "leaf", "leaves", "needle", "grass", "fern", "shrub"))
+    for texture in textures.values():
+        if not texture:
+            continue
+        tname = texture.get_name().lower()
+        if "nor" in tname:
+            texture.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
+            texture.set_editor_property("srgb", False)
+        elif "arm" in tname or "rough" in tname:
+            texture.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
+            texture.set_editor_property("srgb", False)
+        library.save_loaded_asset(texture)
+    mel.set_material_instance_parent(source, scan_masked if masked else scan)
+    mel.set_material_instance_texture_parameter_value(source, "BaseColor", textures["BaseColorTexture"])
+    if textures["NormalTexture"]:
+        mel.set_material_instance_texture_parameter_value(source, "Normal", textures["NormalTexture"])
+    if textures["MetallicRoughnessTexture"]:
+        mel.set_material_instance_texture_parameter_value(source, "ARM", textures["MetallicRoughnessTexture"])
+        if "rough" in textures["MetallicRoughnessTexture"].get_name().lower():
+            mel.set_material_instance_scalar_parameter_value(source, "MetalScale", 0.0)
+    if any(k in lower for k in ("boulder", "rock")):
+        # Scans are captured darker than granite reads in daylight
+        mel.set_material_instance_vector_parameter_value(source, "Tint", unreal.LinearColor(1.35, 1.35, 1.35, 1.0))
+    mel.update_material_instance(source)
+    library.save_loaded_asset(source)
+    unreal.log(f"FWIMPORT scan material {path}")
+
+# Usage audit: every material on an external mesh must come from a master usable with Nanite and
+# instanced meshes, or the game silently draws the default material instead
+problems = 0
+for path in library.list_assets("/Game/External/Models", recursive=True, include_folder=False):
+    # The land gets M_FWTerrain at runtime (FWPlot), whatever its asset says
+    if "/StaticMeshes/" not in path or "/terrain_" in path:
+        continue
+    mesh = unreal.load_asset(path)
+    if not isinstance(mesh, unreal.StaticMesh):
+        continue
+    for slot in mesh.get_editor_property("static_materials"):
+        material = slot.get_editor_property("material_interface")
+        root = material.get_base_material() if material else None
+        if not root or not root.get_editor_property("used_with_nanite") or not root.get_editor_property("used_with_instanced_static_meshes"):
+            problems += 1
+            unreal.log_warning(f"FWIMPORT usage missing: {path} uses {root.get_path_name() if root else None}")
+unreal.log(f"FWIMPORT usage audit: {problems} problem(s)")

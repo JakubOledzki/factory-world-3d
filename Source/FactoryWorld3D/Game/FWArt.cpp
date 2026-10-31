@@ -52,8 +52,7 @@ namespace FWArt
 	{
 		return Meshes({
 			FW_MODEL("boulder_01", "boulder_01"),
-			FW_MODEL("namaqualand_boulder_02", "namaqualand_boulder_02"),
-			FW_MODEL("namaqualand_boulder_04", "namaqualand_boulder_04"),
+			// (The Namaqualand boulders are African sandstone with orange lichen: wrong for the Tatras)
 			FW_MODEL("rock_09", "rock_09"),
 			FW_MODEL("rock_moss_set_01", "rock_moss_set_01_rock01"),
 			FW_MODEL("rock_moss_set_01", "rock_moss_set_01_rock02"),

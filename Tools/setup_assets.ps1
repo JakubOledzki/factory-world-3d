@@ -2,7 +2,7 @@
 #   powershell -ExecutionPolicy Bypass -File Tools\setup_assets.ps1
 # 1. downloads the CC0 models and textures from Poly Haven (checksummed) and the Copernicus DEM tiles,
 # 2. prepares them in Blender (decimation, terrain, real elevation around the demo plot),
-# 3. imports them into Unreal (Nanite, texture settings) and rebuilds the materials.
+# 3. rebuilds the materials and imports the art into Unreal (Nanite, texture settings, material usages).
 # Runs again safely: finished steps are skipped. Needs Node.js, Blender 5.2 and Unreal Engine 5.8.
 param(
     [string]$Blender = "D:\Programs\Blender\blender.exe",
@@ -47,6 +47,7 @@ if (-not (Test-Path RawAssets\processed\terrain_mountains.glb)) {
 Write-Host "== Unreal"
 $Cmd = Join-Path $Engine "Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 $Project = Join-Path $Root "FactoryWorld3D.uproject"
-& $Cmd $Project -run=pythonscript -script="$Root\Tools\import_external.py" -unattended -nosplash | Out-Null
+# Materials first: the import re-parents the scans onto M_FWScan, which make_materials.py rebuilds
 & $Cmd $Project -run=pythonscript -script="$Root\Tools\make_materials.py" -unattended -nosplash | Out-Null
+& $Cmd $Project -run=pythonscript -script="$Root\Tools\import_external.py" -unattended -nosplash | Out-Null
 Write-Host "Done: Content/External is ready."

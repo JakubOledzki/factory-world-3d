@@ -23,7 +23,7 @@ float3 baseN = LAYER(BaseN, uv).rgb * 2 - 1;
 float3 baseM = LAYER(BaseM, uv).rgb;
 
 // Alpine meadow: the photographed grass pulled greener
-float3 grassD = LAYER(GrassD, uv * 0.7).rgb * float3(0.82, 1.0, 0.72);
+float3 grassD = LAYER(GrassD, uv * 0.7).rgb * float3(0.62, 1.0, 0.5);
 float3 grassN = LAYER(GrassN, uv * 0.7).rgb * 2 - 1;
 float3 grassM = LAYER(GrassM, uv * 0.7).rgb;
 
