@@ -64,10 +64,30 @@ namespace FWArt
 
 	TArray<UStaticMesh*> Trees()
 	{
-		// Poly Haven's fir and pine are made for offline rendering: their needles are tiny geometry and cards
-		// that vanish (or turn into dark triangles) at game distances, so the forest reads as dead trees.
-		// Until game-ready trees with card LODs are in (see ASSETS.md), plots and their surroundings get none.
-		return {};
+		// Game-ready Nanite pines from Epic's Project Titan sample, copied locally by Tools/migrate_titan.ps1
+		// (Titan's Arctic firs are left out: their needles are tinted icy blue)
+		// (not in git); none when that has not been run
+		return Meshes({
+			TEXT("/Game/Environment/Foliage/Trees/SM_Pine_A.SM_Pine_A"),
+			TEXT("/Game/Environment/Foliage/Trees/SM_Pine_B.SM_Pine_B"),
+		});
+	}
+
+	TArray<UStaticMesh*> TreeLineTrees()
+	{
+		// Thinner, lichen-covered pines where the forest gives out near the tree line
+		return Meshes({
+			TEXT("/Game/Environment/Foliage/Trees/SM_Pine_A_Lichen.SM_Pine_A_Lichen"),
+			TEXT("/Game/Environment/Foliage/Trees/SM_Pine_B_Lichen.SM_Pine_B_Lichen"),
+		});
+	}
+
+	TArray<UStaticMesh*> TitanSaplings()
+	{
+		return Meshes({
+			TEXT("/Game/Environment/Foliage/Trees/SM_Sapling_A.SM_Sapling_A"),
+			TEXT("/Game/Environment/Foliage/Trees/SM_Sapling_B.SM_Sapling_B"),
+		});
 	}
 
 	TArray<UStaticMesh*> Saplings()

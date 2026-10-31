@@ -139,3 +139,17 @@ Skrypt kompiluje grę, przygotowuje zasoby (cook) i pakuje wszystko do `D:\Facto
 
 - Adres serwera: `FactoryWorld3D.exe -ServerUrl=ws://adres:5080/ws` albo `ServerUrl` w `Saved\Config\Windows\Game.ini`.
 - Wersja Shipping pomija `Saved/DevLogin.ini`, więc zawsze pokazuje ekran logowania. Wersja Development loguje się automatycznie, jeśli ten plik istnieje.
+
+## Las (Project Titan)
+
+Las świerkowo-sosnowy na zboczach wokół działki to drzewa Nanite z darmowego przykładu Epic **Project Titan** (Fab). Nie są w repozytorium (licencja pozwala używać ich w grze, ale nie rozpowszechniać osobno). Żeby je dodać, pobierz Titana w Epic Launcherze („Create Project”, UE 5.8) i uruchom:
+
+```
+powershell -ExecutionPolicy Bypass -File Tools\migrate_titan.ps1 -Titan D:\Titan\ProjectTitan
+```
+
+Las zaczyna się tuż za działką: gęsty do ok. 150 m nad działką, wyżej rzednie i przechodzi w pojedyncze sosny z porostami do ok. 300 m, ponad nimi są hale i skały. Działka i pas 40 m wokół niej zostają wolne pod budowę. Rośnie płatami z polanami, a pod drzewami grunt to ciemna ściółka z igieł. Z daleka las widać też jako ciemny kolor koron w materiale terenu.
+
+Wysokości lasu ustawia `Config/DefaultGame.ini`: `ForestTopAbovePlotMeters` i `TreeLineAbovePlotMeters`. Po ustawieniu `bForestRelativeToPlot=False` las wraca do prawdziwej granicy lasu w Tatrach (`ForestTopMeters=1300`, `TreeLineMeters=1580` m n.p.m.). Wysokość działki n.p.m. zapisuje `Tools/dem_extract.mjs`, a import dołącza ją do siatki terenu (działka testowa: 2020 m).
+
+Drzew jest najwyżej 28 000. Te dalej niż 1 km od działki nie rzucają cieni, a wiatr porusza tylko drzewa w promieniu 50 m. Drzewa do 400 m od działki mają kolizję: niewidoczny walec w miejscu pnia, dużo tańszy niż kolizja całego drzewa. Las nie bierze udziału w ray tracingu. Bez Titana gra działa normalnie, tylko bez drzew.

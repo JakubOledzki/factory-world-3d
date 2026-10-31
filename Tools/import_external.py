@@ -165,6 +165,26 @@ for path in library.list_assets("/Game/External/Models", recursive=True, include
     library.save_loaded_asset(source)
     unreal.log(f"FWIMPORT scan material {path}")
 
+# Real-elevation terrains carry the plot's height above sea level (from dem_<x>_<y>.json) for the game
+import json
+for file in sorted(os.listdir(MODELS)):
+    if not (file.startswith("dem_") and file.endswith(".json")):
+        continue
+    name = "terrain_" + file[:-5]
+    path = f"/Game/External/Models/{name}/{name}/StaticMeshes/{name}.{name}"
+    if not library.does_asset_exist(path):
+        continue
+    mesh = unreal.load_asset(path)
+    user_data = list(mesh.get_editor_property("asset_user_data") or [])
+    info = next((d for d in user_data if isinstance(d, unreal.FWTerrainInfo)), None)
+    if not info:
+        info = unreal.new_object(unreal.FWTerrainInfo, mesh)
+        user_data.append(info)
+        mesh.set_editor_property("asset_user_data", user_data)
+    info.set_editor_property("plot_elevation_meters", json.load(open(os.path.join(MODELS, file)))["plotElevationMeters"])
+    library.save_loaded_asset(mesh)
+    unreal.log(f"FWIMPORT terrain elevation {name}: {info.get_editor_property('plot_elevation_meters'):.0f} m")
+
 # Usage audit: every material on an external mesh must come from a master usable with Nanite and
 # instanced meshes, or the game silently draws the default material instead
 problems = 0

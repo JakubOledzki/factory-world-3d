@@ -55,6 +55,7 @@ public:
 	int32 GetPlotY() const { return PlotY; }
 	float GetTileSize() const { return TileSize; }
 	bool IsBuilt() const { return Size > 0; }
+	TOptional<float> GetPlotElevation() const { return PlotElevationMeters; }
 
 	FVector TileCenter(FIntPoint Tile) const;
 	// Centre of the square an object of Kind covers when standing on Tile.
@@ -127,6 +128,10 @@ private:
 	void BuildGround(int32 Biome);
 	UMaterialInterface* MakeGroundMaterial(int32 Biome);
 	void ScatterSurroundings(int32 Biome);
+	// Conifer forest on the slopes around the plot: thick in the valleys, thinning to the tree line
+	void PlantForest(int32 Biome);
+	// Clear strip between the plot and the forest (cm), left for building
+	static constexpr float ForestMargin = 4000.f;
 	void UpdateGroundCover();
 	UHierarchicalInstancedStaticMeshComponent* MakeArtInstances(UStaticMesh* Mesh, bool bCollide);
 	FTransform ArtTransform(UStaticMesh* Mesh, const FVector& Ground, float Yaw, float Size2D, float Height, float Sink,
@@ -188,6 +193,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> TerrainMesh;
 	int32 PendingScatterBiome = -1;
+	// Plot height above sea level when the land is real terrain (FWTerrainInfo on the mesh, or the config); unset otherwise
+	TOptional<float> PlotElevationMeters;
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> GroundMaterial;
 	UPROPERTY()
 	TMap<FString, TObjectPtr<UStaticMeshComponent>> InserterArms;
 	UPROPERTY()
