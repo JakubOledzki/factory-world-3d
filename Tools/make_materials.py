@@ -177,23 +177,25 @@ def scan_material(name, masked):
         item.set_editor_property("input_name", name)
         grime_inputs.append(item)
     grime_hlsl.set_editor_property("inputs", grime_inputs)
-    # Wear: where the baked vertex colour is dark (crevices, recesses), paint gives way to the Rust
-    # texture. Wear 0 (rocks, plants) ignores the vertex colour entirely.
+    # Wear 0 (rocks, plants) leaves the surface as it is
     rust = lib.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -1100, -300)
     rust.set_editor_property("parameter_name", "Rust")
     rust.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/DefaultTexture.DefaultTexture"))
     wear_hlsl = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -550, -420)
-    wear_hlsl.set_editor_property("code", "float mask = saturate((0.22 - VC.r) * 6.0 + (noise - 0.5) * 0.5) * Wear; return lerp(Paint, RustC, mask);")
+    wear_hlsl.set_editor_property("code", "float3 dn = fwidth(N); float dp = max(length(fwidth(WP)), 0.001); float curve = saturate(length(dn) / dp * 25.0 - 0.15); float mask = saturate(curve * (0.6 + noise)) * Wear; return lerp(Paint, Bare, mask);")
     wear_hlsl.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
     wear_inputs = []
-    for name in ("Paint", "RustC", "VC", "Wear", "noise"):
+    for name in ("Paint", "Bare", "N", "WP", "Wear", "noise"):
         item = unreal.CustomInput()
         item.set_editor_property("input_name", name)
         wear_inputs.append(item)
     wear_hlsl.set_editor_property("inputs", wear_inputs)
     lib.connect_material_expressions(mul, "", wear_hlsl, "Paint")
-    lib.connect_material_expressions(rust, "RGB", wear_hlsl, "RustC")
-    lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionVertexColor, -1100, -500), "", wear_hlsl, "VC")
+    # Edge wear: where the surface curves sharply (the bevels), paint is chipped down to bare steel
+    # (the Rust texture slot holds the bare metal); found from screen-space curvature, no bake needed
+    lib.connect_material_expressions(rust, "RGB", wear_hlsl, "Bare")
+    lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionVertexNormalWS, -1100, -500), "", wear_hlsl, "N")
+    lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionWorldPosition, -1100, -460), "", wear_hlsl, "WP")
     lib.connect_material_expressions(scalar_param(m, "Wear", 0.0, -1100, -580), "", wear_hlsl, "Wear")
     lib.connect_material_expressions(rust, "R", wear_hlsl, "noise")
     lib.connect_material_expressions(wear_hlsl, "", grime_hlsl, "C")
