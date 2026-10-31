@@ -850,7 +850,13 @@ void AFWPlot::RebuildCables()
 		{
 			return FootprintCenter(Object.Kind, Object.Tile) + FVector(0.f, Side * 95.f * Fit, 790.f * Fit);
 		}
-		const float Height = Object.Kind == TEXT("power_wind_turbine") ? 200.f : (FWCatalog::IsInserter(Object.Kind) ? 90.f : 120.f);
+		if (FWCatalog::IsInserter(Object.Kind))
+		{
+			// The terminal box on the base, beside the turning arm
+			const FRotator Facing(0.f, YawOf(Object.Rotation), 0.f);
+			return FootprintCenter(Object.Kind, Object.Tile) + Facing.RotateVector(FVector(-30.f, 45.f, 40.f) * Fit);
+		}
+		const float Height = Object.Kind == TEXT("power_wind_turbine") ? 200.f : 120.f;
 		return FootprintCenter(Object.Kind, Object.Tile) + FVector(0.f, 0.f, Height * Fit);
 	};
 	TArray<FTransform> Segments;

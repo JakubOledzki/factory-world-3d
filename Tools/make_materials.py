@@ -177,7 +177,26 @@ def scan_material(name, masked):
         item.set_editor_property("input_name", name)
         grime_inputs.append(item)
     grime_hlsl.set_editor_property("inputs", grime_inputs)
-    lib.connect_material_expressions(mul, "", grime_hlsl, "C")
+    # Wear: where the baked vertex colour is dark (crevices, recesses), paint gives way to the Rust
+    # texture. Wear 0 (rocks, plants) ignores the vertex colour entirely.
+    rust = lib.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -1100, -300)
+    rust.set_editor_property("parameter_name", "Rust")
+    rust.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/DefaultTexture.DefaultTexture"))
+    wear_hlsl = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -550, -420)
+    wear_hlsl.set_editor_property("code", "float mask = saturate((0.22 - VC.r) * 6.0 + (noise - 0.5) * 0.5) * Wear; return lerp(Paint, RustC, mask);")
+    wear_hlsl.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    wear_inputs = []
+    for name in ("Paint", "RustC", "VC", "Wear", "noise"):
+        item = unreal.CustomInput()
+        item.set_editor_property("input_name", name)
+        wear_inputs.append(item)
+    wear_hlsl.set_editor_property("inputs", wear_inputs)
+    lib.connect_material_expressions(mul, "", wear_hlsl, "Paint")
+    lib.connect_material_expressions(rust, "RGB", wear_hlsl, "RustC")
+    lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionVertexColor, -1100, -500), "", wear_hlsl, "VC")
+    lib.connect_material_expressions(scalar_param(m, "Wear", 0.0, -1100, -580), "", wear_hlsl, "Wear")
+    lib.connect_material_expressions(rust, "R", wear_hlsl, "noise")
+    lib.connect_material_expressions(wear_hlsl, "", grime_hlsl, "C")
     lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionWorldPosition, -700, -700), "", grime_hlsl, "WP")
     lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionObjectPositionWS, -700, -620), "", grime_hlsl, "Base")
     lib.connect_material_expressions(scalar_param(m, "Grime", 0.0, -700, -540), "", grime_hlsl, "Amount")
