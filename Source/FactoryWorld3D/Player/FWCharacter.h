@@ -90,6 +90,10 @@ private:
 	void CreateBody();
 	void UpdateArms(float DeltaSeconds);
 	void UpdateBodyAnimation();
+	// Fingers: Amount 0 straight (the bind pose) .. 1 a fist round a handle
+	void CurlFingers(int32 Side, float Amount);
+	// The pickaxe meets the rock: sound, a jolt of the view, chips flying and a mark where it struck
+	void Strike();
 	// Footsteps by the surface underfoot: "grass", "rock" or "metal" (anything built)
 	void UpdateFootsteps(float DeltaSeconds);
 	FString SurfaceUnder(const FHitResult* Hit = nullptr) const;
@@ -115,6 +119,14 @@ private:
 	float GestureTime = 0.f;
 	float BuildRaise = 0.f;
 	FString BodyAnimation;
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> Tool;
+	float ToolShown = 0.f;
+	float SwingRaise = 0.f;
+	float SwingStrike = 0.f;
+	bool bStruck = false;
+	float ShakeTime = 0.f;
+	FVector ShakeOffset = FVector::ZeroVector;
 	float MineSoundIn = 0.f;
 
 	AFWPlayerController* GetFWController() const;

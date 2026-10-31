@@ -3,7 +3,11 @@
 #include "Camera/CameraComponent.h"
 #include "Animation/AnimSequence.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/DecalComponent.h"
 #include "Components/PoseableMeshComponent.h"
+#include "Engine/StaticMeshActor.h"
+#include "Game/FWArt.h"
+#include "Kismet/GameplayStatics.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "TwoBoneIK.h"
@@ -129,6 +133,116 @@ void AFWCharacter::CreateBody()
 	}
 	bArmsReady = true;
 	SetLook(FFWLook());
+
+	// The pickaxe (Tools/blender/make_tools.py): in the right hand while mining
+	if (UStaticMesh* Pickaxe = FWArt::Factory(TEXT("tool_pickaxe")))
+	{
+		Tool = NewObject<UStaticMeshComponent>(this);
+		Tool->SetStaticMesh(Pickaxe);
+		Tool->SetupAttachment(Arms);
+		// Its grip in the palm, the head forward over the knuckles (the tool's +Z handle, +X head)
+		Tool->SetRelativeLocationAndRotation(FVector(-9.f, 1.5f, -3.f), FRotator(0.f, 0.f, 0.f));
+		// The import already turned metres into centimetres
+		Tool->SetRelativeScale3D(FVector(1.f));
+		Tool->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Tool->SetOnlyOwnerSee(true);
+		Tool->SetCastShadow(false);
+		Tool->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
+		Tool->SetVisibility(false);
+		Tool->RegisterComponent();
+	}
+}
+
+void AFWCharacter::CurlFingers(int32 Side, float Amount)
+{
+	// Each finger joint bends about its own Z axis (the bind pose is already a little bent); the thumb closes less
+	static const TCHAR* Fingers[] = { TEXT("index"), TEXT("middle"), TEXT("ring"), TEXT("pinky"), TEXT("thumb") };
+	const TCHAR* Suffix = Side == 0 ? TEXT("_l") : TEXT("_r");
+	const FReferenceSkeleton& Skeleton = Arms->GetSkinnedAsset()->GetRefSkeleton();
+	const TArray<FTransform>& RefPose = Skeleton.GetRefBonePose();
+	const float Sign = Side == 0 ? 1.f : -1.f;
+	for (const TCHAR* Finger : Fingers)
+	{
+		const bool bThumb = FCString::Strcmp(Finger, TEXT("thumb")) == 0;
+		for (int32 Joint = bThumb ? 2 : 1; Joint <= 3; ++Joint)
+		{
+			const FName Bone(*FString::Printf(TEXT("%s_0%d%s"), Finger, Joint, Suffix));
+			const int32 Index = Skeleton.FindBoneIndex(Bone);
+			if (Index == INDEX_NONE)
+			{
+				continue;
+			}
+			const FName Parent = Skeleton.GetBoneName(Skeleton.GetParentIndex(Index));
+			// More at the knuckle, less at the tip, and the pinky closes most
+			const float Degrees = (bThumb ? 30.f : (Joint == 1 ? 62.f : Joint == 2 ? 75.f : 45.f)) * Amount;
+			FTransform Local = RefPose[Index];
+			Local.SetRotation(Local.GetRotation() * FQuat(FVector::UpVector, FMath::DegreesToRadians(Sign * Degrees)));
+			Arms->SetBoneTransformByName(Bone, Local * Arms->GetBoneTransformByName(Parent, EBoneSpaces::ComponentSpace), EBoneSpaces::ComponentSpace);
+		}
+	}
+}
+
+void AFWCharacter::Strike()
+{
+	FWAudio::Play2D(this, TEXT("mine_hit"), 0.6f, 3);
+	ShakeTime = 0.18f;
+	// Where the pickaxe meets the rock: straight ahead of the eye
+	FHitResult Hit;
+	const FVector Eye = Camera->GetComponentLocation();
+	FCollisionQueryParams Params(TEXT("FWStrike"), true, this);
+	if (!GetWorld()->LineTraceSingleByChannel(Hit, Eye, Eye + Camera->GetForwardVector() * 800.f, ECC_Visibility, Params))
+	{
+		return;
+	}
+	// Chips of rock fly out of the strike and fall
+	const TArray<UStaticMesh*> Rocks = FWArt::Rocks();
+	UMaterialInterface* RockMaterial = Rocks.IsEmpty() ? nullptr : Rocks[0]->GetMaterial(0);
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	for (int32 i = 0; i < 10 && Cube; ++i)
+	{
+		FActorSpawnParameters Spawn;
+		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AStaticMeshActor* Chip = GetWorld()->SpawnActor<AStaticMeshActor>(Hit.ImpactPoint + Hit.ImpactNormal * 4.f, FRotator(FMath::FRandRange(0.f, 360.f), FMath::FRandRange(0.f, 360.f), 0.f), Spawn);
+		if (!Chip)
+		{
+			continue;
+		}
+		UStaticMeshComponent* Piece = Chip->GetStaticMeshComponent();
+		Piece->SetMobility(EComponentMobility::Movable);
+		Piece->SetStaticMesh(Cube);
+		Piece->SetWorldScale3D(FVector(FMath::FRandRange(0.035f, 0.07f), FMath::FRandRange(0.03f, 0.06f), FMath::FRandRange(0.02f, 0.045f)));
+		if (RockMaterial)
+		{
+			Piece->SetMaterial(0, RockMaterial);
+		}
+		Piece->SetCollisionProfileName(TEXT("PhysicsActor"));
+		Piece->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+		Piece->SetSimulatePhysics(true);
+		Piece->SetCastShadow(false);
+		const FVector Out = (Hit.ImpactNormal + FMath::VRand() * 0.7f + FVector(0, 0, 0.6f)).GetSafeNormal();
+		Piece->AddImpulse(Out * FMath::FRandRange(120.f, 260.f), NAME_None, true);
+		Piece->AddAngularImpulseInDegrees(FMath::VRand() * 900.f, NAME_None, true);
+		Chip->SetLifeSpan(FMath::FRandRange(1.4f, 2.2f));
+	}
+	// A scuff where it struck, fading after a while
+	if (UMaterialInterface* DecalBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_FWDecal.M_FWDecal")))
+	{
+		UTexture2D* Color = FWArt::Texture(TEXT("/Game/External/Decals/Leaking008/Leaking008_2K-PNG_Color.Leaking008_2K-PNG_Color"));
+		UTexture2D* Mask = FWArt::Texture(TEXT("/Game/External/Decals/Leaking008/Leaking008_2K-PNG_Opacity.Leaking008_2K-PNG_Opacity"));
+		if (Color && Mask)
+		{
+			UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(DecalBase, this);
+			Material->SetTextureParameterValue(TEXT("Color"), Color);
+			Material->SetTextureParameterValue(TEXT("Opacity"), Mask);
+			Material->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.12f, 0.11f, 0.1f));
+			Material->SetScalarParameterValue(TEXT("Strength"), 0.9f);
+			const FRotator Facing = (-Hit.ImpactNormal).Rotation() + FRotator(0.f, 0.f, FMath::FRandRange(0.f, 360.f));
+			if (UDecalComponent* Decal = UGameplayStatics::SpawnDecalAttached(Material, FVector(8.f, 16.f, 16.f), Hit.GetComponent(), NAME_None, Hit.ImpactPoint, Facing, EAttachLocation::KeepWorldPosition, 12.f))
+			{
+				Decal->SetFadeOut(8.f, 4.f);
+			}
+		}
+	}
 }
 
 void AFWCharacter::SetLook(const FFWLook& Look)
@@ -152,10 +266,16 @@ void AFWCharacter::PlayGesture(EGesture InGesture)
 {
 	Gesture = InGesture;
 	GestureTime = 0.f;
+	bStruck = false;
 }
 
 void AFWCharacter::FWGesture(const FString& Name)
 {
+	if (Name == TEXT("mine"))
+	{
+		// Holds the pickaxe and swings as when mining
+		ToolShown = 1.f;
+	}
 	PlayGesture(Name == TEXT("place") ? EGesture::Place : Name == TEXT("rotate") ? EGesture::Rotate
 		: Name == TEXT("pickup") ? EGesture::Pickup : Name == TEXT("swing") ? EGesture::Swing : EGesture::None);
 }
@@ -211,12 +331,19 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 		{
 			const float Raise = T < 0.45f ? FMath::SmoothStep(0.f, 1.f, T / 0.45f) : 1.f - FMath::SmoothStep(0.f, 1.f, (T - 0.45f) / 0.25f);
 			const float Strike = T < 0.45f ? 0.f : FMath::Sin(FMath::Clamp((T - 0.45f) / 0.55f, 0.f, 1.f) * PI);
-			Gest[1] = FVector(-4.f, -10.f, 30.f) * Raise + FVector(2.f, 22.f, -24.f) * Strike;
+			Gest[1] = FVector(-4.f, -10.f, 26.f) * Raise + FVector(4.f, 20.f, -6.f) * Strike;
 			Gest[0] = FVector(0, -4.f, -6.f) * Strike;
+			SwingRaise = Raise;
+			SwingStrike = Strike;
 			break;
 		}
 		default:
 			break;
+		}
+		if (Gesture == EGesture::Swing && !bStruck && T >= 0.62f)
+		{
+			bStruck = true;
+			Strike();
 		}
 		if (T >= 1.f)
 		{
@@ -225,6 +352,10 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 	}
 
 	// Where the hands rest in the mesh's space (+Y forward, +X the character's left, Z up from the feet)
+	if (Gesture != EGesture::Swing)
+	{
+		SwingRaise = SwingStrike = 0.f;
+	}
 	const float Breath = FMath::Sin(Time * 1.6f) * 0.6f;
 	const float StepBob = FMath::Abs(FMath::Sin(BobPhase)) * 1.8f * Moving;
 	const float StepSway = FMath::Cos(BobPhase) * 1.4f * Moving;
@@ -250,6 +381,32 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 		Arms->SetBoneTransformByName(Sides[Side][1], Lower, EBoneSpaces::ComponentSpace);
 		Arms->SetBoneTransformByName(Sides[Side][2], End, EBoneSpaces::ComponentSpace);
 	}
+	// The pickaxe comes out for mining and goes away a moment after
+	const bool bMining = Hold == EHold::Mine || Gesture == EGesture::Swing;
+	ToolShown = bMining ? 1.f : FMath::Max(0.f, ToolShown - DeltaSeconds * 1.5f);
+	if (Tool)
+	{
+		Tool->SetVisibility(ToolShown > 0.f);
+		// The handle in the fist, pointing up and forward over the hand at rest, tipped back at the top of the
+		// swing and driven forward and down into the strike; the head always points ahead
+		const FVector Forward = Camera->GetForwardVector();
+		const FVector Right = Camera->GetRightVector();
+		const FVector Up = Camera->GetUpVector();
+		FVector Handle = Forward * 0.9f - Right * 0.4f + Up * 0.35f;
+		Handle = FMath::Lerp(Handle, -Forward * 0.25f - Right * 0.1f + Up, SwingRaise);
+		Handle = FMath::Lerp(Handle, Forward - Right * 0.1f - Up * 0.1f, SwingStrike);
+		Handle.Normalize();
+		FVector Head = Forward - Handle * FVector::DotProduct(Forward, Handle);
+		Head = Head.IsNearlyZero() ? Up : Head.GetSafeNormal();
+		const FVector Grip = Arms->GetBoneLocation(TEXT("hand_r")) - Handle * 3.f;
+		Tool->SetWorldLocationAndRotation(Grip, FRotationMatrix::MakeFromZX(Handle, Head).Rotator());
+	}
+	// Relaxed hands, a little more closed in build mode; the right one a fist round the handle
+	CurlFingers(0, 0.25f + 0.15f * BuildRaise);
+	CurlFingers(1, ToolShown > 0.f && Tool ? 1.f : 0.25f + 0.15f * BuildRaise);
+	// The jolt of a strike: a few millimetres, gone in a fifth of a second
+	ShakeTime = FMath::Max(0.f, ShakeTime - DeltaSeconds);
+	ShakeOffset = ShakeTime > 0.f ? FMath::VRand() * 0.6f * (ShakeTime / 0.18f) : FVector::ZeroVector;
 }
 
 void AFWCharacter::UpdateBodyAnimation()
@@ -664,7 +821,6 @@ void AFWCharacter::UpdateHold(float DeltaSeconds)
 		if (MineSoundIn <= 0.f)
 		{
 			MineSoundIn = FMath::FRandRange(0.55f, 0.75f);
-			FWAudio::Play2D(this, TEXT("mine_hit"), 0.55f, 3);
 			PlayGesture(EGesture::Swing);
 		}
 	}
@@ -704,7 +860,7 @@ void AFWCharacter::UpdateHeadBob(float DeltaSeconds)
 	BobPhase = Speed > 20.f ? BobPhase + DeltaSeconds * Speed / 70.f : FMath::FInterpTo(BobPhase, FMath::RoundToFloat(BobPhase / PI) * PI, DeltaSeconds, 6.f);
 	const float Amount = FMath::Clamp(Speed / WalkSpeed, 0.f, 1.6f);
 	const FVector Bob(0.f, FMath::Cos(BobPhase) * 0.8f * Amount, FMath::Abs(FMath::Sin(BobPhase)) * 2.2f * Amount);
-	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight()) + Bob);
+	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight()) + Bob + ShakeOffset);
 }
 
 void AFWCharacter::FWGroundCheck()
