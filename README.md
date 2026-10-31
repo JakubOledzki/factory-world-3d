@@ -117,6 +117,21 @@ Bez niego kreator działa, tylko podgląd jest pusty.
 
 Fryzury, zarost i ubrania to prawdziwe modele 3D (`Tools/blender/make_character_gear.py`): po jednym na każdy styl, który podaje serwer (5 fryzur, 3 rodzaje zarostu, t-shirt, bezrękawnik, bluza z kapturem, spodnie, buty). Każdy jest wycięty z ciała manekina, odsunięty od skóry i pogrubiony, więc ma te same wagi kości co ciało i porusza się razem z nim. Kucyk i kaptur to dodatkowe kształty. Włosy i zarost to warstwy pasków („hair cards”) z pasmami wyciętymi przezroczystością, anizotropowym połyskiem i jaśniejszymi końcówkami, na ciemnej warstwie spodniej. Kolory wybrane w kreatorze nakładają materiały `M_FWHairCard` i `M_FWHair` i `M_FWCloth` (tkaniny CC0 z Poly Haven: dzianina, polar, dżins, skóra). Modele tworzy `Tools/setup_assets.ps1` (eksport manekina z edytora, Blender, import), gdy manekin jest już skopiowany. Bez nich podgląd pokazuje malowanego manekina.
 
+## Ręce i cień gracza
+
+W widoku z pierwszej osoby widać ręce postaci w jej ubraniu (rękawy koszulki, bluzy albo gołe ramiona przy bezrękawniku) i w jej kolorze skóry. Ręce trzyma przed kamerą dwukośćowe IK na manekinie, bez gotowych animacji:
+
+- lekko oddychają,
+- kołyszą się w rytm kroków,
+- przy obrocie głowy chwilę zostają w tyle,
+- w trybie budowania są wyżej.
+
+Ruchy: postawienie (pchnięcie obiema rękami), obrót (skręt prawej dłoni), zabranie (sięgnięcie i przyciągnięcie), kopanie (zamach i uderzenie przy każdym uderzeniu kilofa). Ręce mają własne pole widzenia (70°) i są przyciągnięte do oka, więc nie wchodzą w ściany. Resztę ciała wycinają materiały `M_FWCharacterArms` i `M_FWClothArms`.
+
+Cień rzuca osobna, niewidoczna dla gracza pełna postać w tym samym wyglądzie. Stoi, chodzi, biega albo spada (animacje manekina z szablonów silnika, kopiuje je `Tools/copy_mannequins.ps1`). Wygląd przychodzi z serwera po zalogowaniu (`character.get` → `appearance` + palety z `character.options`).
+
+Do testów: `FWGesture place|rotate|pickup|swing`, `FWDress <koszulka 0–2> <kolor hex>`, `FWWalk <s>`.
+
 ## Dźwięk
 
 Wszystkie dźwięki (49) są syntezowane przez nasz skrypt `Tools/make_audio.py` (Python z numpy, uruchamiany w Blenderze), bez nagrań i bez licencji do pilnowania. Tworzy je `Tools/setup_assets.ps1` i nie ma ich w gicie.

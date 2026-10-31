@@ -1,7 +1,12 @@
 #include "Player/FWCharacter.h"
 
 #include "Camera/CameraComponent.h"
+#include "Animation/AnimSequence.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/PoseableMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "TwoBoneIK.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EnhancedInputComponent.h"
@@ -37,6 +42,12 @@ AFWCharacter::AFWCharacter()
 	Camera->SetupAttachment(GetCapsuleComponent());
 	Camera->bUsePawnControlRotation = true;
 	Camera->SetFieldOfView(90.f);
+	// The arms are drawn with their own narrower field of view and pulled towards the eye, so they keep their
+	// shape at the edges of the screen and never sink into a wall
+	Camera->bEnableFirstPersonFieldOfView = true;
+	Camera->FirstPersonFieldOfView = 70.f;
+	Camera->bEnableFirstPersonScale = true;
+	Camera->FirstPersonScale = 0.3f;
 
 	// A person, not a tile: eyes ~165 cm above the feet whatever TileSizeCm is
 	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - 92.f));
@@ -75,6 +86,191 @@ void AFWCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	GhostMaterial = Ghost->CreateDynamicMaterialInstance(0);
+	CreateBody();
+}
+
+void AFWCharacter::CreateBody()
+{
+	USkeletalMesh* Mannequin = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!Mannequin || !IsLocallyControlled())
+	{
+		return;
+	}
+	// The whole body: not seen by the player, only in its shadow (and by others, later)
+	Body = NewObject<USkeletalMeshComponent>(this);
+	Body->SetupAttachment(GetCapsuleComponent());
+	Body->SetSkeletalMesh(Mannequin);
+	Body->SetRelativeLocationAndRotation(FVector(0, 0, -GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight()), FRotator(0, -90.f, 0));
+	Body->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Body->SetOwnerNoSee(true);
+	Body->bCastHiddenShadow = true;
+	Body->RegisterComponent();
+
+	// The arms: the same mannequin drawn only for the player, in first person, its body cut away by the
+	// "...Arms" materials; it casts no shadow (the body does)
+	Arms = NewObject<UPoseableMeshComponent>(this);
+	Arms->SetupAttachment(Camera);
+	Arms->SetSkinnedAssetAndUpdate(Mannequin);
+	// The mesh faces +Y: turned to look along the camera, its eyes (~0, 8, 168 in the bind pose) on the camera
+	const FRotator Turn(0, -90.f, 0);
+	Arms->SetRelativeLocationAndRotation(-Turn.RotateVector(FVector(0.f, 8.f, 168.f)), Turn);
+	Arms->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Arms->SetOnlyOwnerSee(true);
+	Arms->SetCastShadow(false);
+	Arms->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
+	Arms->RegisterComponent();
+	// The bind pose of both arms, to solve from every frame
+	const TCHAR* Sides[2][3] = { { TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l") }, { TEXT("upperarm_r"), TEXT("lowerarm_r"), TEXT("hand_r") } };
+	for (int32 Side = 0; Side < 2; ++Side)
+	{
+		ArmRef[Side].Upper = Arms->GetBoneTransformByName(Sides[Side][0], EBoneSpaces::ComponentSpace);
+		ArmRef[Side].Lower = Arms->GetBoneTransformByName(Sides[Side][1], EBoneSpaces::ComponentSpace);
+		ArmRef[Side].Hand = Arms->GetBoneTransformByName(Sides[Side][2], EBoneSpaces::ComponentSpace);
+	}
+	bArmsReady = true;
+	SetLook(FFWLook());
+}
+
+void AFWCharacter::SetLook(const FFWLook& Look)
+{
+	FWGear::Dress(this, Body, BodyGear, Look);
+	FWGear::Dress(this, Arms, ArmsGear, Look, true);
+}
+
+void AFWCharacter::FWDress(int32 ShirtStyle, const FString& ShirtColor)
+{
+	FFWLook Look;
+	Look.Skin = FLinearColor::FromSRGBColor(FColor::FromHex(TEXT("d9a07a")));
+	Look.Shirt = FLinearColor::FromSRGBColor(FColor::FromHex(ShirtColor));
+	Look.Pants = FLinearColor::FromSRGBColor(FColor::FromHex(TEXT("34495e")));
+	Look.Shoes = FLinearColor::FromSRGBColor(FColor::FromHex(TEXT("7f5539")));
+	Look.ShirtStyle = ShirtStyle;
+	SetLook(Look);
+}
+
+void AFWCharacter::PlayGesture(EGesture InGesture)
+{
+	Gesture = InGesture;
+	GestureTime = 0.f;
+}
+
+void AFWCharacter::FWGesture(const FString& Name)
+{
+	PlayGesture(Name == TEXT("place") ? EGesture::Place : Name == TEXT("rotate") ? EGesture::Rotate
+		: Name == TEXT("pickup") ? EGesture::Pickup : Name == TEXT("swing") ? EGesture::Swing : EGesture::None);
+}
+
+void AFWCharacter::UpdateArms(float DeltaSeconds)
+{
+	if (!bArmsReady || !Arms)
+	{
+		return;
+	}
+	const float Time = GetWorld()->GetTimeSeconds();
+	const float Speed = GetCharacterMovement()->IsMovingOnGround() ? GetVelocity().Size2D() : 0.f;
+	const float Moving = FMath::Clamp(Speed / WalkSpeed, 0.f, 1.6f);
+
+	// The arms trail a turn of the head a little and catch up
+	const FRotator View = GetControlRotation();
+	const FRotator Turned = (View - LastView).GetNormalized();
+	LastView = View;
+	ViewLag = FMath::Vector2DInterpTo(ViewLag + FVector2D(Turned.Yaw, Turned.Pitch) * 0.6f, FVector2D::ZeroVector, DeltaSeconds, 8.f);
+	ViewLag = ViewLag.ClampAxes(-6.f, 6.f);
+
+	// Hands a little higher and closer in build mode, as if holding something up to set it down
+	BuildRaise = FMath::FInterpTo(BuildRaise, bBuildMode ? 1.f : 0.f, DeltaSeconds, 6.f);
+
+	// Gestures: offsets of the right (index 1) and left hand over their length
+	FVector Gest[2] = { FVector::ZeroVector, FVector::ZeroVector };
+	float Length = 0.f;
+	switch (Gesture)
+	{
+	case EGesture::Place: Length = 0.35f; break;
+	case EGesture::Rotate: Length = 0.25f; break;
+	case EGesture::Pickup: Length = 0.45f; break;
+	case EGesture::Swing: Length = 0.6f; break;
+	default: break;
+	}
+	if (Gesture != EGesture::None)
+	{
+		GestureTime += DeltaSeconds;
+		const float T = FMath::Clamp(GestureTime / Length, 0.f, 1.f);
+		const float Out = FMath::Sin(T * PI);
+		switch (Gesture)
+		{
+		case EGesture::Place:  // both hands push forward and down, and come back
+			Gest[0] = Gest[1] = FVector(0, 14.f, -8.f) * Out;
+			break;
+		case EGesture::Rotate:  // a quick turn of the right hand
+			Gest[1] = FVector(-8.f, 4.f, 3.f) * Out;
+			break;
+		case EGesture::Pickup:  // reach forward and down, pull back to the chest
+			Gest[0] = Gest[1] = FVector(0, 18.f * FMath::Sin(FMath::Min(T * 2.f, 1.f) * PI * 0.5f) - 22.f * FMath::Max(0.f, T - 0.5f), -14.f * Out);
+			break;
+		case EGesture::Swing:  // the right hand up and back, then down and forward in a strike
+		{
+			const float Raise = T < 0.45f ? FMath::SmoothStep(0.f, 1.f, T / 0.45f) : 1.f - FMath::SmoothStep(0.f, 1.f, (T - 0.45f) / 0.25f);
+			const float Strike = T < 0.45f ? 0.f : FMath::Sin(FMath::Clamp((T - 0.45f) / 0.55f, 0.f, 1.f) * PI);
+			Gest[1] = FVector(-4.f, -10.f, 30.f) * Raise + FVector(2.f, 22.f, -24.f) * Strike;
+			Gest[0] = FVector(0, -4.f, -6.f) * Strike;
+			break;
+		}
+		default:
+			break;
+		}
+		if (T >= 1.f)
+		{
+			Gesture = EGesture::None;
+		}
+	}
+
+	// Where the hands rest in the mesh's space (+Y forward, +X the character's left, Z up from the feet)
+	const float Breath = FMath::Sin(Time * 1.6f) * 0.6f;
+	const float StepBob = FMath::Abs(FMath::Sin(BobPhase)) * 1.8f * Moving;
+	const float StepSway = FMath::Cos(BobPhase) * 1.4f * Moving;
+	const TCHAR* Sides[2][3] = { { TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l") }, { TEXT("upperarm_r"), TEXT("lowerarm_r"), TEXT("hand_r") } };
+	for (int32 Side = 0; Side < 2; ++Side)
+	{
+		const float Sign = Side == 0 ? 1.f : -1.f;
+		FVector Hand(Sign * (21.f - 4.f * BuildRaise), 48.f + 4.f * BuildRaise, 146.f + 6.f * BuildRaise);
+		Hand += FVector(StepSway * Sign * 0.3f + ViewLag.X * -0.8f, 0.f, Breath - StepBob - ViewLag.Y * 0.8f);
+		Hand += Gest[Side];
+		// Elbows out and down
+		const FVector Elbow(Sign * 45.f, 18.f, 112.f);
+		FTransform Upper = ArmRef[Side].Upper;
+		FTransform Lower = ArmRef[Side].Lower;
+		FTransform End = ArmRef[Side].Hand;
+		const FQuat LowerRef = Lower.GetRotation();
+		AnimationCore::SolveTwoBoneIK(Upper, Lower, End, Elbow, Hand, false, 1.0, 1.0);
+		// The hand turns with the forearm, then twists about it, palms turned in towards each other
+		const FQuat Delta = Lower.GetRotation() * LowerRef.Inverse();
+		const FVector Forearm = (End.GetLocation() - Lower.GetLocation()).GetSafeNormal();
+		End.SetRotation(FQuat(Forearm, FMath::DegreesToRadians(Sign * 40.f)) * Delta * ArmRef[Side].Hand.GetRotation());
+		Arms->SetBoneTransformByName(Sides[Side][0], Upper, EBoneSpaces::ComponentSpace);
+		Arms->SetBoneTransformByName(Sides[Side][1], Lower, EBoneSpaces::ComponentSpace);
+		Arms->SetBoneTransformByName(Sides[Side][2], End, EBoneSpaces::ComponentSpace);
+	}
+}
+
+void AFWCharacter::UpdateBodyAnimation()
+{
+	if (!Body)
+	{
+		return;
+	}
+	const UCharacterMovementComponent* Movement = GetCharacterMovement();
+	const float Speed = GetVelocity().Size2D();
+	const FString Wanted = Movement->IsFalling() ? TEXT("Jump/MM_Fall_Loop") : Speed > 500.f ? TEXT("Jog/MF_Unarmed_Jog_Fwd")
+		: Speed > 40.f ? TEXT("Walk/MF_Unarmed_Walk_Fwd") : TEXT("MM_Idle");
+	if (Wanted != BodyAnimation)
+	{
+		BodyAnimation = Wanted;
+		const FString Name = FPaths::GetBaseFilename(Wanted);
+		if (UAnimSequence* Animation = LoadObject<UAnimSequence>(nullptr, *FString::Printf(TEXT("/Game/Characters/Mannequins/Anims/Unarmed/%s.%s"), *Wanted, *Name), nullptr, LOAD_NoWarn | LOAD_Quiet))
+		{
+			Body->PlayAnimation(Animation, true);
+		}
+	}
 }
 
 AFWPlayerController* AFWCharacter::GetFWController() const
@@ -269,6 +465,7 @@ void AFWCharacter::Primary()
 		PC->Toast(LOCTEXT("CantPlace", "Tu nie można tego postawić."), true);
 		return;
 	}
+	PlayGesture(EGesture::Place);
 	PC->Place(Kind, TargetTile, BuildRotation);
 }
 
@@ -297,6 +494,7 @@ void AFWCharacter::Rotate()
 	if (bBuildMode)
 	{
 		FWAudio::Play2D(this, TEXT("build_rotate"), 0.5f);
+		PlayGesture(EGesture::Rotate);
 	}
 }
 
@@ -318,6 +516,8 @@ void AFWCharacter::Tick(float DeltaSeconds)
 	UpdateHold(DeltaSeconds);
 	UpdateHeadBob(DeltaSeconds);
 	UpdateFootsteps(DeltaSeconds);
+	UpdateArms(DeltaSeconds);
+	UpdateBodyAnimation();
 }
 
 FString AFWCharacter::SurfaceUnder(const FHitResult* Hit) const
@@ -465,6 +665,7 @@ void AFWCharacter::UpdateHold(float DeltaSeconds)
 		{
 			MineSoundIn = FMath::FRandRange(0.55f, 0.75f);
 			FWAudio::Play2D(this, TEXT("mine_hit"), 0.55f, 3);
+			PlayGesture(EGesture::Swing);
 		}
 	}
 	if (HoldTime < HoldNeeded)
@@ -474,6 +675,7 @@ void AFWCharacter::UpdateHold(float DeltaSeconds)
 	if (Hold == EHold::Pickup)
 	{
 		Hold = EHold::None;
+		PlayGesture(EGesture::Pickup);
 		PC->Pickup(HoldObject);
 		return;
 	}

@@ -22,6 +22,7 @@
 #include "UI/SFWCharacterCreator.h"
 #include "UI/SFWLoginWidget.h"
 #include "World/FWCharacterStudio.h"
+#include "Player/FWCharacter.h"
 #include "UI/SFWPromptWidget.h"
 #include "World/FWEnvironment.h"
 #include "World/FWPlot.h"
@@ -212,6 +213,7 @@ void AFWPlayerController::OnLoggedIn()
 			}
 			else if (Reply.Type == TEXT("character"))
 			{
+				This->ApplyLook(Reply.Payload);
 				This->ChoosePlot();
 			}
 			else
@@ -237,6 +239,29 @@ void AFWPlayerController::AskForCharacter()
 			else
 			{
 				This->ToastError(Reply);
+			}
+		}
+	});
+}
+
+void AFWPlayerController::ApplyLook(const TSharedPtr<FJsonObject>& Described)
+{
+	const TSharedPtr<FJsonObject>* Appearance = nullptr;
+	if (!Described.IsValid() || !Described->TryGetObjectField(TEXT("appearance"), Appearance))
+	{
+		return;
+	}
+	// The palettes the indices point into
+	const TSharedPtr<FJsonObject> Look = *Appearance;
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Net()->Request(TEXT("character.options"), nullptr, [WeakThis, Look](const FFWNetReply& Reply)
+	{
+		AFWPlayerController* This = WeakThis.Get();
+		if (This && Reply.Type == TEXT("character.options"))
+		{
+			if (AFWCharacter* Player = Cast<AFWCharacter>(This->GetPawn()))
+			{
+				Player->SetLook(FWGear::MakeLook(Look, Reply.Payload));
 			}
 		}
 	});
@@ -284,6 +309,7 @@ void AFWPlayerController::OpenCreator(const TSharedPtr<FJsonObject>& Options)
 					UE_LOG(LogFWGame, Log, TEXT("Character created"));
 					FWAudio::Play2D(Inner, TEXT("ui_confirm"), 0.7f);
 					Inner->CloseCreator();
+					Inner->ApplyLook(Reply.Payload);
 					Inner->ChoosePlot();
 				}
 				else

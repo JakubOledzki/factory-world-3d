@@ -338,70 +338,6 @@ unreal.log("FW decal material saved")
 
 # The character creator's preview: the UE5 mannequin painted as the picked character (skin, hair, eyes, face,
 # facial hair, shirt, trousers, shoes) by body region in the bind pose (Tools/character_material.hlsl)
-m = fresh("M_FWCharacter")
-m.set_editor_property("used_with_skeletal_mesh", True)
-hlsl = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "character_material.hlsl"), encoding="utf-8").read()
-custom = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 0)
-custom.set_editor_property("code", "\n".join(line for line in hlsl.splitlines() if not line.startswith("//")))
-custom.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
-colors = (("Skin", (0.87, 0.65, 0.53)), ("Hair", (0.1, 0.07, 0.05)), ("Eyes", (0.2, 0.12, 0.06)),
-          ("Shirt", (0.8, 0.78, 0.72)), ("Pants", (0.15, 0.15, 0.17)), ("Shoes", (0.3, 0.2, 0.12)))
-styles = ("HairStyle", "ShirtStyle", "FacialHair", "FaceStyle")
-inputs = []
-for name in ["P"] + [c[0] for c in colors] + list(styles):
-    item = unreal.CustomInput()
-    item.set_editor_property("input_name", name)
-    inputs.append(item)
-custom.set_editor_property("inputs", inputs)
-rough_out = unreal.CustomOutput()
-rough_out.set_editor_property("output_name", "RoughOut")
-rough_out.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
-custom.set_editor_property("additional_outputs", [rough_out])
-# The bind-pose position exists only per vertex: carried to the pixels by an interpolator
-pre_skinned = lib.create_material_expression(m, unreal.MaterialExpressionPreSkinnedPosition, -1100, -600)
-interpolator = lib.create_material_expression(m, unreal.MaterialExpressionVertexInterpolator, -900, -600)
-lib.connect_material_expressions(pre_skinned, "", interpolator, "")
-lib.connect_material_expressions(interpolator, "", custom, "P")
-for i, (name, default) in enumerate(colors):
-    lib.connect_material_expressions(vector_param(m, name, (*default, 1.0), -900, -500 + i * 90), "", custom, name)
-for i, name in enumerate(styles):
-    lib.connect_material_expressions(scalar_param(m, name, 1.0, -900, 100 + i * 80), "", custom, name)
-lib.connect_material_property(custom, "", unreal.MaterialProperty.MP_BASE_COLOR)
-lib.connect_material_property(custom, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
-lib.recompile_material(m)
-unreal.EditorAssetLibrary.save_asset(m.get_path_name())
-unreal.log("FW character material saved")
-
-
-# Clothes made in Blender (Tools/blender/make_character_gear.py): a CC0 fabric (Diffuse, Normal, ARM) seen
-# from three sides in the bind pose (no seams from the mannequin's UVs), its own colour taken out and the
-# server's colour put in (Color); Scale = cm per texture repeat
-m = fresh("M_FWCloth")
-m.set_editor_property("used_with_skeletal_mesh", True)
-cloth = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 0)
-cloth.set_editor_property("code", "float3 n = abs(normalize(N)); n = pow(n, 4.0); n /= (n.x + n.y + n.z); "
-                                 "float2 ux = P.yz / Scale, uy = P.xz / Scale, uz = P.xy / Scale; "
-                                 "float3 d = Texture2DSample(D, DSampler, ux).rgb * n.x + Texture2DSample(D, DSampler, uy).rgb * n.y + Texture2DSample(D, DSampler, uz).rgb * n.z; "
-                                 "float3 a = Texture2DSample(A, ASampler, ux).rgb * n.x + Texture2DSample(A, ASampler, uy).rgb * n.y + Texture2DSample(A, ASampler, uz).rgb * n.z; "
-                                 "float3 t = Texture2DSample(T, TSampler, ux).rgb * n.x + Texture2DSample(T, TSampler, uy).rgb * n.y + Texture2DSample(T, TSampler, uz).rgb * n.z; "
-                                 "NormalOut = float3((t.xy * 2 - 1) * Bump, 1); RoughOut = a.g; "
-                                 "float l = dot(d, float3(0.3, 0.59, 0.11)); return Color * lerp(0.55, 1.25, saturate(l * 2.2)) * a.r;")
-cloth.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
-inputs = []
-for name in ("P", "N", "Color", "Scale", "Bump", "D", "A", "T"):
-    item = unreal.CustomInput()
-    item.set_editor_property("input_name", name)
-    inputs.append(item)
-cloth.set_editor_property("inputs", inputs)
-outs = []
-for name, kind in (("NormalOut", unreal.CustomMaterialOutputType.CMOT_FLOAT3), ("RoughOut", unreal.CustomMaterialOutputType.CMOT_FLOAT1)):
-    item = unreal.CustomOutput()
-    item.set_editor_property("output_name", name)
-    item.set_editor_property("output_type", kind)
-    outs.append(item)
-cloth.set_editor_property("additional_outputs", outs)
-
-
 def bind_pose_position(material, x, y):
     """The bind-pose position (cm), carried from the vertices to the pixels."""
     pre = lib.create_material_expression(material, unreal.MaterialExpressionPreSkinnedPosition, x - 200, y)
@@ -410,28 +346,116 @@ def bind_pose_position(material, x, y):
     return carry
 
 
-lib.connect_material_expressions(bind_pose_position(m, -900, -700), "", cloth, "P")
-pre_normal = lib.create_material_expression(m, unreal.MaterialExpressionPreSkinnedNormal, -1100, -620)
-carry_normal = lib.create_material_expression(m, unreal.MaterialExpressionVertexInterpolator, -900, -620)
-lib.connect_material_expressions(pre_normal, "", carry_normal, "")
-lib.connect_material_expressions(carry_normal, "", cloth, "N")
-lib.connect_material_expressions(vector_param(m, "Color", (0.5, 0.5, 0.5, 1), -900, -540), "", cloth, "Color")
-lib.connect_material_expressions(scalar_param(m, "Scale", 18.0, -900, -460), "", cloth, "Scale")
-lib.connect_material_expressions(scalar_param(m, "Bump", 1.0, -900, -380), "", cloth, "Bump")
-for i, (name, default, sampler) in enumerate((
-        ("D", "/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture", unreal.MaterialSamplerType.SAMPLERTYPE_COLOR),
-        ("A", "/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS),
-        ("T", "/Engine/EngineMaterials/DefaultNormal.DefaultNormal", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL))):
-    node = lib.create_material_expression(m, unreal.MaterialExpressionTextureObjectParameter, -900, -280 + i * 100)
-    node.set_editor_property("parameter_name", {"D": "Diffuse", "A": "ARM", "T": "NormalMap"}[name])
-    node.set_editor_property("texture", unreal.load_asset(default))
-    node.set_editor_property("sampler_type", sampler)
-    lib.connect_material_expressions(node, "", cloth, name)
-lib.connect_material_property(cloth, "", unreal.MaterialProperty.MP_BASE_COLOR)
-lib.connect_material_property(cloth, "NormalOut", unreal.MaterialProperty.MP_NORMAL)
-lib.connect_material_property(cloth, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
-lib.recompile_material(m)
-unreal.EditorAssetLibrary.save_asset(m.get_path_name())
+def arm_mask(material, position):
+    """1 on the arms (the mannequin's bind pose, as in character_material.hlsl), 0 elsewhere: the first-person
+    arms (\"...Arms\" materials) cut everything else away, so looking down shows no chest."""
+    mask = lib.create_material_expression(material, unreal.MaterialExpressionCustom, -400, 400)
+    mask.set_editor_property("code", "float ax = abs(P.x); return (P.z > 80.0 && ax >= 18.0 + max(0.0, 140.0 - P.z) * 0.12) ? 1.0 : 0.0;")
+    mask.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
+    item = unreal.CustomInput()
+    item.set_editor_property("input_name", "P")
+    mask.set_editor_property("inputs", [item])
+    lib.connect_material_expressions(position, "", mask, "P")
+    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+    lib.connect_material_property(mask, "", unreal.MaterialProperty.MP_OPACITY_MASK)
+
+
+for character_name, arms_only in (("M_FWCharacter", False), ("M_FWCharacterArms", True)):
+    m = fresh(character_name)
+    m.set_editor_property("used_with_skeletal_mesh", True)
+    hlsl = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "character_material.hlsl"), encoding="utf-8").read()
+    custom = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 0)
+    custom.set_editor_property("code", "\n".join(line for line in hlsl.splitlines() if not line.startswith("//")))
+    custom.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    colors = (("Skin", (0.87, 0.65, 0.53)), ("Hair", (0.1, 0.07, 0.05)), ("Eyes", (0.2, 0.12, 0.06)),
+              ("Shirt", (0.8, 0.78, 0.72)), ("Pants", (0.15, 0.15, 0.17)), ("Shoes", (0.3, 0.2, 0.12)))
+    styles = ("HairStyle", "ShirtStyle", "FacialHair", "FaceStyle")
+    inputs = []
+    for name in ["P"] + [c[0] for c in colors] + list(styles):
+        item = unreal.CustomInput()
+        item.set_editor_property("input_name", name)
+        inputs.append(item)
+    custom.set_editor_property("inputs", inputs)
+    rough_out = unreal.CustomOutput()
+    rough_out.set_editor_property("output_name", "RoughOut")
+    rough_out.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
+    custom.set_editor_property("additional_outputs", [rough_out])
+    # The bind-pose position exists only per vertex: carried to the pixels by an interpolator
+    pre_skinned = lib.create_material_expression(m, unreal.MaterialExpressionPreSkinnedPosition, -1100, -600)
+    interpolator = lib.create_material_expression(m, unreal.MaterialExpressionVertexInterpolator, -900, -600)
+    lib.connect_material_expressions(pre_skinned, "", interpolator, "")
+    lib.connect_material_expressions(interpolator, "", custom, "P")
+    for i, (name, default) in enumerate(colors):
+        lib.connect_material_expressions(vector_param(m, name, (*default, 1.0), -900, -500 + i * 90), "", custom, name)
+    for i, name in enumerate(styles):
+        lib.connect_material_expressions(scalar_param(m, name, 1.0, -900, 100 + i * 80), "", custom, name)
+    lib.connect_material_property(custom, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    lib.connect_material_property(custom, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
+    if arms_only:
+        arm_mask(m, interpolator)
+    lib.recompile_material(m)
+    unreal.EditorAssetLibrary.save_asset(m.get_path_name())
+unreal.log("FW character material saved")
+
+
+# Clothes made in Blender (Tools/blender/make_character_gear.py): a CC0 fabric (Diffuse, Normal, ARM) seen
+# from three sides in the bind pose (no seams from the mannequin's UVs), its own colour taken out and the
+# server's colour put in (Color); Scale = cm per texture repeat
+
+for cloth_name, arms_only in (("M_FWCloth", False), ("M_FWClothArms", True)):
+    m = fresh(cloth_name)
+    m.set_editor_property("used_with_skeletal_mesh", True)
+    cloth = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 0)
+    cloth.set_editor_property("code", "float3 n = abs(normalize(N)); n = pow(n, 4.0); n /= (n.x + n.y + n.z); "
+                                     "float2 ux = P.yz / Scale, uy = P.xz / Scale, uz = P.xy / Scale; "
+                                     "float3 d = Texture2DSample(D, DSampler, ux).rgb * n.x + Texture2DSample(D, DSampler, uy).rgb * n.y + Texture2DSample(D, DSampler, uz).rgb * n.z; "
+                                     "float3 a = Texture2DSample(A, ASampler, ux).rgb * n.x + Texture2DSample(A, ASampler, uy).rgb * n.y + Texture2DSample(A, ASampler, uz).rgb * n.z; "
+                                     "float3 t = Texture2DSample(T, TSampler, ux).rgb * n.x + Texture2DSample(T, TSampler, uy).rgb * n.y + Texture2DSample(T, TSampler, uz).rgb * n.z; "
+                                     "NormalOut = float3((t.xy * 2 - 1) * Bump, 1); RoughOut = a.g; "
+                                     "float l = dot(d, float3(0.3, 0.59, 0.11)); return Color * lerp(0.55, 1.25, saturate(l * 2.2)) * a.r;")
+    cloth.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    inputs = []
+    for name in ("P", "N", "Color", "Scale", "Bump", "D", "A", "T"):
+        item = unreal.CustomInput()
+        item.set_editor_property("input_name", name)
+        inputs.append(item)
+    cloth.set_editor_property("inputs", inputs)
+    outs = []
+    for name, kind in (("NormalOut", unreal.CustomMaterialOutputType.CMOT_FLOAT3), ("RoughOut", unreal.CustomMaterialOutputType.CMOT_FLOAT1)):
+        item = unreal.CustomOutput()
+        item.set_editor_property("output_name", name)
+        item.set_editor_property("output_type", kind)
+        outs.append(item)
+    cloth.set_editor_property("additional_outputs", outs)
+
+
+
+
+    cloth_position = bind_pose_position(m, -900, -700)
+    lib.connect_material_expressions(cloth_position, "", cloth, "P")
+    pre_normal = lib.create_material_expression(m, unreal.MaterialExpressionPreSkinnedNormal, -1100, -620)
+    carry_normal = lib.create_material_expression(m, unreal.MaterialExpressionVertexInterpolator, -900, -620)
+    lib.connect_material_expressions(pre_normal, "", carry_normal, "")
+    lib.connect_material_expressions(carry_normal, "", cloth, "N")
+    lib.connect_material_expressions(vector_param(m, "Color", (0.5, 0.5, 0.5, 1), -900, -540), "", cloth, "Color")
+    lib.connect_material_expressions(scalar_param(m, "Scale", 18.0, -900, -460), "", cloth, "Scale")
+    lib.connect_material_expressions(scalar_param(m, "Bump", 1.0, -900, -380), "", cloth, "Bump")
+    for i, (name, default, sampler) in enumerate((
+            ("D", "/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture", unreal.MaterialSamplerType.SAMPLERTYPE_COLOR),
+            ("A", "/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS),
+            ("T", "/Engine/EngineMaterials/DefaultNormal.DefaultNormal", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL))):
+        node = lib.create_material_expression(m, unreal.MaterialExpressionTextureObjectParameter, -900, -280 + i * 100)
+        node.set_editor_property("parameter_name", {"D": "Diffuse", "A": "ARM", "T": "NormalMap"}[name])
+        node.set_editor_property("texture", unreal.load_asset(default))
+        node.set_editor_property("sampler_type", sampler)
+        lib.connect_material_expressions(node, "", cloth, name)
+    lib.connect_material_property(cloth, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    lib.connect_material_property(cloth, "NormalOut", unreal.MaterialProperty.MP_NORMAL)
+    lib.connect_material_property(cloth, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
+    if arms_only:
+        arm_mask(m, cloth_position)
+    lib.recompile_material(m)
+    unreal.EditorAssetLibrary.save_asset(m.get_path_name())
 
 # Hair and facial hair: the server's colour broken into fine strands that run down from the crown (around the
 # head and along its height), with a darker root and a moving sheen; strand normals tilt across the strands

@@ -128,6 +128,8 @@ private:
 	void HideWidget();
 	void OnLoggedIn();
 	void AskForCharacter();
+	// Dresses the player's arms and body as the character the server describes (its "appearance")
+	void ApplyLook(const TSharedPtr<FJsonObject>& Described);
 	void OpenCreator(const TSharedPtr<FJsonObject>& Options);
 	void CloseCreator();
 	void ChoosePlot();

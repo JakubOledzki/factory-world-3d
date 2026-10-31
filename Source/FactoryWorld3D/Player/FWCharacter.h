@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Game/FWGear.h"
 #include "GameFramework/Character.h"
 #include "FWCharacter.generated.h"
 
@@ -10,6 +11,8 @@ class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
 class UMaterialInstanceDynamic;
+class UPoseableMeshComponent;
+class USkeletalMeshComponent;
 class UStaticMeshComponent;
 struct FInputActionValue;
 
@@ -44,6 +47,20 @@ public:
 	UFUNCTION(Exec)
 	void FWJump() { Jump(); }
 
+	// The character's look (from the server): the first-person arms wear its sleeves and skin, and the body that
+	// casts the player's shadow all of it
+	void SetLook(const FFWLook& Look);
+
+	// One-off movements of the first-person arms
+	enum class EGesture : uint8 { None, Place, Rotate, Pickup, Swing };
+	void PlayGesture(EGesture Gesture);
+	// Console: plays a gesture (place, rotate, pickup, swing)
+	UFUNCTION(Exec)
+	void FWGesture(const FString& Name);
+	// Console: tries a shirt (0 t-shirt, 1 tank top, 2 hoodie) in a colour (hex), for screenshots
+	UFUNCTION(Exec)
+	void FWDress(int32 ShirtStyle, const FString& ShirtColor = TEXT("e67e22"));
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void PawnClientRestart() override;
@@ -69,10 +86,35 @@ private:
 	void UpdateGhost();
 	void UpdateHold(float DeltaSeconds);
 	void UpdateHeadBob(float DeltaSeconds);
+	// First-person arms: hands held in front by two-bone IK, swaying with breath, steps and turning, plus gestures
+	void CreateBody();
+	void UpdateArms(float DeltaSeconds);
+	void UpdateBodyAnimation();
 	// Footsteps by the surface underfoot: "grass", "rock" or "metal" (anything built)
 	void UpdateFootsteps(float DeltaSeconds);
 	FString SurfaceUnder(const FHitResult* Hit = nullptr) const;
 	float StepDistance = 0.f;
+
+	UPROPERTY()
+	TObjectPtr<UPoseableMeshComponent> Arms;
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent> Body;
+	UPROPERTY()
+	TMap<FString, TObjectPtr<USkeletalMeshComponent>> ArmsGear;
+	UPROPERTY()
+	TMap<FString, TObjectPtr<USkeletalMeshComponent>> BodyGear;
+	struct FArmRef
+	{
+		FTransform Upper, Lower, Hand;
+	};
+	FArmRef ArmRef[2];
+	bool bArmsReady = false;
+	FRotator LastView = FRotator::ZeroRotator;
+	FVector2D ViewLag = FVector2D::ZeroVector;
+	EGesture Gesture = EGesture::None;
+	float GestureTime = 0.f;
+	float BuildRaise = 0.f;
+	FString BodyAnimation;
 	float MineSoundIn = 0.f;
 
 	AFWPlayerController* GetFWController() const;

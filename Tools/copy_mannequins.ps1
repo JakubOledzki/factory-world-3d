@@ -19,4 +19,10 @@ foreach ($Folder in @("Meshes", "Materials", "Textures")) {
 New-Item -ItemType Directory -Force (Join-Path $Target "Rigs"), (Join-Path $Target "Anims\Unarmed") | Out-Null
 Copy-Item (Join-Path $Source "Rigs\*") (Join-Path $Target "Rigs") -Force
 Copy-Item (Join-Path $Source "Anims\Unarmed\MM_Idle.uasset") (Join-Path $Target "Anims\Unarmed") -Force
+# The full body that casts the player's shadow walks, runs and falls
+foreach ($Anim in @("Walk\MF_Unarmed_Walk_Fwd", "Jog\MF_Unarmed_Jog_Fwd", "Jump\MM_Fall_Loop")) {
+    $To = Join-Path $Target "Anims\Unarmed\$Anim.uasset"
+    New-Item -ItemType Directory -Force (Split-Path $To) | Out-Null
+    Copy-Item (Join-Path $Source "Anims\Unarmed\$Anim.uasset") $To -Force
+}
 Write-Host "Copied the mannequin into $Target"
