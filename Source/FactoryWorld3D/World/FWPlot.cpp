@@ -28,6 +28,14 @@ namespace
 	constexpr float LaneOffset = 0.08f;
 	constexpr float BandHeight = 0.11f;
 
+	// Where the woods stand (0..1, stands above ~0.44): the same pattern as "stands" in
+	// Tools/terrain_material.hlsl, so the forest floor in the ground lies under the trees
+	float ForestStand(const FVector& World)
+	{
+		return FMath::Clamp(0.5f + 0.5f * FMath::Sin(World.X * 0.00011f + FMath::Sin(World.Y * 0.00009f) * 2.3f)
+			* FMath::Cos(World.Y * 0.00013f - World.X * 0.00004f), 0.f, 1.f);
+	}
+
 	TArray<uint8> Gunzip(const FString& Base64)
 	{
 		TArray<uint8> Compressed;
@@ -444,8 +452,7 @@ void AFWPlot::PlantForest(int32 Biome)
 		// Woods grow in closed stands with clearings between them. The pattern is the "stands" one in
 		// Tools/terrain_material.hlsl, so the ground under a stand is forest floor and far stands read as canopy
 		const FVector World = GetActorTransform().TransformPosition(At);
-		const float Stand = FMath::Clamp(0.5f + 0.5f * FMath::Sin(World.X * 0.00011f + FMath::Sin(World.Y * 0.00009f) * 2.3f)
-			* FMath::Cos(World.Y * 0.00013f - World.X * 0.00004f), 0.f, 1.f);
+		const float Stand = ForestStand(World);
 		if (Random.FRand() > FMath::SmoothStep(0.4f, 0.48f, Stand))
 		{
 			continue;
@@ -511,6 +518,116 @@ void AFWPlot::PlantForest(int32 Biome)
 	}
 	UE_LOG(LogFWPlot, Log, TEXT("Planted %d trees around the plot (%d with trunk collision), forest to %.0f m and tree line %.0f m above the plot"),
 		Count, Trunks.Num(), ForestTop / 100.f, TreeLineTop / 100.f);
+}
+
+void AFWPlot::PlantDwarfPine(int32 Biome)
+{
+	const TArray<UStaticMesh*> Shrubs = FWArt::DwarfPines();
+	if (!TerrainMesh || Shrubs.IsEmpty() || Biome == 5 || Biome == 8 || Biome == 12)
+	{
+		return;
+	}
+	// Dwarf mountain pine (kosodrzewina) grows in a belt right above the spruce: from the forest top up to
+	// DwarfPineBandMeters higher, in thickets with gaps. Lower down it only takes clearings in the forest,
+	// in clumps, some of them right beside the plot
+	const UFWGameSettings& Settings = UFWGameSettings::Get();
+	const float ForestTop = Settings.ForestBandsAbovePlot(PlotElevationMeters).X * 100.f;
+	const float BeltTop = ForestTop + Settings.DwarfPineBandMeters * 100.f;
+	constexpr int32 Budget = 24000;
+	// Shrubs a metre or two high vanish into the slope past a kilometre or two
+	constexpr float Reach = 150000.f;
+	const float Extent = Size * TileSize;
+	const FVector Middle(Extent / 2, Extent / 2, 0.f);
+	FRandomStream Random(PlotX * 7919 + PlotY * 104729);
+	TMap<UStaticMesh*, TArray<FTransform>> Placed;
+	TArray<FTransform> Thickets;
+	int32 Count = 0;
+	// Where the nearest thicket is (metres east and south of the plot centre), for screenshots
+	FVector Nearest = FVector::ZeroVector;
+	float NearestDistance = TNumericLimits<float>::Max();
+	for (int32 i = 0; i < 400000 && Count < Budget; ++i)
+	{
+		const float Angle = Random.FRandRange(0.f, 2 * PI);
+		const float Distance = Extent * 0.5f + ForestMargin + FMath::Pow(Random.FRand(), 1.6f) * Reach;
+		const FVector At = Middle + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * Distance;
+		if (FMath::Abs(At.X - Middle.X) < Extent * 0.5f + ForestMargin && FMath::Abs(At.Y - Middle.Y) < Extent * 0.5f + ForestMargin)
+		{
+			continue;
+		}
+		// Thickets: patches tens of metres across, with gaps between them
+		const float Clump = FMath::PerlinNoise2D(FVector2D(At.X, At.Y) / 9000.f) + 0.5f * FMath::PerlinNoise2D(FVector2D(At.X, At.Y) / 2500.f);
+		if (Random.FRand() > FMath::SmoothStep(0.0f, 0.12f, Clump))
+		{
+			continue;
+		}
+		FHitResult Hit;
+		const FVector World = GetActorTransform().TransformPosition(At);
+		if (!TerrainMesh->LineTraceComponent(Hit, World + FVector(0, 0, 400000.f), World - FVector(0, 0, 100000.f), FCollisionQueryParams(TEXT("FWDwarfPine"), true)))
+		{
+			continue;
+		}
+		// Not on rock faces or steep scree
+		if (Hit.ImpactNormal.Z < 0.8f)
+		{
+			continue;
+		}
+		const FVector Ground = GetActorTransform().InverseTransformPosition(Hit.ImpactPoint);
+		const float Edge = FMath::PerlinNoise2D(FVector2D(At.X, At.Y) / 20000.f) * 5000.f;
+		if (Ground.Z > BeltTop + Edge)
+		{
+			continue;
+		}
+		if (Ground.Z < ForestTop + Edge)
+		{
+			// Below the belt: only in clearings, and sparser
+			if (ForestStand(World) > 0.38f || Random.FRand() > 0.5f)
+			{
+				continue;
+			}
+		}
+		else if (Random.FRand() < FMath::Clamp((Ground.Z - BeltTop + 6000.f) / 6000.f, 0.f, 1.f) * 0.8f)
+		{
+			// Thinning out towards the top of the belt
+			continue;
+		}
+		UStaticMesh* Mesh = Shrubs[Random.RandHelper(Shrubs.Num())];
+		const float Scale = Random.FRandRange(0.7f, 1.3f);
+		// Leaning with the slope a little, the base sunk into the ground
+		const FVector Up = FMath::Lerp(FVector::UpVector, Hit.ImpactNormal, 0.5f).GetSafeNormal();
+		const FQuat Lean = FQuat::FindBetweenNormals(FVector::UpVector, Up) * FQuat(FVector::UpVector, Random.FRandRange(0.f, 2 * PI));
+		Placed.FindOrAdd(Mesh).Add(FTransform(Lean, Ground - FVector(0, 0, 15.f), FVector(Scale)));
+		if (Distance < NearestDistance)
+		{
+			NearestDistance = Distance;
+			Nearest = (Ground - Middle) / 100.f;
+		}
+		// Thickets near the plot cannot be walked through: an invisible drum over most of the shrub
+		if (Distance < Extent * 0.5f + 40000.f)
+		{
+			const float Radius = FMath::Min(Mesh->GetBounds().BoxExtent.X, Mesh->GetBounds().BoxExtent.Y) * 0.6f * Scale;
+			Thickets.Add(FTransform(FRotator::ZeroRotator, Ground + FVector(0, 0, 60.f), FVector(Radius / 50.f, Radius / 50.f, 1.2f)));
+		}
+		++Count;
+	}
+	for (TPair<UStaticMesh*, TArray<FTransform>>& Pair : Placed)
+	{
+		UHierarchicalInstancedStaticMeshComponent* Belt = MakeArtInstances(Pair.Key, false);
+		// Wind only within 15 m (swaying needles redraw their shadows); no ray tracing for thousands of shrubs
+		Belt->SetWorldPositionOffsetDisableDistance(1500);
+		Belt->SetVisibleInRayTracing(false);
+		Belt->AddInstances(Pair.Value, false);
+	}
+	UStaticMesh* Cylinder = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	if (Cylinder && Thickets.Num() > 0)
+	{
+		UHierarchicalInstancedStaticMeshComponent* Collision = MakeArtInstances(Cylinder, true);
+		Collision->SetVisibility(false);
+		Collision->SetHiddenInGame(true);
+		Collision->SetCastShadow(false);
+		Collision->AddInstances(Thickets, false);
+	}
+	UE_LOG(LogFWPlot, Log, TEXT("Planted %d dwarf pines (%d with collision), belt %.0f-%.0f m above the plot, nearest at %.0f m E %.0f m S"),
+		Count, Thickets.Num(), ForestTop / 100.f, BeltTop / 100.f, Nearest.X, Nearest.Y);
 }
 
 void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCodes)
@@ -1492,6 +1609,7 @@ void AFWPlot::Tick(float DeltaSeconds)
 			PendingScatterBiome = -1;
 			ScatterSurroundings(Biome);
 			PlantForest(Biome);
+			PlantDwarfPine(Biome);
 		}
 	}
 	if (SimTime <= 0.0 || !HasLogistics())

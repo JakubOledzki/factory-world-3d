@@ -279,6 +279,51 @@ if os.path.isdir(FACTORY):
                 library.save_loaded_asset(asset)
         unreal.log(f"FWIMPORT factory {name}")
 
+# Dwarf pine from Tools/blender/make_mugo_pine.py: bark from Poly Haven's pine_tree_01 (CC0, imported above),
+# needles a plain colour shaded by the vertex colour; both sway in the wind (M_FWFoliage)
+MUGO = os.path.join(MODELS, "mugo")
+foliage = unreal.load_asset("/Game/Materials/M_FWFoliage.M_FWFoliage")
+PINE_TEXTURES = "/Game/External/Models/pine_tree_01/pine_tree_01/Textures/pine_tree_01_bark"
+if os.path.isdir(MUGO) and foliage:
+    for file in sorted(os.listdir(MUGO)):
+        if not file.endswith(".glb"):
+            continue
+        name = file[:-4]
+        destination = f"/Game/External/Mugo/{name}"
+        if library.list_assets(destination, recursive=True):
+            library.delete_directory(destination)  # always rebuilt from the script's latest output
+        run([os.path.join(MUGO, file)], destination)
+        for path in library.list_assets(destination, recursive=True, include_folder=False):
+            asset = unreal.load_asset(path)
+            if isinstance(asset, unreal.StaticMesh):
+                settings = asset.get_editor_property("nanite_settings")
+                settings.set_editor_property("enabled", True)
+                asset.set_editor_property("nanite_settings", settings)
+                library.save_loaded_asset(asset)
+            elif isinstance(asset, unreal.MaterialInstanceConstant):
+                slot = asset.get_name()
+                mel.set_material_instance_parent(asset, foliage)
+                if slot == "FW_MugoBark":
+                    for param, kind in (("BaseColor", "diff"), ("Normal", "nor_gl")):
+                        texture_path = f"{PINE_TEXTURES}_{kind}_2k"
+                        if library.does_asset_exist(texture_path):
+                            mel.set_material_instance_texture_parameter_value(asset, param, unreal.load_asset(texture_path))
+                    # Grey-brown, flaky: darker than the Scots pine the texture was shot from
+                    mel.set_material_instance_vector_parameter_value(asset, "Tint", unreal.LinearColor(0.55, 0.5, 0.46, 1))
+                    mel.set_material_instance_scalar_parameter_value(asset, "Roughness", 0.85)
+                    mel.set_material_instance_scalar_parameter_value(asset, "Wind", 3.0)
+                elif slot == "FW_MugoNeedles":
+                    # Dark, slightly blue-green needles (Pinus mugo); the vertex colour lightens young tips
+                    mel.set_material_instance_vector_parameter_value(asset, "Tint", unreal.LinearColor(0.028, 0.055, 0.04, 1))
+                    mel.set_material_instance_scalar_parameter_value(asset, "Roughness", 0.55)
+                    mel.set_material_instance_scalar_parameter_value(asset, "Wind", 5.0)
+                else:
+                    unreal.log_warning(f"FWIMPORT mugo: unknown material slot {slot} in {path}")
+                    continue
+                mel.update_material_instance(asset)
+                library.save_loaded_asset(asset)
+        unreal.log(f"FWIMPORT mugo {name}")
+
 # Leak and stain decal textures (ambientCG, CC0): RawAssets/ambientcg/<id>/<id>_2K-PNG_{Color,Opacity}.png
 DECALS = os.path.join(ROOT, "ambientcg")
 if os.path.isdir(DECALS):

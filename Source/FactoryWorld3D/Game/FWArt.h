@@ -21,6 +21,8 @@ namespace FWArt
 	TArray<UStaticMesh*> Saplings();
 	TArray<UStaticMesh*> TreeLineTrees();
 	TArray<UStaticMesh*> TitanSaplings();
+	// Dwarf mountain pine (kosodrzewina) from Tools/blender/make_mugo_pine.py
+	TArray<UStaticMesh*> DwarfPines();
 	TArray<UStaticMesh*> Bushes();
 	TArray<UStaticMesh*> Grass();
 	// A factory model made by Tools/blender/make_factory.py (belt_straight, inserter_arm, ...), real size for a 4 m tile

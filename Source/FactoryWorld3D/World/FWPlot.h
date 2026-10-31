@@ -130,6 +130,8 @@ private:
 	void ScatterSurroundings(int32 Biome);
 	// Conifer forest on the slopes around the plot: thick in the valleys, thinning to the tree line
 	void PlantForest(int32 Biome);
+	// Dwarf mountain pine thickets in a belt above the forest, and clumps in its clearings
+	void PlantDwarfPine(int32 Biome);
 	// Clear strip between the plot and the forest (cm), left for building
 	static constexpr float ForestMargin = 4000.f;
 	void UpdateGroundCover();
