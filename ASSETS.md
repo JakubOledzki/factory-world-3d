@@ -51,6 +51,16 @@ Tekstury z Poly Haven nakładane na modele z `Tools/blender/make_factory.py` wed
 
 Same modele (taśmociągi, podajnik, skrzynia, słup, panel, wiatrak, tory, peron, maszyna, rudy, sztabki) są nasze: powstają ze skryptu.
 
+## ambientCG, licencja CC0
+
+Naklejki (decale) z zaciekami i plamami: https://ambientcg.com, licencja [CC0 1.0](https://docs.ambientcg.com/license/), użycie komercyjne dozwolone.
+
+| Zasób | Adres | Użycie |
+| --- | --- | --- |
+| Leaking007 | https://ambientcg.com/view?id=Leaking007 | plamy oleju, zacieki |
+| Leaking008 | https://ambientcg.com/view?id=Leaking008 | plamy oleju, zacieki |
+| Leaking009 | https://ambientcg.com/view?id=Leaking009 | plamy oleju, zacieki |
+
 ## Copernicus DEM GLO-30
 
 Numeryczny model terenu (30 m), z którego powstaje prawdziwe ukształtowanie Tatr wokół działki. Kafle `N49_00_E019_00` i `N49_00_E020_00` są pobierane z https://copernicus-dem-30m.s3.amazonaws.com.

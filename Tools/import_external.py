@@ -258,3 +258,21 @@ if os.path.isdir(FACTORY):
                 mel.update_material_instance(asset)
                 library.save_loaded_asset(asset)
         unreal.log(f"FWIMPORT factory {name}")
+
+# Leak and stain decal textures (ambientCG, CC0): RawAssets/ambientcg/<id>/<id>_2K-PNG_{Color,Opacity}.png
+DECALS = os.path.join(ROOT, "ambientcg")
+if os.path.isdir(DECALS):
+    for decal_id in sorted(os.listdir(DECALS)):
+        folder = os.path.join(DECALS, decal_id)
+        destination = f"/Game/External/Decals/{decal_id}"
+        if not os.path.isdir(folder) or library.list_assets(destination, recursive=True):
+            continue
+        files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(("_Color.png", "_Opacity.png"))]
+        run(files, destination)
+        for path in library.list_assets(destination, recursive=True, include_folder=False):
+            texture = unreal.load_asset(path)
+            if isinstance(texture, unreal.Texture2D) and "opacity" in path.lower():
+                texture.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_GRAYSCALE)
+                texture.set_editor_property("srgb", False)
+                library.save_loaded_asset(texture)
+        unreal.log(f"FWIMPORT decal {decal_id}")

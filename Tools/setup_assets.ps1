@@ -18,6 +18,16 @@ Write-Host "== Poly Haven (CC0)"
 node Tools/fetch_polyhaven.mjs
 if ($LASTEXITCODE -ne 0) { throw "download failed" }
 
+Write-Host "== ambientCG decals (CC0)"
+New-Item -ItemType Directory -Force RawAssets\ambientcg | Out-Null
+foreach ($id in @("Leaking007", "Leaking008", "Leaking009")) {
+    if (-not (Test-Path "RawAssets\ambientcg\$id")) {
+        Invoke-WebRequest "https://ambientcg.com/get?file=$($id)_2K-PNG.zip" -OutFile "RawAssets\ambientcg\$id.zip"
+        Expand-Archive "RawAssets\ambientcg\$id.zip" "RawAssets\ambientcg\$id"
+        Remove-Item "RawAssets\ambientcg\$id.zip"
+    }
+}
+
 Write-Host "== Copernicus GLO-30 DEM"
 New-Item -ItemType Directory -Force RawAssets\dem | Out-Null
 if (-not (Test-Path RawAssets\node_modules\geotiff)) {
@@ -39,6 +49,9 @@ foreach ($plot in $DemPlots) {
 Write-Host "== Blender"
 if (-not (Test-Path RawAssets\processed\pine_tree_01.glb)) {
     & $Blender --background --factory-startup --python Tools\blender\prepare_polyhaven.py
+}
+if (-not (Test-Path RawAssets\processed\factory\belt_straight.glb)) {
+    & $Blender --background --factory-startup --python Tools\blender\make_factory.py
 }
 if (-not (Test-Path RawAssets\processed\terrain_mountains.glb)) {
     & $Blender --background --factory-startup --python Tools\blender\make_terrain.py
