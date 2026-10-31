@@ -2,6 +2,9 @@
 
 #include "Net/FWNetSubsystem.h"
 #include "Styling/CoreStyle.h"
+#include "UI/FWStyle.h"
+#include "Widgets/Layout/SBackgroundBlur.h"
+#include "Widgets/SOverlay.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -14,11 +17,6 @@
 
 namespace
 {
-	FSlateFontInfo Font(int32 Size, const FName Typeface = TEXT("Regular"))
-	{
-		return FCoreStyle::GetDefaultFontStyle(Typeface, Size);
-	}
-
 	FText DescribeError(const FFWNetReply& Reply)
 	{
 		const FString Code = Reply.ErrorCode();
@@ -60,96 +58,122 @@ void SFWLoginWidget::Construct(const FArguments& InArgs)
 
 	ChildSlot
 	[
-		SNew(SBorder)
-		.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
-		.BorderBackgroundColor(FLinearColor(0.f, 0.f, 0.f, 0.35f))
-		.HAlign(HAlign_Center)
-		.VAlign(VAlign_Center)
+		SNew(SOverlay)
+		// The world behind, softened, so the form reads first
+		+ SOverlay::Slot()
 		[
-			SNew(SBox)
-			.WidthOverride(420.f)
+			SNew(SBackgroundBlur).BlurStrength(6.f)
+		]
+		+ SOverlay::Slot()
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth()
 			[
 				SNew(SBorder)
-				.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
-				.BorderBackgroundColor(FLinearColor(0.02f, 0.025f, 0.03f, 0.88f))
-				.Padding(32.f)
+				.BorderImage(FWStyle::SideShade())
+				.Padding(FMargin(96.f, 0.f, 72.f, 0.f))
+				.VAlign(VAlign_Center)
 				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 4)
+					SNew(SBox)
+					.WidthOverride(400.f)
 					[
-						SNew(STextBlock)
-						.Text(LOCTEXT("Title", "FACTORY WORLD"))
-						.Font(Font(28, TEXT("Bold")))
-						.ColorAndOpacity(FLinearColor(1.f, 0.62f, 0.15f))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 24)
-					[
-						SNew(STextBlock)
-						.Text(LOCTEXT("Subtitle", "Zaloguj się kontem z gry Factory World"))
-						.Font(Font(11))
-						.ColorAndOpacity(FLinearColor(0.7f, 0.72f, 0.75f))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 4)
-					[
-						SNew(STextBlock).Text(LOCTEXT("Email", "E-mail")).Font(Font(11))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 12)
-					[
-						SAssignNew(EmailBox, SEditableTextBox)
-						.Font(Font(13))
-						.HintText(LOCTEXT("EmailHint", "ty@example.com"))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 4)
-					[
-						SNew(STextBlock).Text(LOCTEXT("Password", "Hasło")).Font(Font(11))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 20)
-					[
-						SAssignNew(PasswordBox, SEditableTextBox)
-						.Font(Font(13))
-						.IsPassword(true)
-						.OnTextCommitted_Lambda([this](const FText&, ETextCommit::Type Commit)
-						{
-							if (Commit == ETextCommit::OnEnter && CanSubmit())
-							{
-								Submit(false);
-							}
-						})
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 8)
-					[
-						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0, 0, 6, 0)
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()
 						[
-							SNew(SButton)
-							.HAlign(HAlign_Center)
-							.ContentPadding(FMargin(0, 8))
-							.IsEnabled(this, &SFWLoginWidget::CanSubmit)
-							.OnClicked(this, &SFWLoginWidget::OnLoginClicked)
+							SNew(STextBlock)
+							.Text(LOCTEXT("Title", "FACTORY WORLD"))
+							.Font(FWStyle::Font(40, TEXT("Bold")))
+							.ColorAndOpacity(FWStyle::Accent)
+						]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0, 2, 0, 36)
+						[
+							SNew(STextBlock)
+							.Text(LOCTEXT("Subtitle", "Zbuduj fabrykę w Tatrach"))
+							.Font(FWStyle::Font(14))
+							.ColorAndOpacity(FWStyle::Muted)
+						]
+						+ SVerticalBox::Slot().AutoHeight()
+						[
+							SNew(SBorder)
+							.BorderImage(FWStyle::Panel())
+							.Padding(28.f)
 							[
-								SNew(STextBlock).Text(LOCTEXT("Login", "Zaloguj")).Font(Font(13, TEXT("Bold")))
+								SNew(SVerticalBox)
+								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 18)
+								[
+									SNew(STextBlock)
+									.Text(LOCTEXT("Heading", "Zaloguj się"))
+									.Font(FWStyle::Font(20, TEXT("Bold")))
+									.ColorAndOpacity(FWStyle::Text)
+								]
+								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
+								[
+									SNew(STextBlock).Text(LOCTEXT("Email", "E-mail")).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Muted)
+								]
+								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 14)
+								[
+									SAssignNew(EmailBox, SEditableTextBox)
+									.Style(&FWStyle::TextBox())
+									.HintText(LOCTEXT("EmailHint", "ty@example.com"))
+								]
+								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
+								[
+									SNew(STextBlock).Text(LOCTEXT("Password", "Hasło")).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Muted)
+								]
+								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 22)
+								[
+									SAssignNew(PasswordBox, SEditableTextBox)
+									.Style(&FWStyle::TextBox())
+									.IsPassword(true)
+									.OnTextCommitted_Lambda([this](const FText&, ETextCommit::Type Commit)
+									{
+										if (Commit == ETextCommit::OnEnter && CanSubmit())
+										{
+											Submit(false);
+										}
+									})
+								]
+								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 10)
+								[
+									SNew(SButton)
+									.ButtonStyle(&FWStyle::PrimaryButton())
+									.HAlign(HAlign_Center)
+									.IsEnabled(this, &SFWLoginWidget::CanSubmit)
+									.OnClicked(this, &SFWLoginWidget::OnLoginClicked)
+									[
+										SNew(STextBlock).Text(LOCTEXT("Login", "Zaloguj się")).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FLinearColor::White)
+									]
+								]
+								+ SVerticalBox::Slot().AutoHeight()
+								[
+									SNew(SButton)
+									.ButtonStyle(&FWStyle::SecondaryButton())
+									.HAlign(HAlign_Center)
+									.IsEnabled(this, &SFWLoginWidget::CanSubmit)
+									.OnClicked(this, &SFWLoginWidget::OnRegisterClicked)
+									[
+										SNew(STextBlock).Text(LOCTEXT("Register", "Załóż nowe konto")).Font(FWStyle::Font(13)).ColorAndOpacity(FWStyle::Text)
+									]
+								]
+								+ SVerticalBox::Slot().AutoHeight().Padding(0, 16, 0, 0)
+								[
+									SAssignNew(StatusText, STextBlock)
+									.Font(FWStyle::Font(11))
+									.AutoWrapText(true)
+								]
 							]
 						]
-						+ SHorizontalBox::Slot().FillWidth(1.f).Padding(6, 0, 0, 0)
+						+ SVerticalBox::Slot().AutoHeight().Padding(0, 18, 0, 0)
 						[
-							SNew(SButton)
-							.HAlign(HAlign_Center)
-							.ContentPadding(FMargin(0, 8))
-							.IsEnabled(this, &SFWLoginWidget::CanSubmit)
-							.OnClicked(this, &SFWLoginWidget::OnRegisterClicked)
-							[
-								SNew(STextBlock).Text(LOCTEXT("Register", "Załóż konto")).Font(Font(13))
-							]
+							SNew(STextBlock)
+							.Text(LOCTEXT("Shared", "To samo konto co w Factory World 2D."))
+							.Font(FWStyle::Font(10))
+							.ColorAndOpacity(FWStyle::Muted)
 						]
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0, 8, 0, 0)
-					[
-						SAssignNew(StatusText, STextBlock)
-						.Font(Font(11))
-						.AutoWrapText(true)
 					]
 				]
 			]
+			+ SHorizontalBox::Slot().FillWidth(1.f)
 		]
 	];
 
@@ -334,7 +358,7 @@ void SFWLoginWidget::SetStatus(const FText& Text, bool bError)
 	if (StatusText.IsValid())
 	{
 		StatusText->SetText(Text);
-		StatusText->SetColorAndOpacity(bError ? FLinearColor(1.f, 0.35f, 0.3f) : FLinearColor(0.75f, 0.85f, 0.95f));
+		StatusText->SetColorAndOpacity(bError ? FWStyle::Error : FWStyle::Muted);
 	}
 }
 

@@ -31,3 +31,6 @@ Content/Environment/
 Content/Landscape/
 Content/Blueprint/FoliageInteraction/
 Plugins/EasyImpostor/
+
+# UE5 mannequin from the engine's templates, copied locally by Tools/copy_mannequins.ps1
+Content/Characters/
