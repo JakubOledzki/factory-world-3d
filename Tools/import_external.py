@@ -212,6 +212,8 @@ PAINTED = {"FW_PaintedSteel": (0.12, 0.15, 0.12), "FW_Worn": (0.42, 0.3, 0.04), 
 SLOT_TEXTURES = {
     "FW_Rubber": "rubberized_track", "FW_Wood": "weathered_planks", "FW_Concrete": "concrete_floor_worn_001",
     "FW_Grate": "metal_grate_rusty",
+    # Hand tools (Tools/blender/make_tools.py)
+    "FW_ToolSteel": "metal_plate", "FW_Grip": "rubberized_track",
 }
 belt_master = unreal.load_asset("/Game/Materials/M_FWBelt.M_FWBelt")
 surface = unreal.load_asset("/Game/Materials/M_FWSurface.M_FWSurface")

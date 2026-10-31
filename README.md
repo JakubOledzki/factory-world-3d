@@ -130,7 +130,9 @@ Ruchy: postawienie (pchnięcie obiema rękami), obrót (skręt prawej dłoni), z
 
 Cień rzuca osobna, niewidoczna dla gracza pełna postać w tym samym wyglądzie. Stoi, chodzi, biega albo spada (animacje manekina z szablonów silnika, kopiuje je `Tools/copy_mannequins.ps1`). Wygląd przychodzi z serwera po zalogowaniu (`character.get` → `appearance` + palety z `character.options`).
 
-Do testów: `FWGesture place|rotate|pickup|swing`, `FWDress <koszulka 0–2> <kolor hex>`, `FWWalk <s>`.
+**Kilof:** przy kopaniu prawa ręka zaciska się na kilofie (model z Blendera, `Tools/blender/make_tools.py`: kuta głowica z kilofem i dłutem, trzonek z jesionu z gumowym owijem; tekstury CC0 z Poly Haven). Przy każdym uderzeniu: dźwięk, lekkie szarpnięcie widoku, odpryski skały (fizyka, znikają po 2 s) i ślad na kamieniu (znika po kilkunastu sekundach). Bez kopania dłonie są lekko zgięte.
+
+Do testów: `FWGesture place|rotate|pickup|swing|mine`, `FWDress <koszulka 0–2> <kolor hex>`, `FWWalk <s>`.
 
 ## Dźwięk
 
