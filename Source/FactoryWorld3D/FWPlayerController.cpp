@@ -82,6 +82,11 @@ UFWNetSubsystem* AFWPlayerController::Net() const
 void AFWPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	// No engine debug text over the game (it still goes to the log)
+	if (GEngine && !GIsEditor)
+	{
+		GEngine->bEnableOnScreenDebugMessages = false;
+	}
 	if (!IsLocalController() || !Net())
 	{
 		return;

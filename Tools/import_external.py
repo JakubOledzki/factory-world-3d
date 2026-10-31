@@ -182,3 +182,60 @@ for path in library.list_assets("/Game/External/Models", recursive=True, include
             problems += 1
             unreal.log_warning(f"FWIMPORT usage missing: {path} uses {root.get_path_name() if root else None}")
 unreal.log(f"FWIMPORT usage audit: {problems} problem(s)")
+
+# Factory models from Tools/blender/make_factory.py: their material slots (FW_*) are named after the
+# texture sets to use
+FACTORY = os.path.join(MODELS, "factory")
+SLOT_TEXTURES = {
+    "FW_PaintedSteel": "blue_metal_plate", "FW_Steel": "metal_plate", "FW_Worn": "rusty_painted_metal",
+    "FW_Rubber": "rubberized_track", "FW_Wood": "weathered_planks", "FW_Concrete": "concrete_floor_worn_001",
+    "FW_Grate": "metal_grate_rusty",
+}
+belt_master = unreal.load_asset("/Game/Materials/M_FWBelt.M_FWBelt")
+surface = unreal.load_asset("/Game/Materials/M_FWSurface.M_FWSurface")
+
+
+def texture_set(set_id, kind):
+    path = f"/Game/External/Textures/{set_id}/{set_id}_{kind}_2k"
+    return unreal.load_asset(path) if library.does_asset_exist(path) else None
+
+
+if os.path.isdir(FACTORY):
+    for file in sorted(os.listdir(FACTORY)):
+        if not file.endswith(".glb"):
+            continue
+        name = file[:-4]
+        destination = f"/Game/External/Factory/{name}"
+        if library.list_assets(destination, recursive=True):
+            library.delete_directory(destination)  # always rebuilt from the script's latest output
+        run([os.path.join(FACTORY, file)], destination)
+        for path in library.list_assets(destination, recursive=True, include_folder=False):
+            asset = unreal.load_asset(path)
+            if isinstance(asset, unreal.StaticMesh):
+                settings = asset.get_editor_property("nanite_settings")
+                settings.set_editor_property("enabled", True)
+                asset.set_editor_property("nanite_settings", settings)
+                body = asset.get_editor_property("body_setup")
+                if body:
+                    body.set_editor_property("collision_trace_flag", unreal.CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE)
+                library.save_loaded_asset(asset)
+            elif isinstance(asset, unreal.MaterialInstanceConstant):
+                slot = asset.get_name()
+                if slot == "FW_Glass":
+                    mel.set_material_instance_parent(asset, surface)
+                    mel.set_material_instance_vector_parameter_value(asset, "Color", unreal.LinearColor(0.012, 0.02, 0.05, 1))
+                    mel.set_material_instance_scalar_parameter_value(asset, "Roughness", 0.08)
+                    mel.set_material_instance_scalar_parameter_value(asset, "Metallic", 0.35)
+                elif slot in SLOT_TEXTURES:
+                    set_id = SLOT_TEXTURES[slot]
+                    mel.set_material_instance_parent(asset, belt_master if slot == "FW_Rubber" else scan)
+                    for param, kind in (("BaseColor", "diff"), ("Normal", "nor_gl"), ("ARM", "arm")):
+                        texture = texture_set(set_id, kind)
+                        if texture and not (slot == "FW_Rubber" and param == "ARM"):
+                            mel.set_material_instance_texture_parameter_value(asset, param, texture)
+                else:
+                    unreal.log_warning(f"FWIMPORT factory: unknown material slot {slot} in {path}")
+                    continue
+                mel.update_material_instance(asset)
+                library.save_loaded_asset(asset)
+        unreal.log(f"FWIMPORT factory {name}")

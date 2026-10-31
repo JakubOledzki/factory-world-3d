@@ -35,6 +35,22 @@ Gra używa wyłącznie zasobów, które wolno wykorzystać w grze komercyjnej. P
 | coast_sand_01 | https://polyhaven.com/a/coast_sand_01 | 2K | piasek (pustynia) |
 | dirt | https://polyhaven.com/a/dirt | 2K | ziemia |
 
+### Tekstury fabryki (CC0, 2K)
+
+Tekstury z Poly Haven nakładane na modele z `Tools/blender/make_factory.py` według nazw slotów materiałów:
+
+| Zasób | Adres | Slot |
+| --- | --- | --- |
+| blue_metal_plate | https://polyhaven.com/a/blue_metal_plate | FW_PaintedSteel |
+| metal_plate | https://polyhaven.com/a/metal_plate | FW_Steel |
+| rusty_painted_metal | https://polyhaven.com/a/rusty_painted_metal | FW_Worn |
+| rubberized_track | https://polyhaven.com/a/rubberized_track | FW_Rubber (przyciemniona do czarnej gumy) |
+| weathered_planks | https://polyhaven.com/a/weathered_planks | FW_Wood |
+| concrete_floor_worn_001 | https://polyhaven.com/a/concrete_floor_worn_001 | FW_Concrete |
+| metal_grate_rusty | https://polyhaven.com/a/metal_grate_rusty | FW_Grate |
+
+Same modele (taśmociągi, podajnik, skrzynia, słup, panel, wiatrak, tory, peron, maszyna, rudy, sztabki) są nasze: powstają ze skryptu.
+
 ## Copernicus DEM GLO-30
 
 Numeryczny model terenu (30 m), z którego powstaje prawdziwe ukształtowanie Tatr wokół działki. Kafle `N49_00_E019_00` i `N49_00_E020_00` są pobierane z https://copernicus-dem-30m.s3.amazonaws.com.

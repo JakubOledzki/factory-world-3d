@@ -21,7 +21,8 @@ namespace
 {
 	// Basic shapes are 100 units across
 	constexpr float ShapeSize = 100.f;
-	constexpr float LaneOffset = 0.2f;
+	// Lanes on the ~1.3 m band of the modelled belt
+	constexpr float LaneOffset = 0.08f;
 	constexpr float BandHeight = 0.11f;
 
 	TArray<uint8> Gunzip(const FString& Base64)
@@ -367,7 +368,10 @@ void AFWPlot::ScatterSurroundings(int32 Biome)
 	for (TPair<UStaticMesh*, TArray<FTransform>>& Pair : Placed)
 	{
 		Total += Pair.Value.Num();
-		MakeArtInstances(Pair.Key, false)->AddInstances(Pair.Value, false);
+		// Scattered surroundings stay out of ray tracing: they would fill its always-resident memory
+		UHierarchicalInstancedStaticMeshComponent* Scatter = MakeArtInstances(Pair.Key, false);
+		Scatter->SetVisibleInRayTracing(false);
+		Scatter->AddInstances(Pair.Value, false);
 	}
 	UE_LOG(LogFWPlot, Log, TEXT("Scattered %d trees, rocks and bushes around the plot"), Total);
 }
@@ -391,6 +395,11 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 	Rails->SetMaterial(0, SurfaceMaterial(FLinearColor(0.25f, 0.24f, 0.24f), 0.35f, 1.f));
 
 	TArray<FTransform> TrunkT, CrownT, RockT, DuneT, BushT, RailT, SleeperT, PlatformT, MineT;
+	// Modelled track and platform pieces (one per tile, 4 m) when the factory models are set up
+	UStaticMesh* RailArt = FWArt::Factory(TEXT("rails"));
+	UStaticMesh* PlatformArt = FWArt::Factory(TEXT("platform"));
+	TArray<FTransform> RailArtT, PlatformArtT;
+	const FVector ArtScale(TileSize / 400.f);
 	TMap<UStaticMesh*, TArray<FTransform>> ArtSolid, ArtSoft;
 	for (int32 Y = 0; Y < Size; ++Y)
 	{
@@ -423,7 +432,8 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 				if (!RockMeshes.IsEmpty())
 				{
 					UStaticMesh* Mesh = RockMeshes[Random.RandHelper(RockMeshes.Num())];
-					ArtSolid.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Center + Jitter, Spin.Yaw, Random.FRandRange(0.55f, 0.95f) * TileSize, 0.f, 0.2f));
+					// Kept inside their own tile, so they never reach into a neighbouring belt or machine
+					ArtSolid.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Center + Jitter * 0.3f, Spin.Yaw, Random.FRandRange(0.5f, 0.75f) * TileSize, 0.f, 0.2f));
 					continue;
 				}
 				const float S = Random.FRandRange(0.45f, 0.8f) * T;
@@ -448,6 +458,11 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 			else if (Code == FWCatalog::Rails)
 			{
 				// Rails run along the row (east-west)
+				if (RailArt)
+				{
+					RailArtT.Add(FTransform(FRotator::ZeroRotator, Center, ArtScale));
+					continue;
+				}
 				for (const float Side : { -0.18f, 0.18f })
 				{
 					RailT.Add(FTransform(FRotator::ZeroRotator, Center + FVector(0, Side * TileSize, 12.f), FVector(T, 0.03f * T, 0.06f)));
@@ -459,6 +474,11 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 			}
 			else if (Code == FWCatalog::Station)
 			{
+				if (PlatformArt)
+				{
+					PlatformArtT.Add(FTransform(FRotator::ZeroRotator, Center, ArtScale));
+					continue;
+				}
 				PlatformT.Add(FTransform(FRotator::ZeroRotator, Center + FVector(0, 0, 40.f), FVector(T, T, 0.8f)));
 			}
 			else if (Code == FWCatalog::Mine)
@@ -484,6 +504,14 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 	Sleepers->AddInstances(SleeperT, false);
 	Platform->AddInstances(PlatformT, false);
 	MineRock->AddInstances(MineT, false);
+	if (RailArt)
+	{
+		MakeArtInstances(RailArt, false)->AddInstances(RailArtT, false);
+	}
+	if (PlatformArt)
+	{
+		MakeArtInstances(PlatformArt, true)->AddInstances(PlatformArtT, false);
+	}
 	for (TPair<UStaticMesh*, TArray<FTransform>>& Pair : ArtSolid)
 	{
 		MakeArtInstances(Pair.Key, true)->AddInstances(Pair.Value, false);
@@ -624,6 +652,8 @@ void AFWPlot::RemoveObject(const FString& Id)
 	{
 		return;
 	}
+	InserterArms.Remove(Id);
+	DrawnBends.Remove(Id);
 	for (UStaticMeshComponent* Mesh : Removed.Meshes)
 	{
 		if (Mesh)
@@ -644,8 +674,179 @@ void AFWPlot::RemoveObject(const FString& Id)
 	}
 }
 
+UStaticMeshComponent* AFWPlot::MakeArtMesh(UStaticMesh* Mesh, const FTransform& Transform, bool bCollide)
+{
+	UStaticMeshComponent* Component = NewObject<UStaticMeshComponent>(this);
+	Component->SetStaticMesh(Mesh);
+	Component->SetupAttachment(RootComponent);
+	Component->SetRelativeTransform(Transform);
+	Component->SetCollisionEnabled(bCollide ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+	Component->RegisterComponent();
+	return Component;
+}
+
+bool AFWPlot::DrawArtObject(FFWPlotObject& Object)
+{
+	// The models are built for a 4 m tile
+	const float Fit = TileSize / 400.f;
+	const FVector Center = FootprintCenter(Object.Kind, Object.Tile);
+	const FRotator Facing(0.f, YawOf(Object.Rotation), 0.f);
+	const FString& Kind = Object.Kind;
+	auto Place = [&](UStaticMesh* Mesh, const FVector& Offset, const FRotator& Turn, float Scale, bool bCollide) -> UStaticMeshComponent*
+	{
+		UStaticMeshComponent* Component = MakeArtMesh(Mesh, FTransform(Facing + Turn, Center + Facing.RotateVector(Offset * Fit), FVector(Scale * Fit)), bCollide);
+		Object.Meshes.Add(Component);
+		return Component;
+	};
+
+	if (FWCatalog::IsBelt(Kind))
+	{
+		UStaticMesh* Straight = FWArt::Factory(TEXT("belt_straight"));
+		if (!Straight)
+		{
+			return false;
+		}
+		// Curves are swapped in by RefreshBeltArt once the belt's neighbours are known
+		Place(Straight, FVector::ZeroVector, FRotator::ZeroRotator, 1.f, false);
+		DrawnBends.Add(Object.Id, 0);
+		return true;
+	}
+	if (FWCatalog::IsInserter(Kind))
+	{
+		UStaticMesh* Base = FWArt::Factory(TEXT("inserter_base"));
+		UStaticMesh* Arm = FWArt::Factory(TEXT("inserter_arm"));
+		if (!Base || !Arm)
+		{
+			return false;
+		}
+		Place(Base, FVector::ZeroVector, FRotator::ZeroRotator, 1.f, true);
+		// The arm turns about the top of the column; AnimateParts swings it between the tiles behind and in front
+		InserterArms.Add(Object.Id, Place(Arm, FVector(0, 0, 82.f), FRotator(0.f, 180.f, 0.f), 1.f, false));
+		return true;
+	}
+	if (FWCatalog::IsStorage(Kind))
+	{
+		UStaticMesh* Chest = FWArt::Factory(TEXT("chest"));
+		if (!Chest)
+		{
+			return false;
+		}
+		const float N = FWCatalog::FootprintSize(Kind);
+		Place(Chest, FVector::ZeroVector, FRotator::ZeroRotator, N * (Kind.Contains(TEXT("iron")) ? 1.15f : 1.f), true);
+		return true;
+	}
+	if (Kind == TEXT("power_pole") || Kind == TEXT("power_substation") || Kind == TEXT("power_pylon"))
+	{
+		UStaticMesh* Pole = FWArt::Factory(TEXT("pole"));
+		if (!Pole)
+		{
+			return false;
+		}
+		Place(Pole, FVector::ZeroVector, FRotator(0.f, 90.f, 0.f), Kind == TEXT("power_pylon") ? 1.8f : 1.f, true);
+		return true;
+	}
+	if (Kind == TEXT("power_solar_panel"))
+	{
+		UStaticMesh* Panel = FWArt::Factory(TEXT("solar_panel"));
+		if (!Panel)
+		{
+			return false;
+		}
+		Place(Panel, FVector::ZeroVector, FRotator::ZeroRotator, 1.f, true);
+		return true;
+	}
+	if (Kind == TEXT("power_wind_turbine") || Kind == TEXT("power_large_wind_turbine"))
+	{
+		UStaticMesh* Tower = FWArt::Factory(TEXT("turbine_tower"));
+		UStaticMesh* Rotor = FWArt::Factory(TEXT("turbine_rotor"));
+		if (!Tower || !Rotor)
+		{
+			return false;
+		}
+		const float Scale = Kind == TEXT("power_large_wind_turbine") ? 2.f : 1.f;
+		Place(Tower, FVector::ZeroVector, FRotator::ZeroRotator, Scale, true);
+		UStaticMeshComponent* Spinning = Place(Rotor, FVector(165.f, 0.f, 1440.f) * Scale, FRotator::ZeroRotator, Scale, false);
+		Spinning->SetVisibleInRayTracing(false);
+		TurbineRotors.Add(Spinning);
+		return true;
+	}
+	// Anything else that stands on the plot: the generic machine at the size of its footprint
+	if (UStaticMesh* Machine = FWArt::Factory(TEXT("machine")))
+	{
+		Place(Machine, FVector::ZeroVector, FRotator::ZeroRotator, float(FWCatalog::FootprintSize(Kind)), true);
+		return true;
+	}
+	return false;
+}
+
+void AFWPlot::RefreshBeltArt()
+{
+	UStaticMesh* Straight = FWArt::Factory(TEXT("belt_straight"));
+	UStaticMesh* Curve = FWArt::Factory(TEXT("belt_curve"));
+	if (!Straight || !Curve)
+	{
+		return;
+	}
+	const float Fit = TileSize / 400.f;
+	for (const TPair<FIntPoint, FBelt>& Pair : Belts)
+	{
+		const FBelt& Belt = Pair.Value;
+		FFWPlotObject* Object = Objects.Find(Belt.Id);
+		const int32* Drawn = DrawnBends.Find(Belt.Id);
+		if (!Object || !Drawn || *Drawn == Belt.Bend || Object->Meshes.Num() != 1)
+		{
+			continue;
+		}
+		// The curve model comes in from its back (-X) and leaves to its left (+Y): turned a quarter so it
+		// leaves the way the belt faces, and mirrored for belts fed from their left
+		const float Yaw = YawOf(Belt.Rotation);
+		const FTransform Transform = Belt.Bend == 0
+			? FTransform(FRotator(0.f, Yaw, 0.f), TileCenter(Pair.Key), FVector(Fit))
+			: Belt.Bend > 0
+				? FTransform(FRotator(0.f, Yaw - 90.f, 0.f), TileCenter(Pair.Key), FVector(Fit))
+				: FTransform(FRotator(0.f, Yaw + 90.f, 0.f), TileCenter(Pair.Key), FVector(Fit, -Fit, Fit));
+		Object->Meshes[0]->SetStaticMesh(Belt.Bend == 0 ? Straight : Curve);
+		Object->Meshes[0]->SetRelativeTransform(Transform);
+		DrawnBends[Belt.Id] = Belt.Bend;
+	}
+}
+
+void AFWPlot::AnimateParts(float DeltaSeconds)
+{
+	// Rotors turn slowly whatever the wind; inserter arms follow their swing between pick-up and drop
+	for (UStaticMeshComponent* Rotor : TurbineRotors)
+	{
+		if (Rotor)
+		{
+			Rotor->AddLocalRotation(FRotator(0.f, 0.f, 70.f * DeltaSeconds));
+		}
+	}
+	if (InserterArms.IsEmpty())
+	{
+		return;
+	}
+	const float Fraction = FMath::Clamp(float((ServerNow() - SimTime) / TickMs), 0.f, 1.f);
+	for (const TPair<FIntPoint, FInserter>& Pair : Inserters)
+	{
+		const FInserter& Inserter = Pair.Value;
+		const TObjectPtr<UStaticMeshComponent>* Arm = InserterArms.Find(Inserter.Id);
+		if (!Arm || !*Arm)
+		{
+			continue;
+		}
+		const float Swing = FMath::Lerp(float(Inserter.Was), float(Inserter.Swing), Fraction) / FMath::Max(1, Inserter.SwingTicks);
+		// 0 points back at the tile it takes from, 1 forward at the tile it drops on
+		const float Yaw = YawOf(Inserter.Rotation) + 180.f * (1.f - FMath::SmoothStep(0.f, 1.f, Swing));
+		(*Arm)->SetRelativeRotation(FRotator(0.f, Yaw, 0.f));
+	}
+}
+
 void AFWPlot::DrawObject(FFWPlotObject& Object)
 {
+	if (DrawArtObject(Object))
+	{
+		return;
+	}
 	const float T = TileSize / ShapeSize;
 	const FVector Center = FootprintCenter(Object.Kind, Object.Tile);
 	const FRotator Facing(0.f, YawOf(Object.Rotation), 0.f);
@@ -772,6 +973,7 @@ void AFWPlot::RebuildBelts()
 	{
 		AddDownstream(Start, Seen);
 	}
+	RefreshBeltArt();
 }
 
 int32 AFWPlot::BendOf(FIntPoint Tile) const
@@ -967,6 +1169,7 @@ void AFWPlot::UpdateGroundCover()
 			if (!GroundCoverParts.IsValidIndex(Part))
 			{
 				UHierarchicalInstancedStaticMeshComponent* Component = MakeArtInstances(GroundCoverMeshes[i], false);
+				Component->SetVisibleInRayTracing(false);
 				Component->SetCastShadow(L == 0);
 				GroundCoverParts.Add(Component);
 			}
@@ -980,6 +1183,7 @@ void AFWPlot::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateGroundCover();
+	AnimateParts(DeltaSeconds);
 	if (PendingScatterBiome >= 0 && TerrainMesh)
 	{
 		FHitResult Probe;
@@ -1124,8 +1328,17 @@ UInstancedStaticMeshComponent* AFWPlot::ItemInstances(const FString& Item)
 		return *Found;
 	}
 	UInstancedStaticMeshComponent* Component = NewObject<UInstancedStaticMeshComponent>(this);
-	Component->SetStaticMesh(CubeMesh);
-	Component->SetMaterial(0, SurfaceMaterial(FWCatalog::ColorFor(Item), 0.7f));
+	// Ore and stone as rough chunks, bars as ingots, anything else boxed up; tinted per item
+	const TCHAR* Model = Item.EndsWith(TEXT("_ore")) || Item == TEXT("coal") ? TEXT("chunk_ore")
+		: Item == TEXT("stone") || Item == TEXT("gravel") || Item == TEXT("sand") ? TEXT("chunk_stone")
+		: Item.EndsWith(TEXT("_ingot")) ? TEXT("ingot") : TEXT("crate");
+	UStaticMesh* Art = FWArt::Factory(Model);
+	Component->SetStaticMesh(Art ? Art : CubeMesh.Get());
+	if (!Art || FCString::Strcmp(Model, TEXT("crate")) != 0)
+	{
+		Component->SetMaterial(0, SurfaceMaterial(FWCatalog::ColorFor(Item), Item.EndsWith(TEXT("_ingot")) ? 0.35f : 0.85f,
+			Item.EndsWith(TEXT("_ingot")) ? 1.f : 0.f));
+	}
 	Component->SetupAttachment(RootComponent);
 	Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Component->SetCastShadow(true);
@@ -1137,7 +1350,8 @@ UInstancedStaticMeshComponent* AFWPlot::ItemInstances(const FString& Item)
 void AFWPlot::DrawItems()
 {
 	const float Fraction = FMath::Clamp(float((ServerNow() - SimTime) / TickMs), 0.f, 1.f);
-	const float ItemScale = 0.12f * TileSize / ShapeSize;
+	// Item models are real size for a 4 m tile; the cube placeholder is 1 m
+	const float ItemScale = FWArt::Factory(TEXT("crate")) ? TileSize / 400.f : 0.12f * TileSize / ShapeSize;
 	TMap<FString, TArray<FTransform>> ByItem;
 	for (const TPair<FIntPoint, FBelt>& Pair : Belts)
 	{
