@@ -127,3 +127,15 @@ powershell -ExecutionPolicy Bypass -File Tools\setup_assets.ps1
 Skrypt pobiera pliki i sprawdza ich sumy kontrolne, przygotowuje je w Blenderze (odchudza skany do budżetów Nanite i buduje teren wokół działki) i importuje do `Content/External`. Wymaga Node.js, Blendera 5.2 i UE 5.8 (ścieżki można zmienić parametrami). Bez tych zasobów gra też działa, tylko z prostymi kształtami zastępczymi. Licencje i źródła są opisane w [ASSETS.md](ASSETS.md).
 
 Obraz: fizyczne słońce (75 000 lx), ekspozycja z histogramu w zakresie EV 12,5–14,8, krzywa filmowa, delikatny bloom, winieta i ziarno, Lumen z HW RT (oświetlenie trafień z surface cache), wirtualne mapy cieni, Nanite, mgła wolumetryczna.
+
+## Wersja do grania (paczka dla Windows)
+
+```
+powershell -ExecutionPolicy Bypass -File Tools\package.ps1                         (Shipping)
+powershell -ExecutionPolicy Bypass -File Tools\package.ps1 -Configuration Development
+```
+
+Skrypt kompiluje grę, przygotowuje zasoby (cook) i pakuje wszystko do `D:\Factory-World\Builds\<konfiguracja>\Windows`. Najpierw trzeba uruchomić `Tools\setup_assets.ps1`, bo grafika z `Content/External` nie jest w gicie i trafia do paczki z tego komputera (`DirectoriesToAlwaysCook` w `Config/DefaultGame.ini`). Ostrzeżenia z przygotowania zasobów są zapisywane w `CookWarnings.txt` obok paczki.
+
+- Adres serwera: `FactoryWorld3D.exe -ServerUrl=ws://adres:5080/ws` albo `ServerUrl` w `Saved\Config\Windows\Game.ini`.
+- Wersja Shipping pomija `Saved/DevLogin.ini`, więc zawsze pokazuje ekran logowania. Wersja Development loguje się automatycznie, jeśli ten plik istnieje.

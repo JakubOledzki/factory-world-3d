@@ -2,6 +2,7 @@
 
 #include "HAL/PlatformFileManager.h"
 #include "IWebSocket.h"
+#include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Serialization/JsonReader.h"
@@ -56,6 +57,8 @@ void UFWNetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 	FModuleManager::LoadModuleChecked<FWebSocketsModule>(TEXT("WebSockets"));
+	// -ServerUrl=wss://... on the command line wins over the .ini (handy for packaged builds)
+	FParse::Value(FCommandLine::Get(), TEXT("ServerUrl="), ServerUrl);
 	TickHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UFWNetSubsystem::Tick), 0.5f);
 }
 
