@@ -22,6 +22,10 @@
 #include "Game/FWArt.h"
 #include "Game/FWAudio.h"
 #include "UI/SFWCharacterCreator.h"
+#include "UI/SFWInventoryWindow.h"
+#include "UI/SFWSettingsWindow.h"
+#include "Engine/Texture2D.h"
+#include "Camera/CameraComponent.h"
 #include "UI/SFWLoginWidget.h"
 #include "World/FWCharacterStudio.h"
 #include "Player/FWCharacter.h"
@@ -555,6 +559,8 @@ void AFWPlayerController::EnterPlot(int32 X, int32 Y)
 			SAssignNew(This->Hud, SFWHud).Controller(This);
 			World->GetGameViewport()->AddViewportWidgetContent(This->Hud.ToSharedRef(), 10);
 		}
+		// The player's own settings from the last time
+		This->ApplyUserSettings(FFWUserSettings::Load());
 		This->Toast(FText::Format(LOCTEXT("Welcome", "Działka {0}:{1}"),
 			FText::AsNumber(This->Plot->GetPlotX(), &FNumberFormattingOptions::DefaultNoGrouping()),
 			FText::AsNumber(This->Plot->GetPlotY(), &FNumberFormattingOptions::DefaultNoGrouping())));
@@ -570,22 +576,11 @@ void AFWPlayerController::RefreshInventory()
 	Net()->Request(TEXT("inventory.get"), nullptr, [WeakThis](const FFWNetReply& Reply)
 	{
 		AFWPlayerController* This = WeakThis.Get();
-		const TArray<TSharedPtr<FJsonValue>>* Items = nullptr;
-		if (!This || Reply.Type != TEXT("inventory") || !Reply.Payload->TryGetArrayField(TEXT("items"), Items))
+		if (!This || Reply.Type != TEXT("inventory"))
 		{
 			return;
 		}
-		This->Inventory.Reset();
-		for (const TSharedPtr<FJsonValue>& Value : *Items)
-		{
-			const TSharedPtr<FJsonObject> Item = Value->AsObject();
-			FFWStack Stack;
-			Item->TryGetStringField(TEXT("id"), Stack.Id);
-			Item->TryGetStringField(TEXT("name"), Stack.Name);
-			Item->TryGetNumberField(TEXT("quantity"), Stack.Quantity);
-			This->Names.Add(Stack.Id, Stack.Name);
-			This->Inventory.Add(Stack);
-		}
+		This->ApplyInventory(Reply.Payload);
 		This->Net()->Request(TEXT("hotbar.get"), nullptr, [WeakThis](const FFWNetReply& Bar)
 		{
 			if (AFWPlayerController* Inner = WeakThis.Get())
@@ -594,6 +589,255 @@ void AFWPlayerController::RefreshInventory()
 			}
 		});
 	});
+}
+
+void AFWPlayerController::ApplyInventory(const TSharedPtr<FJsonObject>& InventoryPayload)
+{
+	const TArray<TSharedPtr<FJsonValue>>* Items = nullptr;
+	if (!InventoryPayload.IsValid() || !InventoryPayload->TryGetArrayField(TEXT("items"), Items))
+	{
+		return;
+	}
+	InventoryPayload->TryGetNumberField(TEXT("slots"), InventorySlots);
+	Inventory.Reset();
+	for (const TSharedPtr<FJsonValue>& Value : *Items)
+	{
+		const TSharedPtr<FJsonObject> Item = Value->AsObject();
+		FFWStack Stack;
+		Item->TryGetStringField(TEXT("id"), Stack.Id);
+		Item->TryGetStringField(TEXT("name"), Stack.Name);
+		Item->TryGetNumberField(TEXT("quantity"), Stack.Quantity);
+		Item->TryGetNumberField(TEXT("stack"), Stack.StackSize);
+		const TArray<TSharedPtr<FJsonValue>>* Tiles = nullptr;
+		if (Item->TryGetArrayField(TEXT("tiles"), Tiles))
+		{
+			for (const TSharedPtr<FJsonValue>& Tile : *Tiles)
+			{
+				Stack.Tiles.Add(int32(Tile->AsNumber()));
+			}
+		}
+		int32 Slot = -1;
+		if (Stack.Tiles.IsEmpty() && Item->TryGetNumberField(TEXT("slot"), Slot))
+		{
+			Stack.Tiles.Add(Slot);
+		}
+		Names.Add(Stack.Id, Stack.Name);
+		Inventory.Add(Stack);
+	}
+}
+
+void AFWPlayerController::ApplyStorage(const TSharedPtr<FJsonObject>& StoragePayload)
+{
+	if (!StoragePayload.IsValid())
+	{
+		return;
+	}
+	StoragePayload->TryGetStringField(TEXT("id"), Storage.Id);
+	StoragePayload->TryGetStringField(TEXT("name"), Storage.Name);
+	StoragePayload->TryGetNumberField(TEXT("slots"), Storage.Slots);
+	StoragePayload->TryGetNumberField(TEXT("capacity"), Storage.Capacity);
+	StoragePayload->TryGetNumberField(TEXT("stored"), Storage.Stored);
+	Storage.Items.Reset();
+	const TArray<TSharedPtr<FJsonValue>>* Items = nullptr;
+	if (StoragePayload->TryGetArrayField(TEXT("items"), Items))
+	{
+		for (const TSharedPtr<FJsonValue>& Value : *Items)
+		{
+			const TSharedPtr<FJsonObject> Item = Value->AsObject();
+			FFWStack Stack;
+			Item->TryGetStringField(TEXT("id"), Stack.Id);
+			Item->TryGetStringField(TEXT("name"), Stack.Name);
+			Item->TryGetNumberField(TEXT("quantity"), Stack.Quantity);
+			Names.Add(Stack.Id, Stack.Name);
+			Storage.Items.Add(Stack);
+		}
+	}
+}
+
+const FSlateBrush* AFWPlayerController::GetIconBrush(const FString& Item)
+{
+	if (Item.IsEmpty())
+	{
+		return nullptr;
+	}
+	if (const TSharedPtr<FSlateBrush>* Found = IconBrushes.Find(Item))
+	{
+		return Found->Get();
+	}
+	TSharedPtr<FSlateBrush> Brush;
+	if (UTexture2D* Texture = GetIcon(Item))
+	{
+		Brush = MakeShared<FSlateBrush>();
+		Brush->SetResourceObject(Texture);
+		Brush->ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
+	}
+	IconBrushes.Add(Item, Brush);
+	return Brush.Get();
+}
+
+void AFWPlayerController::OpenInventory(const FString& StorageId)
+{
+	if (!Plot)
+	{
+		return;
+	}
+	Storage = FFWStorageView();
+	Storage.Id = StorageId;
+	TSharedRef<SFWInventoryWindow> Window = SNew(SFWInventoryWindow).Controller(this).Storage(StorageId);
+	ShowWidget(Window, Window);
+	RefreshInventory();
+	if (!StorageId.IsEmpty())
+	{
+		FWAudio::Play2D(this, TEXT("chest_open"), 0.6f);
+		TSharedPtr<FJsonObject> P = PlotPayload(Plot);
+		P->SetStringField(TEXT("id"), StorageId);
+		TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+		Net()->Request(TEXT("storage.get"), P, [WeakThis](const FFWNetReply& Reply)
+		{
+			if (AFWPlayerController* This = WeakThis.Get(); This && Reply.Type == TEXT("storage"))
+			{
+				This->ApplyStorage(Reply.Payload);
+			}
+			else if (This)
+			{
+				This->ToastError(Reply);
+			}
+		});
+	}
+}
+
+void AFWPlayerController::OpenSettings()
+{
+	TSharedRef<SFWSettingsWindow> Window = SNew(SFWSettingsWindow).Controller(this);
+	ShowWidget(Window, Window);
+}
+
+void AFWPlayerController::CloseWindow()
+{
+	if (!Storage.Id.IsEmpty())
+	{
+		FWAudio::Play2D(this, TEXT("chest_close"), 0.6f);
+		Storage = FFWStorageView();
+	}
+	HideWidget();
+}
+
+void AFWPlayerController::ApplyUserSettings(const FFWUserSettings& Settings)
+{
+	FWAudio::ApplyMasterVolume(Settings.MasterVolume * UFWGameSettings::Get().MasterVolume);
+	if (AFWCharacter* Walker = Cast<AFWCharacter>(GetPawn()))
+	{
+		Walker->ApplyUserSettings(Settings.MouseSensitivity, Settings.FieldOfView);
+	}
+}
+
+void AFWPlayerController::MoveTile(int32 From, int32 To)
+{
+	TSharedPtr<FJsonObject> P = Payload();
+	P->SetNumberField(TEXT("from"), From);
+	P->SetNumberField(TEXT("to"), To);
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Net()->Request(TEXT("inventory.move"), P, [WeakThis](const FFWNetReply& Reply)
+	{
+		if (AFWPlayerController* This = WeakThis.Get())
+		{
+			Reply.Type == TEXT("inventory") ? This->ApplyInventory(Reply.Payload) : This->ToastError(Reply);
+		}
+	});
+}
+
+void AFWPlayerController::SetHotbarSlot(int32 Slot, const FString& Item)
+{
+	TSharedPtr<FJsonObject> P = Payload();
+	P->SetNumberField(TEXT("slot"), Slot);
+	if (Item.IsEmpty())
+	{
+		P->SetField(TEXT("item"), MakeShared<FJsonValueNull>());
+	}
+	else
+	{
+		P->SetStringField(TEXT("item"), Item);
+	}
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Net()->Request(TEXT("hotbar.set"), P, [WeakThis](const FFWNetReply& Reply)
+	{
+		if (AFWPlayerController* This = WeakThis.Get())
+		{
+			Reply.Type == TEXT("hotbar") ? This->ApplyHotbar(Reply.Payload) : This->ToastError(Reply);
+		}
+	});
+}
+
+void AFWPlayerController::StorageTransfer(bool bPut, const FString& Item, int32 Quantity)
+{
+	if (!Plot || Storage.Id.IsEmpty() || Item.IsEmpty() || Quantity <= 0)
+	{
+		return;
+	}
+	TSharedPtr<FJsonObject> P = PlotPayload(Plot);
+	P->SetStringField(TEXT("id"), Storage.Id);
+	P->SetStringField(TEXT("item"), Item);
+	P->SetNumberField(TEXT("quantity"), Quantity);
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Net()->Request(bPut ? TEXT("storage.put") : TEXT("storage.take"), P, [WeakThis](const FFWNetReply& Reply)
+	{
+		if (AFWPlayerController* This = WeakThis.Get())
+		{
+			if (Reply.Type == TEXT("storage"))
+			{
+				This->ApplyStorage(Reply.Payload);
+				This->RefreshInventory();
+			}
+			else
+			{
+				This->ToastError(Reply);
+			}
+		}
+	});
+}
+
+void AFWPlayerController::StorageTransferAll(bool bPut)
+{
+	if (bPut)
+	{
+		PutAllInStorage(Storage.Id);
+		return;
+	}
+	for (const FFWStack& Stack : TArray<FFWStack>(Storage.Items))
+	{
+		StorageTransfer(false, Stack.Id, Stack.Quantity);
+	}
+}
+
+void AFWPlayerController::FWChestNearest()
+{
+	if (!Plot || !GetPawn())
+	{
+		return;
+	}
+	const FIntPoint At = Plot->TileAt(GetPawn()->GetActorLocation());
+	const FFWPlotObject* Nearest = nullptr;
+	for (const TPair<FString, FFWPlotObject>& Pair : Plot->GetObjects())
+	{
+		if (FWCatalog::IsStorage(Pair.Value.Kind) && (!Nearest || (Pair.Value.Tile - At).SizeSquared() < (Nearest->Tile - At).SizeSquared()))
+		{
+			Nearest = &Pair.Value;
+		}
+	}
+	if (Nearest)
+	{
+		UE_LOG(LogFWGame, Log, TEXT("Chest %s at %d,%d"), *Nearest->Id, Nearest->Tile.X, Nearest->Tile.Y);
+		FWGoto(Nearest->Tile.X - 2, Nearest->Tile.Y + 2, -45.f, -25.f);
+		OpenInventory(Nearest->Id);
+	}
+}
+
+void AFWPlayerController::FWChestAt(int32 TileX, int32 TileY)
+{
+	if (const FFWPlotObject* Object = Plot ? Plot->FindObjectAt(FIntPoint(TileX, TileY)) : nullptr)
+	{
+		OpenInventory(Object->Id);
+	}
 }
 
 void AFWPlayerController::ApplyHotbar(const TSharedPtr<FJsonObject>& HotbarPayload)
@@ -831,6 +1075,10 @@ void AFWPlayerController::PutAllInStorage(const FString& ObjectId)
 			else
 			{
 				Put->Add(FString::Printf(TEXT("%d %s"), Stack.Quantity, *Stack.Name));
+			}
+			if (Reply.Type == TEXT("storage"))
+			{
+				This->ApplyStorage(Reply.Payload);
 			}
 			if (--(*Left) == 0)
 			{

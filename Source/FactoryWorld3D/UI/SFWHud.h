@@ -29,5 +29,4 @@ private:
 	TSharedPtr<SVerticalBox> ToastBox;
 	int32 ShownToasts = -1;
 	double LastToastAt = -1.0;
-	mutable TMap<FString, TSharedPtr<FSlateBrush>> Icons;
 };

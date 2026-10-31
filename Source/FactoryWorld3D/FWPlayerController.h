@@ -22,7 +22,24 @@ struct FFWStack
 	FString Id;
 	FString Name;
 	int32 Quantity = 0;
+	// The inventory tiles it lies on, and how many fill one
+	TArray<int32> Tiles;
+	int32 StackSize = 0;
 };
+
+// An open chest (or other storage) on the plot, as storage.get describes it
+struct FFWStorageView
+{
+	FString Id;
+	FString Name;
+	int32 Slots = 0;
+	int32 Capacity = 0;
+	int32 Stored = 0;
+	TArray<FFWStack> Items;
+};
+
+struct FFWUserSettings;
+struct FSlateBrush;
 
 struct FFWToast
 {
@@ -53,6 +70,21 @@ public:
 	int32 GetSelectedSlot() const { return SelectedSlot; }
 	FString GetSelectedItem() const { return Hotbar.IsValidIndex(SelectedSlot) ? Hotbar[SelectedSlot] : FString(); }
 	const FFWStack* FindStack(const FString& Item) const;
+	const TArray<FFWStack>& GetInventory() const { return Inventory; }
+	int32 GetInventorySlots() const { return InventorySlots; }
+	const FFWStorageView& GetStorage() const { return Storage; }
+	const FSlateBrush* GetIconBrush(const FString& Item);
+
+	// Windows over the game: the inventory (with a chest beside it) and the settings menu
+	void OpenInventory(const FString& StorageId = FString());
+	void OpenSettings();
+	void CloseWindow();
+	void ApplyUserSettings(const FFWUserSettings& Settings);
+	// Inventory moves, each answered by the server with the new state
+	void MoveTile(int32 From, int32 To);
+	void SetHotbarSlot(int32 Slot, const FString& Item);
+	void StorageTransfer(bool bPut, const FString& Item, int32 Quantity);
+	void StorageTransferAll(bool bPut);
 	FString ItemName(const FString& Item) const;
 	const TArray<FFWToast>& GetToasts() const { return Toasts; }
 	bool IsInWorld() const { return Plot != nullptr; }
@@ -111,6 +143,22 @@ public:
 	void FWCreatorView(float Zoom, float Yaw = 0.f);
 	UFUNCTION(Exec)
 	void FWCreatorCreate();
+	// Windows and inventory moves for tests: the inventory, a chest at a tile, the menu, a tile move
+	UFUNCTION(Exec)
+	void FWInventory() { OpenInventory(); }
+	UFUNCTION(Exec)
+	void FWChestAt(int32 TileX, int32 TileY);
+	// Opens the storage nearest the player, and goes to stand by it
+	UFUNCTION(Exec)
+	void FWChestNearest();
+	UFUNCTION(Exec)
+	void FWClose() { CloseWindow(); }
+	UFUNCTION(Exec)
+	void FWMenu() { OpenSettings(); }
+	UFUNCTION(Exec)
+	void FWMoveTile(int32 From, int32 To) { MoveTile(From, To); }
+	UFUNCTION(Exec)
+	void FWStorage(int32 Put, const FString& Item, int32 Quantity) { StorageTransfer(Put != 0, Item, Quantity); }
 	// Records what the game plays to Saved/BouncedWavFiles/<Name>.wav (to check the mix without listening)
 	UFUNCTION(Exec)
 	void FWRecordStart(float Seconds = 10.f);
@@ -142,6 +190,8 @@ private:
 	void RefreshWallet();
 	void PollLogistics();
 	void ApplyHotbar(const TSharedPtr<FJsonObject>& Payload);
+	void ApplyInventory(const TSharedPtr<FJsonObject>& Payload);
+	void ApplyStorage(const TSharedPtr<FJsonObject>& Payload);
 	// Stands the pawn on a ground point (its feet there), walking and at rest
 	void PlaceOnGround(const FVector& Feet);
 	// Wind, forest, gusts and birds around the player, by height and how much forest stands about
@@ -171,6 +221,9 @@ private:
 	TSharedPtr<SFWHud> Hud;
 
 	TArray<FFWStack> Inventory;
+	int32 InventorySlots = 0;
+	FFWStorageView Storage;
+	TMap<FString, TSharedPtr<FSlateBrush>> IconBrushes;
 	TMap<FString, FString> Names;
 	TArray<FString> Hotbar;
 	int32 SelectedSlot = 0;

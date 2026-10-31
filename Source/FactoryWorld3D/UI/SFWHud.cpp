@@ -122,7 +122,7 @@ void SFWHud::Construct(const FArguments& InArgs)
 					{
 						return LOCTEXT("BuildHints", "BUDOWANIE   LPM postaw   R obróć   1–5 wybór   PPM (przytrzymaj) zabierz   B wyjdź");
 					}
-					return LOCTEXT("Hints", "WASD ruch   Shift bieg   Spacja skok   E (przytrzymaj) kop / wkładaj do skrzyni   PPM (przytrzymaj) zabierz   B budowanie   1–5 pasek");
+					return LOCTEXT("Hints", "WASD ruch   Shift bieg   Spacja skok   E kop (przytrzymaj) / otwórz skrzynię   PPM (przytrzymaj) zabierz   B budowanie   1–5 pasek   Tab plecak   Esc menu");
 				})
 			]
 		]
@@ -208,25 +208,7 @@ TSharedRef<SWidget> SFWHud::MakeSlot(int32 Slot)
 
 const FSlateBrush* SFWHud::IconBrush(const FString& Item) const
 {
-	if (Item.IsEmpty() || !Controller.IsValid())
-	{
-		return nullptr;
-	}
-	if (const TSharedPtr<FSlateBrush>* Found = Icons.Find(Item))
-	{
-		return Found->Get();
-	}
-	UTexture2D* Texture = Controller->GetIcon(Item);
-	TSharedPtr<FSlateBrush> Brush;
-	if (Texture)
-	{
-		Brush = MakeShared<FSlateBrush>();
-		Brush->SetResourceObject(Texture);
-		Brush->ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
-		Brush->DrawAs = ESlateBrushDrawType::Image;
-	}
-	Icons.Add(Item, Brush);
-	return Brush.Get();
+	return Controller.IsValid() ? Controller->GetIconBrush(Item) : nullptr;
 }
 
 AFWCharacter* SFWHud::GetCharacter() const

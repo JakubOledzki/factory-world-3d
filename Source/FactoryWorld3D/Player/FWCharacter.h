@@ -50,6 +50,8 @@ public:
 	// The character's look (from the server): the first-person arms wear its sleeves and skin, and the body that
 	// casts the player's shadow all of it
 	void SetLook(const FFWLook& Look);
+	// From the settings menu
+	void ApplyUserSettings(float InMouseSensitivity, float FieldOfView);
 
 	// One-off movements of the first-person arms
 	enum class EGesture : uint8 { None, Place, Rotate, Pickup, Swing };
@@ -101,6 +103,7 @@ private:
 	void UpdateFootsteps(float DeltaSeconds);
 	FString SurfaceUnder(const FHitResult* Hit = nullptr) const;
 	float StepDistance = 0.f;
+	float MouseSensitivity = 1.f;
 
 	UPROPERTY()
 	TObjectPtr<UPoseableMeshComponent> Arms;

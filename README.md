@@ -117,6 +117,14 @@ Bez niego kreator działa, tylko podgląd jest pusty.
 
 Fryzury, zarost i ubrania to prawdziwe modele 3D (`Tools/blender/make_character_gear.py`): po jednym na każdy styl, który podaje serwer (5 fryzur, 3 rodzaje zarostu, t-shirt, bezrękawnik, bluza z kapturem, spodnie, buty). Każdy jest wycięty z ciała manekina, odsunięty od skóry i pogrubiony, więc ma te same wagi kości co ciało i porusza się razem z nim. Kucyk i kaptur to dodatkowe kształty. Włosy i zarost to warstwy pasków („hair cards”) z pasmami wyciętymi przezroczystością, anizotropowym połyskiem i jaśniejszymi końcówkami, na ciemnej warstwie spodniej. Kolory wybrane w kreatorze nakładają materiały `M_FWHairCard` i `M_FWHair` i `M_FWCloth` (tkaniny CC0 z Poly Haven: dzianina, polar, dżins, skóra). Modele tworzy `Tools/setup_assets.ps1` (eksport manekina z edytora, Blender, import), gdy manekin jest już skopiowany. Bez nich podgląd pokazuje malowanego manekina.
 
+## Plecak, skrzynie i menu
+
+- **Tab / I** otwiera plecak: pola ułożone tak jak na serwerze, z ikonami i liczbą sztuk, a pod nimi pasek szybkiego wyboru. Przedmioty przeciąga się między polami (`inventory.move`) i na pasek (`hotbar.set`). Przeciągnięcie z paska do plecaka czyści pole paska.
+- **E na skrzyni** otwiera plecak i obok zawartość skrzyni (`storage.get`). Przeciąganie w obie strony (`storage.put` / `storage.take`), Shift + klik przenosi cały stos, są też przyciski „Włóż wszystko” i „Weź wszystko”.
+- **Esc** otwiera ustawienia: głośność, czułość myszy, pole widzenia i jakość grafiki (cztery poziomy). Zapisują się w `GameUserSettings.ini` na tym komputerze. Są też przyciski „Wróć do gry” i „Wyjdź z gry”.
+
+Do testów: `FWInventory`, `FWChestNearest`, `FWMoveTile <z> <do>`, `FWStorage <1 włóż / 0 weź> <przedmiot> <ile>`, `FWMenu`, `FWClose`.
+
 ## Ręce i cień gracza
 
 W widoku z pierwszej osoby widać ręce postaci w jej ubraniu (rękawy koszulki, bluzy albo gołe ramiona przy bezrękawniku) i w jej kolorze skóry. Ręce trzyma przed kamerą dwukośćowe IK na manekinie, bez gotowych animacji:
