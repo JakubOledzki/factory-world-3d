@@ -229,6 +229,8 @@ if os.path.isdir(FACTORY):
                 elif slot in SLOT_TEXTURES:
                     set_id = SLOT_TEXTURES[slot]
                     mel.set_material_instance_parent(asset, belt_master if slot == "FW_Rubber" else scan)
+                    if slot != "FW_Rubber":
+                        mel.set_material_instance_scalar_parameter_value(asset, "Grime", 0.85)
                     for param, kind in (("BaseColor", "diff"), ("Normal", "nor_gl"), ("ARM", "arm")):
                         texture = texture_set(set_id, kind)
                         if texture and not (slot == "FW_Rubber" and param == "ARM"):

@@ -138,6 +138,8 @@ private:
 	// Belts whose bend changed get the curved model (or the straight one back)
 	void RefreshBeltArt();
 	void AnimateParts(float DeltaSeconds);
+	// Sagging cables from each pole to the poles and powered objects in its reach
+	void RebuildCables();
 	void RebuildBelts();
 	FBeltLink Connect(FIntPoint Tile, FIntPoint Way) const;
 	int32 BendOf(FIntPoint Tile) const;
@@ -185,6 +187,8 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<UStaticMeshComponent>> TurbineRotors;
 	TMap<FString, int32> DrawnBends;
+	UPROPERTY()
+	TObjectPtr<UInstancedStaticMeshComponent> Cables;
 	UPROPERTY()
 	TArray<TObjectPtr<UStaticMesh>> GroundCoverMeshes;
 	UPROPERTY()

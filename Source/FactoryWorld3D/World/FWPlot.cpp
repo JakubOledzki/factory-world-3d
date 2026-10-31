@@ -12,6 +12,7 @@
 #include "Game/FWGameSettings.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/Base64.h"
+#include "Misc/ScopeExit.h"
 #include "Misc/Compression.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -639,6 +640,7 @@ void AFWPlot::AddObject(const TSharedPtr<FJsonObject>& Json)
 	DrawObject(Object);
 	const FString Kind = Object.Kind;
 	Objects.Add(Object.Id, MoveTemp(Object));
+	RebuildCables();
 	if (FWCatalog::IsBelt(Kind) || FWCatalog::IsInserter(Kind))
 	{
 		RebuildBelts();
@@ -654,6 +656,7 @@ void AFWPlot::RemoveObject(const FString& Id)
 	}
 	InserterArms.Remove(Id);
 	DrawnBends.Remove(Id);
+	ON_SCOPE_EXIT { RebuildCables(); };
 	for (UStaticMeshComponent* Mesh : Removed.Meshes)
 	{
 		if (Mesh)
@@ -719,9 +722,11 @@ bool AFWPlot::DrawArtObject(FFWPlotObject& Object)
 		{
 			return false;
 		}
-		Place(Base, FVector::ZeroVector, FRotator::ZeroRotator, 1.f, true);
+		// 1.5x: the arm then reaches to the edge of the tiles it takes from and drops on
+		constexpr float InserterScale = 1.5f;
+		Place(Base, FVector::ZeroVector, FRotator::ZeroRotator, InserterScale, true);
 		// The arm turns about the top of the column; AnimateParts swings it between the tiles behind and in front
-		InserterArms.Add(Object.Id, Place(Arm, FVector(0, 0, 82.f), FRotator(0.f, 180.f, 0.f), 1.f, false));
+		InserterArms.Add(Object.Id, Place(Arm, FVector(0, 0, 82.f * InserterScale), FRotator(0.f, 180.f, 0.f), InserterScale, false));
 		return true;
 	}
 	if (FWCatalog::IsStorage(Kind))
@@ -732,7 +737,8 @@ bool AFWPlot::DrawArtObject(FFWPlotObject& Object)
 			return false;
 		}
 		const float N = FWCatalog::FootprintSize(Kind);
-		Place(Chest, FVector::ZeroVector, FRotator::ZeroRotator, N * (Kind.Contains(TEXT("iron")) ? 1.15f : 1.f), true);
+		// A chest you could stand behind: about 2.1 x 1.6 x 1.2 m
+		Place(Chest, FVector::ZeroVector, FRotator::ZeroRotator, N * (Kind.Contains(TEXT("iron")) ? 1.4f : 1.25f), true);
 		return true;
 	}
 	if (Kind == TEXT("power_pole") || Kind == TEXT("power_substation") || Kind == TEXT("power_pylon"))
@@ -752,7 +758,7 @@ bool AFWPlot::DrawArtObject(FFWPlotObject& Object)
 		{
 			return false;
 		}
-		Place(Panel, FVector::ZeroVector, FRotator::ZeroRotator, 1.f, true);
+		Place(Panel, FVector::ZeroVector, FRotator::ZeroRotator, 1.25f, true);
 		return true;
 	}
 	if (Kind == TEXT("power_wind_turbine") || Kind == TEXT("power_large_wind_turbine"))
@@ -809,6 +815,88 @@ void AFWPlot::RefreshBeltArt()
 		Object->Meshes[0]->SetRelativeTransform(Transform);
 		DrawnBends[Belt.Id] = Belt.Bend;
 	}
+}
+
+void AFWPlot::RebuildCables()
+{
+	if (!Cables)
+	{
+		Cables = NewObject<UInstancedStaticMeshComponent>(this);
+		Cables->SetStaticMesh(CylinderMesh);
+		Cables->SetMaterial(0, SurfaceMaterial(FLinearColor(0.02f, 0.02f, 0.022f), 0.45f, 0.f));
+		Cables->SetupAttachment(RootComponent);
+		Cables->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Cables->SetVisibleInRayTracing(false);
+		Cables->RegisterComponent();
+	}
+	Cables->ClearInstances();
+
+	// Poles join the poles within wire reach (7 tiles) and feed what stands within 2 tiles of them
+	const float Fit = TileSize / 400.f;
+	auto IsPole = [](const FString& Kind) { return Kind == TEXT("power_pole") || Kind == TEXT("power_substation") || Kind == TEXT("power_pylon"); };
+	auto Powered = [](const FString& Kind) { return Kind.StartsWith(TEXT("power_")) || FWCatalog::IsInserter(Kind) || Kind.StartsWith(TEXT("furniture_")); };
+	TArray<const FFWPlotObject*> Poles;
+	for (const TPair<FString, FFWPlotObject>& Pair : Objects)
+	{
+		if (IsPole(Pair.Value.Kind))
+		{
+			Poles.Add(&Pair.Value);
+		}
+	}
+	// Where a cable attaches: the pole's crossarm, or the top of a powered object
+	auto Attach = [&](const FFWPlotObject& Object, float Side) -> FVector
+	{
+		if (IsPole(Object.Kind))
+		{
+			return FootprintCenter(Object.Kind, Object.Tile) + FVector(0.f, Side * 95.f * Fit, 790.f * Fit);
+		}
+		const float Height = Object.Kind == TEXT("power_wind_turbine") ? 200.f : (FWCatalog::IsInserter(Object.Kind) ? 90.f : 120.f);
+		return FootprintCenter(Object.Kind, Object.Tile) + FVector(0.f, 0.f, Height * Fit);
+	};
+	TArray<FTransform> Segments;
+	auto Span = [&](const FVector& A, const FVector& B)
+	{
+		// A catenary approximated by a parabola: sag about 3% of the span, at least 30 cm
+		const float Length = FVector::Dist(A, B);
+		const float Sag = FMath::Max(30.f * Fit, Length * 0.03f);
+		const int32 Count = FMath::Clamp(FMath::CeilToInt(Length / (60.f * Fit)), 4, 48);
+		FVector Previous = A;
+		for (int32 i = 1; i <= Count; ++i)
+		{
+			const float T = float(i) / Count;
+			const FVector Point = FMath::Lerp(A, B, T) - FVector(0.f, 0.f, 4.f * Sag * T * (1.f - T));
+			const FVector Delta = Point - Previous;
+			// The cylinder is 100 units tall along Z: stretch it along the segment, 2.4 cm thick
+			Segments.Add(FTransform(FRotationMatrix::MakeFromZ(Delta).Rotator(), (Point + Previous) * 0.5f,
+				FVector(0.024f * Fit, 0.024f * Fit, Delta.Size() / 100.f)));
+			Previous = Point;
+		}
+	};
+	for (int32 i = 0; i < Poles.Num(); ++i)
+	{
+		const FFWPlotObject& Pole = *Poles[i];
+		for (int32 j = i + 1; j < Poles.Num(); ++j)
+		{
+			const FIntPoint D = Poles[j]->Tile - Pole.Tile;
+			if (FMath::Max(FMath::Abs(D.X), FMath::Abs(D.Y)) <= 7)
+			{
+				for (const float Side : { -1.f, 1.f })
+				{
+					Span(Attach(Pole, Side), Attach(*Poles[j], Side));
+				}
+			}
+		}
+		for (const TPair<FString, FFWPlotObject>& Pair : Objects)
+		{
+			const FFWPlotObject& Other = Pair.Value;
+			const FIntPoint D = Other.Tile - Pole.Tile;
+			if (!IsPole(Other.Kind) && Powered(Other.Kind) && FMath::Max(FMath::Abs(D.X), FMath::Abs(D.Y)) <= 2)
+			{
+				Span(Attach(Pole, 0.f) - FVector(0, 0, 60.f * Fit), Attach(Other, 0.f));
+			}
+		}
+	}
+	Cables->AddInstances(Segments, false);
 }
 
 void AFWPlot::AnimateParts(float DeltaSeconds)
