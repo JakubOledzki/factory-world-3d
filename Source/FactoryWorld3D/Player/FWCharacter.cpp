@@ -317,6 +317,12 @@ void AFWCharacter::Strike()
 	}
 }
 
+void AFWCharacter::ApplyUserSettings(float InMouseSensitivity, float FieldOfView)
+{
+	MouseSensitivity = InMouseSensitivity;
+	Camera->SetFieldOfView(FieldOfView);
+}
+
 void AFWCharacter::SetLook(const FFWLook& Look)
 {
 	FWGear::Dress(this, Body, BodyGear, Look);
@@ -552,6 +558,9 @@ void AFWCharacter::CreateInput()
 	Mapping->MapKey(MakeAction(TEXT("Primary"), EInputActionValueType::Boolean), EKeys::LeftMouseButton);
 	Mapping->MapKey(MakeAction(TEXT("Build"), EInputActionValueType::Boolean), EKeys::B);
 	Mapping->MapKey(MakeAction(TEXT("Rotate"), EInputActionValueType::Boolean), EKeys::R);
+	Mapping->MapKey(MakeAction(TEXT("Inventory"), EInputActionValueType::Boolean), EKeys::Tab);
+	Mapping->MapKey(Actions[TEXT("Inventory")], EKeys::I);
+	Mapping->MapKey(MakeAction(TEXT("Menu"), EInputActionValueType::Boolean), EKeys::Escape);
 	// The mouse wheel steps through the hotbar
 	Mapping->MapKey(MakeAction(TEXT("Scroll"), EInputActionValueType::Axis1D), EKeys::MouseWheelAxis);
 	const FKey SlotKeys[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five };
@@ -594,6 +603,20 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	Input->BindAction(Actions[TEXT("Build")], ETriggerEvent::Started, this, &AFWCharacter::ToggleBuild);
 	Input->BindAction(Actions[TEXT("Rotate")], ETriggerEvent::Started, this, &AFWCharacter::Rotate);
 	Input->BindAction(Actions[TEXT("Scroll")], ETriggerEvent::Started, this, &AFWCharacter::Scroll);
+	Input->BindActionValueLambda(Actions[TEXT("Inventory")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenInventory();
+		}
+	});
+	Input->BindActionValueLambda(Actions[TEXT("Menu")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenSettings();
+		}
+	});
 	for (int32 Slot = 0; Slot < 5; ++Slot)
 	{
 		Input->BindActionValueLambda(Actions[*FString::Printf(TEXT("Slot%d"), Slot + 1)], ETriggerEvent::Started,
@@ -617,8 +640,8 @@ void AFWCharacter::Move(const FInputActionValue& Value)
 void AFWCharacter::Look(const FInputActionValue& Value)
 {
 	const FVector2D Axis = Value.Get<FVector2D>();
-	AddControllerYawInput(Axis.X);
-	AddControllerPitchInput(-Axis.Y);
+	AddControllerYawInput(Axis.X * MouseSensitivity);
+	AddControllerPitchInput(-Axis.Y * MouseSensitivity);
 }
 
 void AFWCharacter::SprintStart()
@@ -649,7 +672,7 @@ void AFWCharacter::InteractStart()
 	}
 	else if (const FFWPlotObject* Object = Plot->FindObjectAt(TargetTile); Object && FWCatalog::IsStorage(Object->Kind))
 	{
-		PC->PutAllInStorage(Object->Id);
+		PC->OpenInventory(Object->Id);
 	}
 }
 
