@@ -132,7 +132,9 @@ Cień rzuca osobna, niewidoczna dla gracza pełna postać w tym samym wyglądzie
 
 **Kilof:** przy kopaniu prawa ręka zaciska się na kilofie (model z Blendera, `Tools/blender/make_tools.py`: kuta głowica z kilofem i dłutem, trzonek z jesionu z gumowym owijem; tekstury CC0 z Poly Haven). Przy każdym uderzeniu: dźwięk, lekkie szarpnięcie widoku, odpryski skały (fizyka, znikają po 2 s) i ślad na kamieniu (znika po kilkunastu sekundach). Bez kopania dłonie są lekko zgięte.
 
-Do testów: `FWGesture place|rotate|pickup|swing|mine`, `FWDress <koszulka 0–2> <kolor hex>`, `FWWalk <s>`.
+**Pasek i przedmiot w dłoni:** wybrany przedmiot z paska (1–5 albo kółko myszy) widać w rękach: mały model tego, co się buduje, trzymany między dłońmi i powoli obracany, a kilof w prawej dłoni. Przy zmianie przedmiotu ręce chowają się i wracają z nowym. Pasek ma kwadratowe pola z ikonami wyrenderowanymi z tych samych modeli (`Tools/blender/render_icons.py`, Cycles, przezroczyste tło), liczbą sztuk i podświetlonym, większym wybranym polem, a nad nim nazwę wybranego przedmiotu.
+
+Do testów: `FWSelect <0–4>`, `FWGesture place|rotate|pickup|swing|mine`, `FWDress <koszulka 0–2> <kolor hex>`, `FWWalk <s>`.
 
 ## Dźwięk
 

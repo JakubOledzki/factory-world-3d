@@ -151,6 +151,78 @@ void AFWCharacter::CreateBody()
 		Tool->SetVisibility(false);
 		Tool->RegisterComponent();
 	}
+	Held = NewObject<UStaticMeshComponent>(this);
+	Held->SetupAttachment(Arms);
+	Held->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Held->SetOnlyOwnerSee(true);
+	Held->SetCastShadow(false);
+	Held->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
+	Held->SetVisibility(false);
+	Held->RegisterComponent();
+}
+
+void AFWCharacter::UpdateHeld(float DeltaSeconds)
+{
+	const AFWPlayerController* PC = GetFWController();
+	const FString Selected = PC ? PC->GetSelectedItem() : FString();
+	// A new slot: down with the old item, then up with the new one
+	if (Selected != HeldItem && EquipTime < 0.f)
+	{
+		EquipTime = 0.f;
+	}
+	if (EquipTime >= 0.f)
+	{
+		const float Before = EquipTime;
+		EquipTime += DeltaSeconds;
+		if (Before < 0.18f && EquipTime >= 0.18f)
+		{
+			HeldItem = Selected;
+			UStaticMesh* Model = HeldItem.IsEmpty() || HeldItem.StartsWith(TEXT("tool_")) ? nullptr : FWArt::ItemMesh(HeldItem);
+			if (Held)
+			{
+				Held->SetStaticMesh(Model);
+				if (Model)
+				{
+					// About 13 cm across, whatever the model's size
+					const float Scale = 6.5f / FMath::Max(1.f, Model->GetBounds().SphereRadius);
+					Held->SetWorldScale3D(FVector(Scale));
+				}
+			}
+		}
+		if (EquipTime >= 0.5f)
+		{
+			EquipTime = -1.f;
+		}
+	}
+	const bool bPickaxe = HeldItem.StartsWith(TEXT("tool_pickaxe"));
+	if (bPickaxe)
+	{
+		ToolShown = 1.f;
+	}
+	if (Held)
+	{
+		const bool bShow = Held->GetStaticMesh() != nullptr && ToolShown <= 0.f;
+		Held->SetVisibility(bShow);
+		if (bShow)
+		{
+			// Between the hands, a little above them, turning slowly like a model on a table
+			HeldSpin += DeltaSeconds * 25.f;
+			const FVector Hands = (Arms->GetBoneLocation(TEXT("hand_l")) + Arms->GetBoneLocation(TEXT("hand_r"))) * 0.5f;
+			const FVector Middle = Held->GetStaticMesh()->GetBounds().Origin * Held->GetComponentScale();
+			const FRotator Turn(0.f, GetControlRotation().Yaw + HeldSpin, 0.f);
+			Held->SetWorldLocationAndRotation(Hands + Camera->GetUpVector() * 7.f + Camera->GetForwardVector() * 4.f - Turn.RotateVector(Middle), Turn);
+		}
+	}
+}
+
+void AFWCharacter::Scroll(const FInputActionValue& Value)
+{
+	const float Delta = Value.Get<float>();
+	if (AFWPlayerController* PC = GetFWController(); PC && FMath::Abs(Delta) > 0.f)
+	{
+		const int32 Size = AFWPlayerController::HotbarSize;
+		SelectSlot((PC->GetSelectedSlot() + (Delta < 0.f ? 1 : -1) + Size) % Size);
+	}
 }
 
 void AFWCharacter::CurlFingers(int32 Side, float Amount)
@@ -298,7 +370,7 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 	ViewLag = ViewLag.ClampAxes(-6.f, 6.f);
 
 	// Hands a little higher and closer in build mode, as if holding something up to set it down
-	BuildRaise = FMath::FInterpTo(BuildRaise, bBuildMode ? 1.f : 0.f, DeltaSeconds, 6.f);
+	BuildRaise = FMath::FInterpTo(BuildRaise, bBuildMode || (Held && Held->IsVisible()) ? 1.f : 0.f, DeltaSeconds, 6.f);
 
 	// Gestures: offsets of the right (index 1) and left hand over their length
 	FVector Gest[2] = { FVector::ZeroVector, FVector::ZeroVector };
@@ -366,6 +438,12 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 		FVector Hand(Sign * (21.f - 4.f * BuildRaise), 48.f + 4.f * BuildRaise, 146.f + 6.f * BuildRaise);
 		Hand += FVector(StepSway * Sign * 0.3f + ViewLag.X * -0.8f, 0.f, Breath - StepBob - ViewLag.Y * 0.8f);
 		Hand += Gest[Side];
+		// Changing items: the hands dip out of view and come back
+		if (EquipTime >= 0.f)
+		{
+			const float Dip = EquipTime < 0.18f ? FMath::SmoothStep(0.f, 0.18f, EquipTime) : 1.f - FMath::SmoothStep(0.18f, 0.5f, EquipTime);
+			Hand += FVector(0.f, -6.f, -26.f) * Dip;
+		}
 		// Elbows out and down
 		const FVector Elbow(Sign * 45.f, 18.f, 112.f);
 		FTransform Upper = ArmRef[Side].Upper;
@@ -474,6 +552,8 @@ void AFWCharacter::CreateInput()
 	Mapping->MapKey(MakeAction(TEXT("Primary"), EInputActionValueType::Boolean), EKeys::LeftMouseButton);
 	Mapping->MapKey(MakeAction(TEXT("Build"), EInputActionValueType::Boolean), EKeys::B);
 	Mapping->MapKey(MakeAction(TEXT("Rotate"), EInputActionValueType::Boolean), EKeys::R);
+	// The mouse wheel steps through the hotbar
+	Mapping->MapKey(MakeAction(TEXT("Scroll"), EInputActionValueType::Axis1D), EKeys::MouseWheelAxis);
 	const FKey SlotKeys[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five };
 	for (int32 Slot = 0; Slot < 5; ++Slot)
 	{
@@ -513,6 +593,7 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	Input->BindAction(Actions[TEXT("Primary")], ETriggerEvent::Started, this, &AFWCharacter::Primary);
 	Input->BindAction(Actions[TEXT("Build")], ETriggerEvent::Started, this, &AFWCharacter::ToggleBuild);
 	Input->BindAction(Actions[TEXT("Rotate")], ETriggerEvent::Started, this, &AFWCharacter::Rotate);
+	Input->BindAction(Actions[TEXT("Scroll")], ETriggerEvent::Started, this, &AFWCharacter::Scroll);
 	for (int32 Slot = 0; Slot < 5; ++Slot)
 	{
 		Input->BindActionValueLambda(Actions[*FString::Printf(TEXT("Slot%d"), Slot + 1)], ETriggerEvent::Started,
@@ -673,6 +754,7 @@ void AFWCharacter::Tick(float DeltaSeconds)
 	UpdateHold(DeltaSeconds);
 	UpdateHeadBob(DeltaSeconds);
 	UpdateFootsteps(DeltaSeconds);
+	UpdateHeld(DeltaSeconds);
 	UpdateArms(DeltaSeconds);
 	UpdateBodyAnimation();
 }

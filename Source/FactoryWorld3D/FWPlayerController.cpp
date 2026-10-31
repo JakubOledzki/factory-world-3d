@@ -18,6 +18,8 @@
 #include "UI/SFWHud.h"
 #include "AudioMixerBlueprintLibrary.h"
 #include "Components/AudioComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Game/FWArt.h"
 #include "Game/FWAudio.h"
 #include "UI/SFWCharacterCreator.h"
 #include "UI/SFWLoginWidget.h"
@@ -660,6 +662,17 @@ FString AFWPlayerController::ItemName(const FString& Item) const
 void AFWPlayerController::SelectSlot(int32 Slot)
 {
 	SelectedSlot = FMath::Clamp(Slot, 0, HotbarSize - 1);
+}
+
+UTexture2D* AFWPlayerController::GetIcon(const FString& Item) const
+{
+	const UStaticMesh* Mesh = Item.IsEmpty() ? nullptr : FWArt::ItemMesh(Item);
+	if (!Mesh)
+	{
+		return nullptr;
+	}
+	const FString Name = FString::Printf(TEXT("icon_%s"), *Mesh->GetName());
+	return FWArt::Texture(*FString::Printf(TEXT("/Game/External/Icons/%s.%s"), *Name, *Name));
 }
 
 void AFWPlayerController::Toast(const FText& Text, bool bError)

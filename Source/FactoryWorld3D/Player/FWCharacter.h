@@ -57,6 +57,9 @@ public:
 	// Console: plays a gesture (place, rotate, pickup, swing)
 	UFUNCTION(Exec)
 	void FWGesture(const FString& Name);
+	// Console: picks a hotbar slot (0-based), as 1-5 or the mouse wheel do
+	UFUNCTION(Exec)
+	void FWSelect(int32 Slot) { SelectSlot(Slot); }
 	// Console: tries a shirt (0 t-shirt, 1 tank top, 2 hoodie) in a colour (hex), for screenshots
 	UFUNCTION(Exec)
 	void FWDress(int32 ShirtStyle, const FString& ShirtColor = TEXT("e67e22"));
@@ -122,6 +125,15 @@ private:
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> Tool;
 	float ToolShown = 0.f;
+	// The hotbar item in the hands: a small model of it held up between them (the pickaxe in the right hand);
+	// changing slots lowers the hands and brings the new one up
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> Held;
+	FString HeldItem;
+	float EquipTime = -1.f;
+	float HeldSpin = 0.f;
+	void UpdateHeld(float DeltaSeconds);
+	void Scroll(const FInputActionValue& Value);
 	float SwingRaise = 0.f;
 	float SwingStrike = 0.f;
 	bool bStruck = false;
