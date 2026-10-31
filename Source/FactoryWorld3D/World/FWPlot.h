@@ -123,6 +123,10 @@ private:
 	};
 
 	void BuildGround(int32 Biome);
+	UMaterialInterface* MakeGroundMaterial(int32 Biome);
+	void ScatterSurroundings(int32 Biome);
+	UHierarchicalInstancedStaticMeshComponent* MakeArtInstances(UStaticMesh* Mesh, bool bCollide);
+	FTransform ArtTransform(UStaticMesh* Mesh, const FVector& Ground, float Yaw, float Size2D, float Height, float Sink) const;
 	void BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCodes);
 	UHierarchicalInstancedStaticMeshComponent* MakeInstances(UStaticMesh* Mesh, const FLinearColor& Color, float Roughness, bool bCollide);
 	void DrawObject(FFWPlotObject& Object);
@@ -163,6 +167,11 @@ private:
 	TObjectPtr<UMaterialInterface> SurfaceBase;
 	UPROPERTY()
 	TObjectPtr<UMaterialInterface> GroundBase;
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> TerrainBase;
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> TerrainMesh;
+	int32 PendingScatterBiome = -1;
 	UPROPERTY()
 	TMap<uint32, TObjectPtr<UMaterialInstanceDynamic>> Materials;
 	UPROPERTY()

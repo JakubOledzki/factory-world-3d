@@ -6,6 +6,7 @@
 
 class UDirectionalLightComponent;
 class UExponentialHeightFogComponent;
+class UPostProcessComponent;
 class USkyAtmosphereComponent;
 class USkyLightComponent;
 class UStaticMeshComponent;
@@ -41,4 +42,7 @@ public:
 
 	UPROPERTY(VisibleAnywhere, Category = "Environment")
 	TObjectPtr<UStaticMeshComponent> Ground;
+
+	UPROPERTY(VisibleAnywhere, Category = "Environment")
+	TObjectPtr<UPostProcessComponent> Post;
 };

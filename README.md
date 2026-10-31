@@ -115,3 +115,15 @@ Password=<hasło konta testowego>
 Katalog `Saved/` nie trafia do gita, więc hasła nie ma w repozytorium. Plik jest pomijany w wersji Shipping. Żeby wyłączyć automatyczne logowanie, usuń plik albo zostaw puste `Email=`.
 
 Konto bez działki i bez pieniędzy dostaje propozycję kupna działki i przycisk „Rozejrzyj się (bez działki)”, więc gra nie utyka.
+
+## Grafika: zasoby zewnętrzne
+
+Fotogrametryczne skały, drzewa, krzaki, tekstury gruntu (Poly Haven, CC0) i prawdziwe ukształtowanie terenu (Copernicus DEM) nie są w repozytorium, bo zajęłyby zbyt dużo miejsca w Git LFS. Tworzy je jedno polecenie:
+
+```
+powershell -ExecutionPolicy Bypass -File Tools\setup_assets.ps1
+```
+
+Skrypt pobiera pliki i sprawdza ich sumy kontrolne, przygotowuje je w Blenderze (odchudza skany do budżetów Nanite i buduje teren wokół działki) i importuje do `Content/External`. Wymaga Node.js, Blendera 5.2 i UE 5.8 (ścieżki można zmienić parametrami). Bez tych zasobów gra też działa, tylko z prostymi kształtami zastępczymi. Licencje i źródła są opisane w [ASSETS.md](ASSETS.md).
+
+Obraz: fizyczne słońce (75 000 lx), ekspozycja z histogramu w zakresie EV 12,5–14,8, krzywa filmowa, delikatny bloom, winieta i ziarno, Lumen z HW RT (oświetlenie trafień z surface cache), wirtualne mapy cieni, Nanite, mgła wolumetryczna.
