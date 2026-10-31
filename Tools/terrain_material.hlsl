@@ -22,7 +22,8 @@ float3 baseD = LAYER(BaseD, uv).rgb;
 float3 baseN = LAYER(BaseN, uv).rgb * 2 - 1;
 float3 baseM = LAYER(BaseM, uv).rgb;
 
-float3 grassD = LAYER(GrassD, uv * 0.7).rgb;
+// Alpine meadow: the photographed grass pulled greener
+float3 grassD = LAYER(GrassD, uv * 0.7).rgb * float3(0.82, 1.0, 0.72);
 float3 grassN = LAYER(GrassN, uv * 0.7).rgb * 2 - 1;
 float3 grassM = LAYER(GrassM, uv * 0.7).rgb;
 
@@ -41,7 +42,7 @@ float3 snowM = Texture2DSample(SnowM, SnowMSampler, uv * 0.5).rgb;
 // Masks: grass in patches on gentle ground, rock on steep slopes, snow high up
 float patches = saturate(0.5 + 0.5 * sin(WP.x * 0.0023 + 1.7 * sin(WP.y * 0.0017)) * sin(WP.y * 0.0029 + 1.3 * sin(WP.x * 0.0011)));
 float slope = 1 - saturate(n.z);
-float cliff = smoothstep(0.13, 0.3, slope);
+float cliff = smoothstep(0.09, 0.24, slope + (patches - 0.5) * 0.08);
 float grass = saturate(smoothstep(0.35, 0.75, patches + baseD.g * 0.4) * GrassAmount) * (1 - cliff);
 float snow = smoothstep(SnowHeight, SnowHeight + 8000, WP.z + (patches - 0.5) * 3000) * (1 - cliff * 0.8);
 
@@ -57,7 +58,14 @@ arm = lerp(arm, snowM, snow);
 
 // Large-scale brightness changes, so the ground does not look printed; flatter normals far away
 color *= lerp(0.82, 1.12, macro) * Tint;
-normal.xy *= lerp(1.0, 0.4, farMix);
+// Rock bands on steep ground: darker streaks across the slope and flatter normals far away, so
+// the normal, so kilometre-wide faces of 30 m elevation data do not read as smooth
+// (low frequencies only: anything finer shows as stripes from a distance)
+float streak = 0.5 + 0.5 * sin(WP.z * 0.0007 + sin(WP.x * 0.00031 + WP.y * 0.00023) * 4.0) * sin(WP.x * 0.00019 - WP.y * 0.00027);
+color *= lerp(1.0, lerp(0.78, 1.04, streak), cliff);
+normal.xy *= lerp(1.0, 0.5, farMix);
+// Cooler, greyer rock far off (granite in haze), warmer meadow near
+color = lerp(color, dot(color, float3(0.3, 0.59, 0.11)) * float3(0.95, 0.98, 1.04), cliff * 0.5);
 // Normal maps are BC5 (x, y only): rebuild z after blending
 NormalOut = float3(normal.xy, sqrt(saturate(1 - dot(normal.xy, normal.xy))));
 ArmOut = arm;

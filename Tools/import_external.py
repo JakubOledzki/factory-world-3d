@@ -29,13 +29,17 @@ def run(files, destination):
 
 
 # Models
+# Either RawAssets/processed/<name>.glb (made in Blender) or <name>/<name>.gltf (original, untouched)
+sources = {}
 for file in sorted(os.listdir(MODELS)):
-    if not file.endswith(".glb"):
-        continue
-    name = file[:-4]
+    if file.endswith(".glb"):
+        sources[file[:-4]] = os.path.join(MODELS, file)
+    elif os.path.isfile(os.path.join(MODELS, file, f"{file}.gltf")):
+        sources[file] = os.path.join(MODELS, file, f"{file}.gltf")
+for name, source in sources.items():
     destination = f"/Game/External/Models/{name}"
     if not library.list_assets(destination, recursive=True):  # already imported: just fix settings
-        run([os.path.join(MODELS, file)], destination)
+        run([source], destination)
     # Import tasks do not report what Interchange made, so look in the folder
     for path in library.list_assets(destination, recursive=True, include_folder=False):
         asset = unreal.load_asset(path)
@@ -76,7 +80,7 @@ unreal.log("FWIMPORT done")
 # Twig and leaf cards: glTF brings them as blended (or opaque); they must be alpha-masked cards
 for path in library.list_assets("/Game/External/Models", recursive=True, include_folder=False):
     lower = path.lower()
-    if "/materials/" not in lower or not any(k in lower for k in ("twig", "leaf", "leaves", "needle")):
+    if "/materials/" not in lower or not any(k in lower for k in ("twig", "leaf", "leaves", "needle", "grass", "fern", "shrub")):
         continue
     material = unreal.load_asset(path)
     if isinstance(material, unreal.MaterialInstanceConstant):
@@ -97,3 +101,14 @@ for path in library.list_assets("/Game/External/Models", recursive=True, include
         unreal.MaterialEditingLibrary.recompile_material(material)
         library.save_loaded_asset(material)
         unreal.log(f"FWIMPORT masked {path}")
+
+# Scanned rocks are captured darker than granite reads in daylight: lift their albedo
+for path in library.list_assets("/Game/External/Models", recursive=True, include_folder=False):
+    lower = path.lower()
+    if "/materials/" not in lower or not any(k in lower for k in ("boulder", "rock")):
+        continue
+    material = unreal.load_asset(path)
+    if isinstance(material, unreal.MaterialInstanceConstant):
+        unreal.MaterialEditingLibrary.set_material_instance_vector_parameter_value(material, "BaseColorFactor", unreal.LinearColor(1.6, 1.6, 1.6, 1.0))
+        library.save_loaded_asset(material)
+        unreal.log(f"FWIMPORT brighter {path}")

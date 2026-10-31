@@ -121,7 +121,7 @@ namespace FWArt
 		case 6: // mountains
 			Set.Base = TEXT("rocky_terrain_02");
 			Set.Grass = TEXT("aerial_grass_rock");
-			Set.GrassAmount = 0.55f;
+			Set.GrassAmount = 0.8f;
 			Set.SnowHeightCm = 115000.f;
 			break;
 		case 8: // ice

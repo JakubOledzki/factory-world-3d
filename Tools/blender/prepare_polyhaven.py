@@ -155,6 +155,17 @@ for name in sorted(os.listdir(SOURCE)):
             bpy.ops.object.join()
             keeper.name = original
         meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
+    elif before <= DEFAULT_BUDGET:
+        # Within budget: import the original glTF untouched (a Blender round trip loses the scan's normals)
+        import shutil
+        target = os.path.join(OUT, name)
+        shutil.rmtree(target, ignore_errors=True)
+        shutil.copytree(os.path.join(SOURCE, name), target)
+        stale = os.path.join(OUT, f"{name}.glb")
+        if os.path.exists(stale):
+            os.remove(stale)
+        print(f"FWPREP {name}: {before} triangles, original kept")
+        continue
     else:
         for obj in meshes:
             decimate(obj, DEFAULT_BUDGET * triangles([obj]) / max(1, before))

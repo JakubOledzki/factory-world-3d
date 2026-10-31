@@ -287,15 +287,20 @@ UHierarchicalInstancedStaticMeshComponent* AFWPlot::MakeArtInstances(UStaticMesh
 	return Component;
 }
 
-FTransform AFWPlot::ArtTransform(UStaticMesh* Mesh, const FVector& Ground, float Yaw, float Size2D, float Height, float Sink) const
+FTransform AFWPlot::ArtTransform(UStaticMesh* Mesh, const FVector& Ground, float Yaw, float Size2D, float Height, float Sink, const FVector& Normal, float Tilt) const
 {
-	// Scale a scanned mesh to a size (across, or tall when Height > 0) and stand its bottom on the ground
+	// Scale a scanned mesh to a size (across, or tall when Height > 0) and stand its bottom on the ground,
+	// leaning partly with the slope (Tilt 0..1) and sunk deeper the steeper it is, so no edge floats
 	const FBoxSphereBounds Bounds = Mesh->GetBounds();
 	const float Scale = Height > 0.f
 		? Height / FMath::Max(1.f, 2.f * Bounds.BoxExtent.Z)
 		: Size2D / FMath::Max(1.f, 2.f * FMath::Max(Bounds.BoxExtent.X, Bounds.BoxExtent.Y));
+	const FVector Up = FMath::Lerp(FVector::UpVector, Normal.GetSafeNormal(), Tilt).GetSafeNormal();
+	const FQuat Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Up) * FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw));
+	const float Steep = 1.f - FMath::Clamp(Normal.GetSafeNormal().Z, 0.f, 1.f);
 	const float Bottom = (Bounds.Origin.Z - Bounds.BoxExtent.Z) * Scale;
-	return FTransform(FRotator(0.f, Yaw, 0.f), Ground - FVector(0, 0, Bottom + Sink * Scale * Bounds.BoxExtent.Z * 2.f), FVector(Scale));
+	const float Depth = (Sink + Steep * 0.6f) * Scale * Bounds.BoxExtent.Z * 2.f;
+	return FTransform(Rotation, Ground - Up * (Bottom + Depth), FVector(Scale));
 }
 
 void AFWPlot::ScatterSurroundings(int32 Biome)
@@ -342,17 +347,17 @@ void AFWPlot::ScatterSurroundings(int32 Biome)
 		{
 			// Tufts of grass and ferns on the gentle ground near the plot
 			UStaticMesh* Mesh = GrassMeshes[Random.RandHelper(GrassMeshes.Num())];
-			Placed.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Ground, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(40.f, 110.f), 0.f));
+			Placed.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Ground, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(40.f, 110.f), 0.05f, Hit.ImpactNormal, 0.8f));
 		}
 		else if (!RockMeshes.IsEmpty() && Roll < 0.85f)
 		{
 			UStaticMesh* Mesh = RockMeshes[Random.RandHelper(RockMeshes.Num())];
-			Placed.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Ground, Random.FRandRange(0.f, 360.f), Random.FRandRange(300.f, 1800.f), 0.f, 0.25f));
+			Placed.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Ground, Random.FRandRange(0.f, 360.f), Random.FRandRange(300.f, 1800.f), 0.f, 0.3f, Hit.ImpactNormal, 0.7f));
 		}
 		else if (!BushMeshes.IsEmpty() && Flatness > 0.8f)
 		{
 			UStaticMesh* Mesh = BushMeshes[Random.RandHelper(BushMeshes.Num())];
-			Placed.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Ground, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(80.f, 220.f), 0.05f));
+			Placed.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Ground, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(80.f, 220.f), 0.08f, Hit.ImpactNormal, 0.5f));
 		}
 	}
 	int32 Total = 0;
@@ -370,6 +375,7 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 	const TArray<UStaticMesh*> RockMeshes = FWArt::Rocks();
 	const TArray<UStaticMesh*> TreeMeshes = FWArt::Trees();
 	const TArray<UStaticMesh*> BushMeshes = FWArt::Bushes();
+	const TArray<UStaticMesh*> GrassMeshes = FWArt::Grass();
 
 	UHierarchicalInstancedStaticMeshComponent* Trunks = MakeInstances(CylinderMesh, FLinearColor(0.12f, 0.07f, 0.04f), 0.9f, true);
 	UHierarchicalInstancedStaticMeshComponent* Crowns = MakeInstances(ConeMesh, FLinearColor(0.03f, 0.09f, 0.03f), 0.85f, false);
@@ -389,11 +395,21 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 		for (int32 X = 0; X < Size; ++X)
 		{
 			const uint8 Code = Codes[Y * Size + X];
+			FRandomStream Random(Y * Size + X + 1);
 			if (Code == FWCatalog::Empty)
 			{
+				// Ground cover on some free tiles: not solid, so building over it is fine
+				if (!GrassMeshes.IsEmpty() && Random.FRand() < 0.35f)
+				{
+					for (int32 Tuft = 0; Tuft < 3; ++Tuft)
+					{
+						UStaticMesh* Mesh = GrassMeshes[Random.RandHelper(GrassMeshes.Num())];
+						const FVector At = TileCenter(FIntPoint(X, Y)) + FVector(Random.FRandRange(-0.5f, 0.5f) * TileSize, Random.FRandRange(-0.5f, 0.5f) * TileSize, 0.f);
+						ArtSoft.FindOrAdd(Mesh).Add(ArtTransform(Mesh, At, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(25.f, 70.f), 0.05f));
+					}
+				}
 				continue;
 			}
-			FRandomStream Random(Y * Size + X + 1);
 			const FVector Center = TileCenter(FIntPoint(X, Y));
 			const FVector Jitter(Random.FRandRange(-0.2f, 0.2f) * TileSize, Random.FRandRange(-0.2f, 0.2f) * TileSize, 0.f);
 			const FRotator Spin(0.f, Random.FRandRange(0.f, 360.f), 0.f);
