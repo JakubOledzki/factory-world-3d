@@ -20,6 +20,9 @@ public:
 		SLATE_ARGUMENT(FText, InputHint)
 		SLATE_ARGUMENT(FText, ButtonText)
 		SLATE_EVENT(FOnFWPromptAccepted, OnAccepted)
+		// Optional second button, e.g. to close the panel without choosing
+		SLATE_ARGUMENT(FText, SecondaryText)
+		SLATE_EVENT(FSimpleDelegate, OnSecondary)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);

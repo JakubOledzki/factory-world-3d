@@ -102,3 +102,16 @@ Testy bez klawiatury: polecenia konsoli `FWPrompt`, `FWGoto`, `FWMine`, `FWPlace
 Materiały bazowe (`Content/Materials`) tworzy skrypt `Tools/make_materials.py`.
 
 ![Tryb budowania](docs/screenshots/build_mode.png)
+
+## Automatyczne logowanie (tylko do testów)
+
+Żeby gra od razu wchodziła na działkę, bez ekranu logowania, utwórz plik `Saved/DevLogin.ini`:
+
+```ini
+Email=explore3d@example.test
+Password=<hasło konta testowego>
+```
+
+Katalog `Saved/` nie trafia do gita, więc hasła nie ma w repozytorium. Plik jest pomijany w wersji Shipping. Żeby wyłączyć automatyczne logowanie, usuń plik albo zostaw puste `Email=`.
+
+Konto bez działki i bez pieniędzy dostaje propozycję kupna działki i przycisk „Rozejrzyj się (bez działki)”, więc gra nie utyka.

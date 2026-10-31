@@ -59,6 +59,21 @@ void SFWPromptWidget::Construct(const FArguments& InArgs)
 		]
 	];
 
+	if (!InArgs._SecondaryText.IsEmpty())
+	{
+		FSimpleDelegate OnSecondary = InArgs._OnSecondary;
+		Box->AddSlot().AutoHeight().Padding(0, 8, 0, 0)
+		[
+			SNew(SButton)
+			.HAlign(HAlign_Center)
+			.ContentPadding(FMargin(0, 6))
+			.OnClicked_Lambda([OnSecondary]() { OnSecondary.ExecuteIfBound(); return FReply::Handled(); })
+			[
+				SNew(STextBlock).Text(InArgs._SecondaryText).Font(FCoreStyle::GetDefaultFontStyle("Regular", 12))
+			]
+		];
+	}
+
 	ChildSlot
 	[
 		SNew(SBorder)

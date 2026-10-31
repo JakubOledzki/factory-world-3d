@@ -335,7 +335,19 @@ uint8 AFWPlot::TileCode(FIntPoint Tile) const
 
 FVector AFWPlot::SpawnLocation() const
 {
-	return TileCenter(Spawn) + FVector(0, 0, 120.f);
+	return GroundAt(Spawn);
+}
+
+FVector AFWPlot::GroundAt(FIntPoint Tile) const
+{
+	// The top of whatever stands there, so a body placed on it stands rather than drops or sticks
+	const FVector Center = TileCenter(Tile);
+	FHitResult Hit;
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Center + FVector(0, 0, 5000.f), Center - FVector(0, 0, 5000.f), ECC_Visibility))
+	{
+		return Hit.ImpactPoint;
+	}
+	return Center;
 }
 
 const FFWMine* AFWPlot::FindMine(FIntPoint Tile) const

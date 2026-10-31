@@ -38,6 +38,11 @@ public:
 	// Console: switches build mode as B does
 	UFUNCTION(Exec)
 	void FWBuildMode() { ToggleBuild(); }
+	// Console: logs the movement mode and how far the feet are above the ground
+	UFUNCTION(Exec)
+	void FWGroundCheck();
+	UFUNCTION(Exec)
+	void FWJump() { Jump(); }
 
 protected:
 	virtual void BeginPlay() override;
@@ -61,6 +66,7 @@ private:
 	void UpdateTarget();
 	void UpdateGhost();
 	void UpdateHold(float DeltaSeconds);
+	void UpdateHeadBob(float DeltaSeconds);
 
 	AFWPlayerController* GetFWController() const;
 	AFWPlot* GetPlot() const;
@@ -94,6 +100,8 @@ private:
 	int32 HoldMine = -1;
 	FString HoldObject;
 
-	float WalkSpeed = 520.f;
-	float SprintSpeed = 1100.f;
+	float WalkSpeed = 450.f;
+	float SprintSpeed = 900.f;
+	float EyeHeight = 165.f;
+	float BobPhase = 0.f;
 };

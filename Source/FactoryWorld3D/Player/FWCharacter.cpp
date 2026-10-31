@@ -33,15 +33,27 @@ AFWCharacter::AFWCharacter()
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(GetCapsuleComponent());
-	Camera->SetRelativeLocation(FVector(0.f, 0.f, 70.f));
 	Camera->bUsePawnControlRotation = true;
 	Camera->SetFieldOfView(90.f);
 
+	// A person, not a tile: eyes ~165 cm above the feet whatever TileSizeCm is
+	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - 92.f));
+
+	// Grounded and snappy: stronger gravity, a short jump, quick start and stop without gliding
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	Movement->SetMovementMode(MOVE_Walking);
+	Movement->DefaultLandMovementMode = MOVE_Walking;
+	Movement->GravityScale = 1.6f;
 	Movement->MaxWalkSpeed = WalkSpeed;
-	Movement->JumpZVelocity = 480.f;
-	Movement->AirControl = 0.35f;
-	Movement->BrakingDecelerationWalking = 2400.f;
+	Movement->MaxAcceleration = 2400.f;
+	Movement->GroundFriction = 10.f;
+	Movement->BrakingDecelerationWalking = 3000.f;
+	Movement->BrakingFrictionFactor = 1.f;
+	Movement->JumpZVelocity = 520.f;
+	Movement->AirControl = 0.15f;
+	Movement->FallingLateralFriction = 0.5f;
+	Movement->MaxStepHeight = 50.f;
+	Movement->SetWalkableFloorAngle(50.f);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> GhostBase(TEXT("/Game/Materials/M_FWGhost.M_FWGhost"));
@@ -155,6 +167,11 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 
 void AFWCharacter::Move(const FInputActionValue& Value)
 {
+	// Walking again after a console view from above
+	if (GetCharacterMovement()->IsFlying())
+	{
+		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	}
 	const FVector2D Axis = Value.Get<FVector2D>();
 	const FRotator Yaw(0.f, GetControlRotation().Yaw, 0.f);
 	AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::X), Axis.Y);
@@ -292,6 +309,7 @@ void AFWCharacter::Tick(float DeltaSeconds)
 	UpdateTarget();
 	UpdateGhost();
 	UpdateHold(DeltaSeconds);
+	UpdateHeadBob(DeltaSeconds);
 }
 
 void AFWCharacter::UpdateTarget()
@@ -396,6 +414,31 @@ void AFWCharacter::UpdateHold(float DeltaSeconds)
 			}
 		}
 	});
+}
+
+void AFWCharacter::UpdateHeadBob(float DeltaSeconds)
+{
+	const UCharacterMovementComponent* Movement = GetCharacterMovement();
+	const float Speed = Movement->IsMovingOnGround() ? GetVelocity().Size2D() : 0.f;
+	// About two steps a second at walking speed, a few centimetres up and down
+	BobPhase = Speed > 20.f ? BobPhase + DeltaSeconds * Speed / 70.f : FMath::FInterpTo(BobPhase, FMath::RoundToFloat(BobPhase / PI) * PI, DeltaSeconds, 6.f);
+	const float Amount = FMath::Clamp(Speed / WalkSpeed, 0.f, 1.6f);
+	const FVector Bob(0.f, FMath::Cos(BobPhase) * 0.8f * Amount, FMath::Abs(FMath::Sin(BobPhase)) * 2.2f * Amount);
+	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight()) + Bob);
+}
+
+void AFWCharacter::FWGroundCheck()
+{
+	const UCharacterMovementComponent* Movement = GetCharacterMovement();
+	const FVector Feet = GetActorLocation() - FVector(0, 0, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	FHitResult Hit;
+	FCollisionQueryParams Params(TEXT("FWGround"), false, this);
+	const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Feet + FVector(0, 0, 10.f), Feet - FVector(0, 0, 10000.f), ECC_Visibility, Params);
+	UE_LOG(LogTemp, Log, TEXT("FWGroundCheck: mode=%s feetZ=%.1f groundZ=%s gap=%s eyeAboveFeet=%.1f speed=%.0f"),
+		*UEnum::GetValueAsString(Movement->MovementMode.GetValue()), Feet.Z,
+		bHit ? *FString::Printf(TEXT("%.1f"), Hit.ImpactPoint.Z) : TEXT("none"),
+		bHit ? *FString::Printf(TEXT("%.1f"), Feet.Z - Hit.ImpactPoint.Z) : TEXT("-"),
+		Camera->GetComponentLocation().Z - Feet.Z, GetVelocity().Size());
 }
 
 float AFWCharacter::GetProgress() const

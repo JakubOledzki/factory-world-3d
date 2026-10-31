@@ -107,6 +107,8 @@ private:
 	void RefreshWallet();
 	void PollLogistics();
 	void ApplyHotbar(const TSharedPtr<FJsonObject>& Payload);
+	// Stands the pawn on a ground point (its feet there), walking and at rest
+	void PlaceOnGround(const FVector& Feet);
 
 	UPROPERTY()
 	TObjectPtr<AFWPlot> Plot;

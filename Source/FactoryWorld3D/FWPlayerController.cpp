@@ -1,5 +1,6 @@
 #include "FWPlayerController.h"
 
+#include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
@@ -85,8 +86,40 @@ void AFWPlayerController::BeginPlay()
 	{
 		return;
 	}
+	// Development auto-login from Saved/DevLogin.ini (Email=..., Password=...); never in Shipping builds,
+	// and the file stays out of git with the rest of Saved/
+	FString AutoEmail, AutoPassword;
+#if !UE_BUILD_SHIPPING
+	TArray<FString> DevLines;
+	if (FFileHelper::LoadFileToStringArray(DevLines, *FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLogin.ini"))))
+	{
+		for (const FString& Line : DevLines)
+		{
+			FString Key, Value;
+			if (!Line.StartsWith(TEXT(";")) && Line.Split(TEXT("="), &Key, &Value))
+			{
+				Key.TrimStartAndEndInline();
+				Value.TrimStartAndEndInline();
+				if (Key == TEXT("Email"))
+				{
+					AutoEmail = Value;
+				}
+				else if (Key == TEXT("Password"))
+				{
+					AutoPassword = Value;
+				}
+			}
+		}
+		if (!AutoEmail.IsEmpty())
+		{
+			UE_LOG(LogFWGame, Log, TEXT("Dev auto-login as %s"), *AutoEmail);
+		}
+	}
+#endif
 	SAssignNew(LoginWidget, SFWLoginWidget)
 		.Net(Net())
+		.AutoEmail(AutoEmail)
+		.AutoPassword(AutoPassword)
 		.OnFinished(FOnFWLoginFinished::CreateUObject(this, &AFWPlayerController::OnLoggedIn));
 	ShowWidget(LoginWidget.ToSharedRef(), LoginWidget->GetFocusTarget());
 
@@ -290,6 +323,22 @@ void AFWPlayerController::OfferStarterPlot(int32 Radius, int32 Index)
 			.Title(LOCTEXT("FirstPlot", "Pierwsza działka"))
 			.Message(Message)
 			.ButtonText(LOCTEXT("Buy", "Kup działkę"))
+			.SecondaryText(LOCTEXT("LookAround", "Rozejrzyj się (bez działki)"))
+			.OnSecondary_Lambda([WeakThis]()
+			{
+				if (AFWPlayerController* Inner = WeakThis.Get())
+				{
+					Inner->HideWidget();
+					Inner->Prompt.Reset();
+					Inner->Toast(LOCTEXT("NoPlotYet", "Nie masz jeszcze działki. Zarób na nią w garażu w Factory World i zaloguj się ponownie."));
+					if (!Inner->Hud.IsValid())
+					{
+						SAssignNew(Inner->Hud, SFWHud).Controller(Inner);
+						Inner->GetWorld()->GetGameViewport()->AddViewportWidgetContent(Inner->Hud.ToSharedRef(), 10);
+					}
+					Inner->RefreshWallet();
+				}
+			})
 			.OnAccepted_Lambda([WeakThis, At](const FString&)
 			{
 				AFWPlayerController* Inner = WeakThis.Get();
@@ -362,10 +411,7 @@ void AFWPlayerController::EnterPlot(int32 X, int32 Y)
 		}
 		This->Plot = World->SpawnActor<AFWPlot>();
 		This->Plot->Build(Reply.Payload);
-		if (APawn* MyPawn = This->GetPawn())
-		{
-			MyPawn->SetActorLocation(This->Plot->SpawnLocation(), false, nullptr, ETeleportType::TeleportPhysics);
-		}
+		This->PlaceOnGround(This->Plot->SpawnLocation());
 
 		This->HideWidget();
 		This->Prompt.Reset();
@@ -673,11 +719,7 @@ void AFWPlayerController::FWGoto(int32 TileX, int32 TileY, float Yaw, float Pitc
 {
 	if (Plot && GetPawn())
 	{
-		if (ACharacter* MyCharacter = Cast<ACharacter>(GetPawn()))
-		{
-			MyCharacter->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-		}
-		GetPawn()->SetActorLocation(Plot->TileCenter(FIntPoint(TileX, TileY)) + FVector(0, 0, 120.f), false, nullptr, ETeleportType::TeleportPhysics);
+		PlaceOnGround(Plot->GroundAt(FIntPoint(TileX, TileY)));
 		SetControlRotation(FRotator(Pitch, Yaw, 0.f));
 	}
 }
@@ -746,6 +788,20 @@ void AFWPlayerController::FWStoreAt(int32 TileX, int32 TileY)
 	{
 		PutAllInStorage(Object->Id);
 	}
+}
+
+void AFWPlayerController::PlaceOnGround(const FVector& Feet)
+{
+	ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
+	if (!MyCharacter)
+	{
+		return;
+	}
+	UCharacterMovementComponent* Movement = MyCharacter->GetCharacterMovement();
+	Movement->StopMovementImmediately();
+	Movement->SetMovementMode(MOVE_Walking);
+	const float HalfHeight = MyCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	MyCharacter->SetActorLocation(Feet + FVector(0, 0, HalfHeight + 2.f), false, nullptr, ETeleportType::TeleportPhysics);
 }
 
 void AFWPlayerController::FWBuildLine(int32 BeltCount)

@@ -60,7 +60,9 @@ public:
 	FIntPoint TileAt(const FVector& WorldLocation) const;
 	bool Contains(FIntPoint Tile) const { return Tile.X >= 0 && Tile.Y >= 0 && Tile.X < Size && Tile.Y < Size; }
 	uint8 TileCode(FIntPoint Tile) const;
+	// Where the player stands on arrival: the top of the ground at the spawn tile
 	FVector SpawnLocation() const;
+	FVector GroundAt(FIntPoint Tile) const;
 
 	const FFWMine* FindMine(FIntPoint Tile) const;
 	const FFWPlotObject* FindObjectAt(FIntPoint Tile) const;

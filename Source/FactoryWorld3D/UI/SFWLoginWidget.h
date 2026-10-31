@@ -17,6 +17,9 @@ public:
 	SLATE_BEGIN_ARGS(SFWLoginWidget) {}
 		SLATE_ARGUMENT(TWeakObjectPtr<UFWNetSubsystem>, Net)
 		SLATE_EVENT(FOnFWLoginFinished, OnFinished)
+		// Development only: log in with these as soon as the server is ready
+		SLATE_ARGUMENT(FString, AutoEmail)
+		SLATE_ARGUMENT(FString, AutoPassword)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -41,4 +44,6 @@ private:
 	FDelegateHandle StateHandle;
 	bool bBusy = false;
 	bool bTriedResume = false;
+	FString AutoEmail;
+	FString AutoPassword;
 };

@@ -55,6 +55,8 @@ void SFWLoginWidget::Construct(const FArguments& InArgs)
 {
 	Net = InArgs._Net;
 	OnFinished = InArgs._OnFinished;
+	AutoEmail = InArgs._AutoEmail;
+	AutoPassword = InArgs._AutoPassword;
 
 	ChildSlot
 	[
@@ -244,7 +246,16 @@ void SFWLoginWidget::HandleStateChanged(EFWNetState State)
 	case EFWNetState::Ready:
 	{
 		UFWNetSubsystem* Subsystem = Net.Get();
-		if (Subsystem && !bTriedResume && Subsystem->HasSavedToken())
+		if (Subsystem && !AutoEmail.IsEmpty() && !bBusy)
+		{
+			// Development auto-login (Saved/DevLogin.ini): straight in, no form
+			EmailBox->SetText(FText::FromString(AutoEmail));
+			PasswordBox->SetText(FText::FromString(AutoPassword));
+			AutoEmail.Reset();
+			bTriedResume = true;
+			Submit(false);
+		}
+		else if (Subsystem && !bTriedResume && Subsystem->HasSavedToken())
 		{
 			// Log back in with the saved session before asking for a password
 			bTriedResume = true;
