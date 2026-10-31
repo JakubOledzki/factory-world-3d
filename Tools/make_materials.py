@@ -105,7 +105,7 @@ hlsl = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "terrain_ma
 custom = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 0)
 custom.set_editor_property("code", "\n".join(line for line in hlsl.splitlines() if not line.startswith("//")))
 custom.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
-names = ["WP", "N", "Cam", "Tint", "GrassAmount", "SnowHeight", "Scale"]
+names = ["WP", "N", "Cam", "Tint", "GrassAmount", "SnowHeight", "Scale", "PlotElevation", "ForestTop", "TreeLine"]
 textures = [f"{layer}{kind}" for layer in ("Base", "Grass", "Cliff", "Snow") for kind in ("D", "N", "M")]
 inputs = []
 for name in names + textures:
@@ -127,7 +127,8 @@ normal_ws = lib.create_material_expression(m, unreal.MaterialExpressionVertexNor
 lib.connect_material_expressions(normal_ws, "", custom, "N")
 camera = lib.create_material_expression(m, unreal.MaterialExpressionCameraPositionWS, -900, -480)
 lib.connect_material_expressions(camera, "", custom, "Cam")
-for i, (name, default) in enumerate((("Tint", 1.0), ("GrassAmount", 0.6), ("SnowHeight", 60000.0), ("Scale", 600.0))):
+for i, (name, default) in enumerate((("Tint", 1.0), ("GrassAmount", 0.6), ("SnowHeight", 60000.0), ("Scale", 600.0),
+                                      ("PlotElevation", 0.0), ("ForestTop", 1300.0), ("TreeLine", 1580.0))):
     lib.connect_material_expressions(scalar_param(m, name, default, -900, -440 + i * 80), "", custom, name)
 default_texture = unreal.load_asset("/Engine/EngineResources/DefaultTexture.DefaultTexture")
 for i, name in enumerate(textures):

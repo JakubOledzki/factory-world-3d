@@ -5,6 +5,22 @@
 #include "FWGameSettings.generated.h"
 
 /** Client settings from DefaultGame.ini, [/Script/FactoryWorld3D.FWGameSettings]. */
+// Height above sea level of a plot whose surroundings are built from real elevation data
+USTRUCT()
+struct FFWPlotElevation
+{
+	GENERATED_BODY()
+
+	UPROPERTY(Config)
+	int32 X = 0;
+
+	UPROPERTY(Config)
+	int32 Y = 0;
+
+	UPROPERTY(Config)
+	float Meters = 0.f;
+};
+
 UCLASS(Config = Game)
 class FACTORYWORLD3D_API UFWGameSettings : public UObject
 {
@@ -28,4 +44,21 @@ public:
 	// How often belts and inserters are fetched from the server.
 	UPROPERTY(Config)
 	float LogisticsPollSeconds = 1.f;
+
+	// Plots with real terrain (Tools/dem_extract.mjs prints the value): the forest then follows the real tree
+	// line by altitude above sea level instead of height above the plot
+	UPROPERTY(Config)
+	TArray<FFWPlotElevation> PlotElevations;
+
+	// Tree line in metres above sea level (Tatras: spruce up to ~1550 m, dwarf pine and grass above)
+	UPROPERTY(Config)
+	float ForestTopMeters = 1300.f;
+
+	UPROPERTY(Config)
+	float TreeLineMeters = 1580.f;
+
+	const FFWPlotElevation* FindElevation(int32 PlotX, int32 PlotY) const
+	{
+		return PlotElevations.FindByPredicate([&](const FFWPlotElevation& E) { return E.X == PlotX && E.Y == PlotY; });
+	}
 };

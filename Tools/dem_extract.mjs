@@ -56,5 +56,12 @@ for (let row = 0; row < SIZE; row++) {
 }
 const file = join("RawAssets", "processed", `dem_${plotX}_${plotY}.bin`);
 await writeFile(file, Buffer.from(out.buffer));
+// The plot's own height (median of the samples it covers), written next to the heights:
+// import_external.py attaches it to the terrain mesh, so the forest follows the real tree line
+const inside = [];
+for (let dy = -500; dy <= 500; dy += 30) for (let dx = -500; dx <= 500; dx += 30) inside.push(out[Math.round((HALF + dy) / STEP) * SIZE + Math.round((HALF + dx) / STEP)]);
+inside.sort((a, b) => a - b);
+await writeFile(join("RawAssets", "processed", `dem_${plotX}_${plotY}.json`), JSON.stringify({ plotElevationMeters: inside[inside.length >> 1] }));
+console.log(`FWDEM plot elevation ${inside[inside.length >> 1].toFixed(0)} m: +PlotElevations=(X=${plotX},Y=${plotY},Meters=${inside[inside.length >> 1].toFixed(0)})`);
 console.log(`FWDEM ${file}: ${SIZE}x${SIZE} at ${STEP} m around ${lat0.toFixed(4)}N ${lon0.toFixed(4)}E, ` +
   `${out.reduce((a, b) => Math.min(a, b)).toFixed(0)}..${out.reduce((a, b) => Math.max(a, b)).toFixed(0)} m`);

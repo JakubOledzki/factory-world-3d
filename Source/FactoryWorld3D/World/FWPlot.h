@@ -55,6 +55,7 @@ public:
 	int32 GetPlotY() const { return PlotY; }
 	float GetTileSize() const { return TileSize; }
 	bool IsBuilt() const { return Size > 0; }
+	TOptional<float> GetPlotElevation() const { return PlotElevationMeters; }
 
 	FVector TileCenter(FIntPoint Tile) const;
 	// Centre of the square an object of Kind covers when standing on Tile.
@@ -190,6 +191,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> TerrainMesh;
 	int32 PendingScatterBiome = -1;
+	// Plot height above sea level when the land is real terrain (FWTerrainInfo on the mesh, or the config); unset otherwise
+	TOptional<float> PlotElevationMeters;
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> GroundMaterial;
 	UPROPERTY()
 	TMap<FString, TObjectPtr<UStaticMeshComponent>> InserterArms;
 	UPROPERTY()

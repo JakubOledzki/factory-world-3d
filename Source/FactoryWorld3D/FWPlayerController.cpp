@@ -729,6 +729,51 @@ void AFWPlayerController::FWGoto(int32 TileX, int32 TileY, float Yaw, float Pitc
 	}
 }
 
+void AFWPlayerController::FWGotoLand(float EastMeters, float SouthMeters, float Yaw, float Pitch)
+{
+	if (!Plot)
+	{
+		return;
+	}
+	const float Half = Plot->GetTileSize() * 125.f;
+	const FVector At = Plot->GetActorTransform().TransformPosition(FVector(Half + EastMeters * 100.f, Half + SouthMeters * 100.f, 0.f));
+	FHitResult Hit;
+	if (GetWorld()->LineTraceSingleByChannel(Hit, At + FVector(0, 0, 500000.f), At - FVector(0, 0, 500000.f), ECC_Visibility))
+	{
+		PlaceOnGround(Hit.ImpactPoint);
+		SetControlRotation(FRotator(Pitch, Yaw, 0.f));
+	}
+}
+
+void AFWPlayerController::FWGotoAltitude(float Meters, float Yaw, float Pitch)
+{
+	const TOptional<float> Elevation = Plot ? Plot->GetPlotElevation() : TOptional<float>();
+	if (!Elevation.IsSet())
+	{
+		Toast(FText::FromString(TEXT("FWGotoAltitude: this plot has no real terrain")), true);
+		return;
+	}
+	// Search rings around the plot for the nearest ground at or below that altitude
+	const float Half = Plot->GetTileSize() * 125.f;
+	for (float Radius = 2000.f; Radius < 9000.f; Radius += 250.f)
+	{
+		for (int32 Step = 0; Step < 48; ++Step)
+		{
+			const float Angle = Step * 2.f * PI / 48.f;
+			const FVector At = Plot->GetActorTransform().TransformPosition(FVector(Half + FMath::Cos(Angle) * Radius * 100.f, Half + FMath::Sin(Angle) * Radius * 100.f, 0.f));
+			FHitResult Hit;
+			if (GetWorld()->LineTraceSingleByChannel(Hit, At + FVector(0, 0, 500000.f), At - FVector(0, 0, 500000.f), ECC_Visibility)
+				&& Elevation.GetValue() + Plot->GetActorTransform().InverseTransformPosition(Hit.ImpactPoint).Z / 100.f < Meters)
+			{
+				// Yaw is relative to looking straight away from the plot (downhill, into the valley)
+				PlaceOnGround(Hit.ImpactPoint);
+				SetControlRotation(FRotator(Pitch, FMath::RadiansToDegrees(Angle) + Yaw, 0.f));
+				return;
+			}
+		}
+	}
+}
+
 void AFWPlayerController::FWMine(int32 Times)
 {
 	if (!Plot || !GetPawn() || Times <= 0)

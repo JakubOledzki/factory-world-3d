@@ -78,7 +78,7 @@ Sosny (`SM_Pine_A`, `SM_Pine_B`, wersje z porostami i sadzonki) z darmowego proj
 Dlatego nie ma ich w gicie (`.gitignore`: `Content/Environment/`, `Content/Landscape/`, `Content/Blueprint/FoliageInteraction/`, `Plugins/EasyImpostor/`). Każdy kopiuje je u siebie z własnej kopii Titana:
 
 ```
-powershell -ExecutionPolicy Bypass -File Toolsmigrate_titan.ps1 -Titan D:TitanProjectTitan
+powershell -ExecutionPolicy Bypass -File Tools\migrate_titan.ps1 -Titan D:\Titan\ProjectTitan
 ```
 
 Skrypt sprawdza zależności w Titanie (`Tools/titan_dependencies.py`) i kopiuje tylko potrzebne pakiety (110), z zachowaniem ich ścieżek, bo odwołania w Unrealu opierają się na ścieżkach. Bez nich gra działa, tylko bez lasu.

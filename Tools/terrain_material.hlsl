@@ -58,6 +58,16 @@ color = lerp(color, snowD, snow);
 normal = lerp(normal, snowN, snow);
 arm = lerp(arm, snowM, snow);
 
+// Far forest: below the tree line (real terrain only, PlotElevation > 0) the ground takes a dark spruce
+// canopy colour in stands, so valleys kilometres away read as forest between the scattered trees
+float altitude = PlotElevation + WP.z / 100.0;
+float stands = saturate(0.5 + 0.5 * sin(WP.x * 0.00011 + sin(WP.y * 0.00009) * 2.3) * cos(WP.y * 0.00013 - WP.x * 0.00004));
+float canopy = (PlotElevation > 0.0 ? 1.0 : 0.0) * (1.0 - smoothstep(ForestTop, TreeLine, altitude + (stands - 0.5) * 140.0))
+             * smoothstep(0.25, 0.5, stands) * (1.0 - cliff * 0.7) * smoothstep(0.15, 0.6, farMix);
+float3 spruce = float3(0.035, 0.055, 0.03) * lerp(0.75, 1.2, macro);
+color = lerp(color, spruce, canopy * 0.9);
+arm.g = lerp(arm.g, 0.9, canopy);
+
 // Large-scale brightness changes, so the ground does not look printed; flatter normals far away
 color *= lerp(0.82, 1.12, macro) * Tint;
 // Rock bands on steep ground: darker streaks across the slope and flatter normals far away, so

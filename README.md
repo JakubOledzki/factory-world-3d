@@ -145,7 +145,7 @@ Skrypt kompiluje grę, przygotowuje zasoby (cook) i pakuje wszystko do `D:\Facto
 Las świerkowo-sosnowy na zboczach wokół działki to drzewa Nanite z darmowego przykładu Epic **Project Titan** (Fab). Nie są w repozytorium (licencja pozwala używać ich w grze, ale nie rozpowszechniać osobno). Żeby je dodać, pobierz Titana w Epic Launcherze („Create Project”, UE 5.8) i uruchom:
 
 ```
-powershell -ExecutionPolicy Bypass -File Toolsmigrate_titan.ps1 -Titan D:TitanProjectTitan
+powershell -ExecutionPolicy Bypass -File Tools\migrate_titan.ps1 -Titan D:\Titan\ProjectTitan
 ```
 
-Las rośnie płatami do ok. 350 m nad działką, a wyżej rzednie i przechodzi w pojedyncze sosny z porostami (do ok. 480 m, granica lasu). Na skraju lasu rosną młode drzewka. Działka i pas 50 m wokół niej zostają wolne. Wiatr działa tylko na drzewa w promieniu 120 m. Las nie bierze udziału w ray tracingu.
+Granica lasu zależy od prawdziwej wysokości nad poziomem morza, jak w Tatrach: gęsty las rośnie płatami do ok. 1300 m n.p.m., wyżej rzednie i przechodzi w pojedyncze sosny z porostami do ok. 1580 m, a ponad nią są hale i skały. Wysokość działki zapisuje `Tools/dem_extract.mjs` i import dołącza ją do siatki terenu (działka testowa leży na 2020 m, więc las widać dopiero w dolinach). Można ją nadpisać w `Config/DefaultGame.ini` (`PlotElevations`). W oddali las to też ciemny kolor koron w materiale terenu. Drzew jest najwyżej 30 000, rzadziej dalej niż 6 km. Kolizję mają tylko drzewa do 400 m od działki. Na skraju lasu rosną młode drzewka. Działka i pas 50 m wokół niej zostają wolne. Wiatr działa tylko na drzewa w promieniu 120 m. Las nie bierze udziału w ray tracingu. Bez Titana gra działa normalnie, tylko bez drzew.

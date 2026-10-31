@@ -7,6 +7,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
 #include "Game/FWArt.h"
+#include "World/FWTerrainInfo.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "Game/FWCatalog.h"
@@ -235,6 +236,7 @@ UMaterialInterface* AFWPlot::MakeGroundMaterial(int32 Biome)
 		return Plain;
 	}
 	UMaterialInstanceDynamic* Ground = UMaterialInstanceDynamic::Create(TerrainBase, this);
+	GroundMaterial = Ground;
 	const TPair<const TCHAR*, FString> Sets[] = { { TEXT("Base"), GroundSet.Base }, { TEXT("Grass"), GroundSet.Grass }, { TEXT("Cliff"), GroundSet.Cliff }, { TEXT("Snow"), GroundSet.Snow } };
 	for (const TPair<const TCHAR*, FString>& Set : Sets)
 	{
@@ -269,6 +271,23 @@ void AFWPlot::BuildGround(int32 Biome)
 		const float Fit = Extent / 100000.f;
 		const FBoxSphereBounds Bounds = Land->GetBounds();
 		TerrainMesh = MakeMesh(Land, FLinearColor::White, FTransform::Identity, true);
+		const FFWPlotElevation* Override = UFWGameSettings::Get().FindElevation(PlotX, PlotY);
+		if (Override)
+		{
+			PlotElevationMeters = Override->Meters;
+		}
+		else if (const UFWTerrainInfo* Info = Land->GetAssetUserData<UFWTerrainInfo>())
+		{
+			PlotElevationMeters = Info->PlotElevationMeters;
+		}
+		if (PlotElevationMeters.IsSet() && GroundMaterial)
+		{
+			// Far away the forest shows as canopy colour in the ground, by the same altitude rule as the trees
+			const UFWGameSettings& Settings = UFWGameSettings::Get();
+			GroundMaterial->SetScalarParameterValue(TEXT("PlotElevation"), PlotElevationMeters.GetValue());
+			GroundMaterial->SetScalarParameterValue(TEXT("ForestTop"), Settings.ForestTopMeters);
+			GroundMaterial->SetScalarParameterValue(TEXT("TreeLine"), Settings.TreeLineMeters);
+		}
 		TerrainMesh->SetMaterial(0, Ground);
 		TerrainMesh->SetRelativeScale3D(FVector(Fit, Fit, 1.f));
 		TerrainMesh->SetRelativeLocation(FVector(Extent / 2 - Bounds.Origin.X * Fit, Extent / 2 - Bounds.Origin.Y * Fit, -1.f));
@@ -384,18 +403,30 @@ void AFWPlot::PlantForest(int32 Biome)
 	{
 		return;
 	}
-	// Heights are relative to the plot, which sits on a valley floor: spruce and pine up to ~350 m above
-	// it, sparse lichen-hung pines to ~480 m, bare rock and meadow above (the Tatra tree line)
-	constexpr float ForestTop = 35000.f;
-	constexpr float TreeLineTop = 48000.f;
+	// With real terrain the tree line is by altitude above sea level (the demo plot itself lies above it, at
+	// ~2000 m, so its forest is in the valleys below); otherwise up to ~350 m above the plot, thinning to ~480 m
+	const UFWGameSettings& Settings = UFWGameSettings::Get();
+	const bool bReal = PlotElevationMeters.IsSet();
+	const float ForestTop = bReal ? (Settings.ForestTopMeters - PlotElevationMeters.GetValue()) * 100.f : 35000.f;
+	const float TreeLineTop = bReal ? (Settings.TreeLineMeters - PlotElevationMeters.GetValue()) * 100.f : 48000.f;
+	// A bounded budget, thinning past ~6 km where a tree is a few pixels and the canopy colour
+	// in the ground carries the forest
+	constexpr int32 Budget = 30000;
+	TArray<FTransform> Near;
+	UStaticMesh* NearMesh = nullptr;
 	const float Extent = Size * TileSize;
 	const FVector Middle(Extent / 2, Extent / 2, 0.f);
 	FRandomStream Random(PlotX * 31337 + PlotY * 7);
 	TMap<UStaticMesh*, TArray<FTransform>> Placed;
-	for (int32 i = 0; i < 48000; ++i)
+	for (int32 i = 0; i < 400000; ++i)
 	{
 		const float Angle = Random.FRandRange(0.f, 2 * PI);
-		const float Distance = Extent * 0.5f + 6000.f + FMath::Pow(Random.FRand(), 1.3f) * 240000.f;
+		// Out to the edge of the land (~9 km), the valleys where the real tree line lets trees grow included
+		const float Distance = Extent * 0.5f + 6000.f + FMath::Pow(Random.FRand(), 1.1f) * 780000.f;
+		if (Random.FRand() > FMath::Exp(-FMath::Max(0.f, Distance - 600000.f) / 250000.f))
+		{
+			continue;
+		}
 		const FVector At = Middle + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * Distance * 1.15f;
 		// Keep the plot and a strip around it clear, so the forest never covers the building area
 		if (FMath::Abs(At.X - Middle.X) < Extent * 0.5f + 5000.f && FMath::Abs(At.Y - Middle.Y) < Extent * 0.5f + 5000.f)
@@ -415,11 +446,13 @@ void AFWPlot::PlantForest(int32 Biome)
 			continue;
 		}
 		const FVector Ground = GetActorTransform().InverseTransformPosition(Hit.ImpactPoint);
-		if (Hit.ImpactNormal.Z < 0.78f || Ground.Z > TreeLineTop)
+		// A wavy edge, not a contour line: the limits shift up to ~70 m with the lie of the land
+		const float Edge = FMath::PerlinNoise2D(FVector2D(At.X, At.Y) / 25000.f) * 7000.f;
+		if (Hit.ImpactNormal.Z < 0.78f || Ground.Z > TreeLineTop + Edge)
 		{
 			continue;
 		}
-		const float Line = FMath::Clamp((Ground.Z - ForestTop) / (TreeLineTop - ForestTop), 0.f, 1.f);
+		const float Line = FMath::Clamp((Ground.Z - ForestTop - Edge) / (TreeLineTop - ForestTop), 0.f, 1.f);
 		if (Random.FRand() < Line * 0.85f)
 		{
 			continue;
@@ -431,7 +464,33 @@ void AFWPlot::PlantForest(int32 Biome)
 		const float Scale = Random.FRandRange(0.85f, 1.25f) * FMath::Lerp(1.f, 0.7f, Line);
 		const FBoxSphereBounds Bounds = Mesh->GetBounds();
 		const float Bottom = (Bounds.Origin.Z - Bounds.BoxExtent.Z) * Scale;
-		Placed.FindOrAdd(Mesh).Add(FTransform(FRotator(0.f, Random.FRandRange(0.f, 360.f), 0.f), Ground - FVector(0, 0, Bottom + 40.f), FVector(Scale)));
+		const FTransform Tree(FRotator(0.f, Random.FRandRange(0.f, 360.f), 0.f), Ground - FVector(0, 0, Bottom + 40.f), FVector(Scale));
+		// Trees within walking reach get collision (kept in their own component); far ones none
+		if (Distance < Extent * 0.5f + 40000.f && Pool == Trees)
+		{
+			NearMesh = NearMesh ? NearMesh : Mesh;
+			Near.Add(Tree);
+		}
+		else
+		{
+			Placed.FindOrAdd(Mesh).Add(Tree);
+		}
+		int32 Count = Near.Num();
+		for (const TPair<UStaticMesh*, TArray<FTransform>>& Pair : Placed)
+		{
+			Count += Pair.Value.Num();
+		}
+		if (Count >= Budget)
+		{
+			break;
+		}
+	}
+	if (NearMesh && Near.Num() > 0)
+	{
+		UHierarchicalInstancedStaticMeshComponent* Walkable = MakeArtInstances(NearMesh, true);
+		Walkable->SetWorldPositionOffsetDisableDistance(12000);
+		Walkable->SetVisibleInRayTracing(false);
+		Walkable->AddInstances(Near, false);
 	}
 	int32 Total = 0;
 	for (TPair<UStaticMesh*, TArray<FTransform>>& Pair : Placed)
@@ -444,7 +503,8 @@ void AFWPlot::PlantForest(int32 Biome)
 		Forest->AddInstances(Pair.Value, false);
 		Total += Pair.Value.Num();
 	}
-	UE_LOG(LogFWPlot, Log, TEXT("Planted %d trees around the plot"), Total);
+	UE_LOG(LogFWPlot, Log, TEXT("Planted %d trees around the plot (%d with collision), tree line by %s"), Total + Near.Num(), Near.Num(),
+		bReal ? *FString::Printf(TEXT("altitude (plot at %.0f m)"), PlotElevationMeters.GetValue()) : TEXT("height above the plot"));
 }
 
 void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCodes)

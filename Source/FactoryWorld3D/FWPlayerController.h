@@ -69,6 +69,12 @@ public:
 	void FWPrompt(const FString& Text);
 	UFUNCTION(Exec)
 	void FWGoto(int32 TileX, int32 TileY, float Yaw = 0.f, float Pitch = -30.f);
+	// Stands at a point of the land around the plot: metres from the plot's middle (+X east, +Y south)
+	UFUNCTION(Exec)
+	void FWGotoLand(float EastMeters, float SouthMeters, float Yaw = 0.f, float Pitch = 0.f);
+	// Walks downhill from the plot until the ground is below Meters above sea level (plots with real terrain)
+	UFUNCTION(Exec)
+	void FWGotoAltitude(float Meters, float Yaw = 0.f, float Pitch = 0.f);
 	UFUNCTION(Exec)
 	void FWMine(int32 Times = 1);
 	UFUNCTION(Exec)
