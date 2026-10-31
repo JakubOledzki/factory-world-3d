@@ -4,6 +4,10 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/Texture2D.h"
+#include "Game/FWArt.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Game/FWCatalog.h"
 #include "Game/FWGameSettings.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -71,12 +75,14 @@ AFWPlot::AFWPlot()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cone(TEXT("/Engine/BasicShapes/Cone.Cone"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Surface(TEXT("/Game/Materials/M_FWSurface.M_FWSurface"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Ground(TEXT("/Game/Materials/M_FWGround.M_FWGround"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Terrain(TEXT("/Game/Materials/M_FWTerrain.M_FWTerrain"));
 	CubeMesh = Cube.Object;
 	CylinderMesh = Cylinder.Object;
 	SphereMesh = Sphere.Object;
 	ConeMesh = Cone.Object;
 	SurfaceBase = Surface.Object;
 	GroundBase = Ground.Object;
+	TerrainBase = Terrain.Object;
 }
 
 UMaterialInterface* AFWPlot::SurfaceMaterial(const FLinearColor& Color, float Roughness, float Metallic)
@@ -185,6 +191,7 @@ void AFWPlot::Build(const TSharedPtr<FJsonObject>& Plot)
 	}
 
 	BuildGround(Biome);
+	GroundCoverMeshes = FWArt::Grass();
 	BuildTerrain(Tiles, TreeCodes);
 
 	const TArray<TSharedPtr<FJsonValue>>* ObjectList = nullptr;
@@ -198,27 +205,180 @@ void AFWPlot::Build(const TSharedPtr<FJsonObject>& Plot)
 	UE_LOG(LogFWPlot, Log, TEXT("Built plot %d:%d, biome %d, %d objects, %d mines"), PlotX, PlotY, Biome, Objects.Num(), Mines.Num());
 }
 
+UMaterialInterface* AFWPlot::MakeGroundMaterial(int32 Biome)
+{
+	const FWArt::FLayerSet GroundSet = FWArt::GroundLayers(Biome);
+	auto LayerTexture = [](const FString& Set, const TCHAR* Kind)
+	{
+		// The sets come in 4K or 2K
+		for (const TCHAR* Resolution : { TEXT("4k"), TEXT("2k") })
+		{
+			const FString Name = FString::Printf(TEXT("%s_%s_%s"), *Set, Kind, Resolution);
+			if (UTexture2D* Found = FWArt::Texture(*FString::Printf(TEXT("/Game/External/Textures/%s/%s.%s"), *Set, *Name, *Name)))
+			{
+				return Found;
+			}
+		}
+		return static_cast<UTexture2D*>(nullptr);
+	};
+	UTexture2D* BaseColor = LayerTexture(GroundSet.Base, TEXT("diff"));
+	if (!TerrainBase || !BaseColor)
+	{
+		// No photographed ground set up: the plain tinted ground
+		UMaterialInstanceDynamic* Plain = UMaterialInstanceDynamic::Create(GroundBase, this);
+		Plain->SetVectorParameterValue(TEXT("Color"), FWCatalog::BiomeColor(Biome));
+		return Plain;
+	}
+	UMaterialInstanceDynamic* Ground = UMaterialInstanceDynamic::Create(TerrainBase, this);
+	const TPair<const TCHAR*, FString> Sets[] = { { TEXT("Base"), GroundSet.Base }, { TEXT("Grass"), GroundSet.Grass }, { TEXT("Cliff"), GroundSet.Cliff }, { TEXT("Snow"), GroundSet.Snow } };
+	for (const TPair<const TCHAR*, FString>& Set : Sets)
+	{
+		const TPair<const TCHAR*, const TCHAR*> Maps[] = { { TEXT("D"), TEXT("diff") }, { TEXT("N"), TEXT("nor_gl") }, { TEXT("M"), TEXT("arm") } };
+		for (const TPair<const TCHAR*, const TCHAR*>& Map : Maps)
+		{
+			if (UTexture2D* Texture = LayerTexture(Set.Value, Map.Value))
+			{
+				Ground->SetTextureParameterValue(*FString::Printf(TEXT("%s%s"), Set.Key, Map.Key), Texture);
+			}
+		}
+	}
+	Ground->SetScalarParameterValue(TEXT("GrassAmount"), GroundSet.GrassAmount);
+	Ground->SetScalarParameterValue(TEXT("SnowHeight"), GroundSet.SnowHeightCm);
+	Ground->SetScalarParameterValue(TEXT("Scale"), 600.f);
+	return Ground;
+}
+
 void AFWPlot::BuildGround(int32 Biome)
 {
 	const float Extent = Size * TileSize;
-	UMaterialInstanceDynamic* Ground = UMaterialInstanceDynamic::Create(GroundBase, this);
-	Ground->SetVectorParameterValue(TEXT("Color"), FWCatalog::BiomeColor(Biome));
+	UMaterialInterface* Ground = MakeGroundMaterial(Biome);
 
-	// The plot, and land around it a little lower so its edge shows
+	// The plot itself: flat, solid, the same ground as the land around
 	UStaticMeshComponent* Plot = MakeMesh(CubeMesh, FLinearColor::White,
 		FTransform(FRotator::ZeroRotator, FVector(Extent / 2, Extent / 2, -50.f), FVector(Extent / ShapeSize, Extent / ShapeSize, 1.f)));
 	Plot->SetMaterial(0, Ground);
 
-	UMaterialInstanceDynamic* Around = UMaterialInstanceDynamic::Create(GroundBase, this);
-	Around->SetVectorParameterValue(TEXT("Color"), FWCatalog::BiomeColor(Biome) * 0.8f);
-	UStaticMeshComponent* Land = MakeMesh(CubeMesh, FLinearColor::White,
-		FTransform(FRotator::ZeroRotator, FVector(Extent / 2, Extent / 2, -70.f), FVector(Extent * 6 / ShapeSize, Extent * 6 / ShapeSize, 1.f)));
-	Land->SetMaterial(0, Around);
+	if (UStaticMesh* Land = FWArt::Terrain(Biome, PlotX, PlotY))
+	{
+		// Made for a 1 km plot centred in it (Tools/blender/make_terrain.py): scale it to this plot and put its middle on the plot's
+		const float Fit = Extent / 100000.f;
+		const FBoxSphereBounds Bounds = Land->GetBounds();
+		TerrainMesh = MakeMesh(Land, FLinearColor::White, FTransform::Identity, true);
+		TerrainMesh->SetMaterial(0, Ground);
+		TerrainMesh->SetRelativeScale3D(FVector(Fit, Fit, 1.f));
+		TerrainMesh->SetRelativeLocation(FVector(Extent / 2 - Bounds.Origin.X * Fit, Extent / 2 - Bounds.Origin.Y * Fit, -1.f));
+		// The land's collision is cooked in the background: scatter once traces hit it (see Tick)
+		PendingScatterBiome = Biome;
+	}
+	else
+	{
+		UMaterialInstanceDynamic* Around = UMaterialInstanceDynamic::Create(GroundBase, this);
+		Around->SetVectorParameterValue(TEXT("Color"), FWCatalog::BiomeColor(Biome) * 0.8f);
+		UStaticMeshComponent* Land2 = MakeMesh(CubeMesh, FLinearColor::White,
+			FTransform(FRotator::ZeroRotator, FVector(Extent / 2, Extent / 2, -70.f), FVector(Extent * 6 / ShapeSize, Extent * 6 / ShapeSize, 1.f)));
+		Land2->SetMaterial(0, Around);
+	}
+}
+
+UHierarchicalInstancedStaticMeshComponent* AFWPlot::MakeArtInstances(UStaticMesh* Mesh, bool bCollide)
+{
+	UHierarchicalInstancedStaticMeshComponent* Component = NewObject<UHierarchicalInstancedStaticMeshComponent>(this);
+	Component->SetStaticMesh(Mesh);
+	Component->SetupAttachment(RootComponent);
+	Component->SetCollisionEnabled(bCollide ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+	Component->RegisterComponent();
+	return Component;
+}
+
+FTransform AFWPlot::ArtTransform(UStaticMesh* Mesh, const FVector& Ground, float Yaw, float Size2D, float Height, float Sink, const FVector& Normal, float Tilt) const
+{
+	// Scale a scanned mesh to a size (across, or tall when Height > 0) and stand its bottom on the ground,
+	// leaning partly with the slope (Tilt 0..1) and sunk deeper the steeper it is, so no edge floats
+	const FBoxSphereBounds Bounds = Mesh->GetBounds();
+	const float Scale = Height > 0.f
+		? Height / FMath::Max(1.f, 2.f * Bounds.BoxExtent.Z)
+		: Size2D / FMath::Max(1.f, 2.f * FMath::Max(Bounds.BoxExtent.X, Bounds.BoxExtent.Y));
+	const FVector Up = FMath::Lerp(FVector::UpVector, Normal.GetSafeNormal(), Tilt).GetSafeNormal();
+	const FQuat Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Up) * FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw));
+	const float Steep = 1.f - FMath::Clamp(Normal.GetSafeNormal().Z, 0.f, 1.f);
+	const float Bottom = (Bounds.Origin.Z - Bounds.BoxExtent.Z) * Scale;
+	const float Depth = (Sink + Steep * 0.6f) * Scale * Bounds.BoxExtent.Z * 2.f;
+	return FTransform(Rotation, Ground - Up * (Bottom + Depth), FVector(Scale));
+}
+
+void AFWPlot::ScatterSurroundings(int32 Biome)
+{
+	const TArray<UStaticMesh*> TreeMeshes = FWArt::Trees();
+	const TArray<UStaticMesh*> RockMeshes = FWArt::Rocks();
+	const TArray<UStaticMesh*> BushMeshes = FWArt::Bushes();
+	const TArray<UStaticMesh*> GrassMeshes = FWArt::Grass();
+	if (!TerrainMesh || (TreeMeshes.IsEmpty() && RockMeshes.IsEmpty()))
+	{
+		return;
+	}
+	TMap<UStaticMesh*, TArray<FTransform>> Placed;
+	const float Extent = Size * TileSize;
+	const FVector Middle(Extent / 2, Extent / 2, 0.f);
+	FRandomStream Random(PlotX * 7919 + PlotY);
+	const bool bForest = Biome != 5 && Biome != 8 && Biome != 12;
+	const int32 Count = bForest ? 9000 : 3000;
+	for (int32 i = 0; i < Count; ++i)
+	{
+		// Around the plot, thicker near it
+		const float Angle = Random.FRandRange(0.f, 2 * PI);
+		const float Distance = Extent * 0.5f + 4000.f + FMath::Pow(Random.FRand(), 1.6f) * 260000.f;
+		FVector At = Middle + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * Distance * 1.15f;
+		if (FMath::Abs(At.X - Middle.X) < Extent * 0.5f + 3000.f && FMath::Abs(At.Y - Middle.Y) < Extent * 0.5f + 3000.f)
+		{
+			continue;
+		}
+		FHitResult Hit;
+		const FVector World = GetActorTransform().TransformPosition(At);
+		if (!TerrainMesh->LineTraceComponent(Hit, World + FVector(0, 0, 400000.f), World - FVector(0, 0, 100000.f), FCollisionQueryParams(TEXT("FWScatter"), true)))
+		{
+			continue;
+		}
+		const FVector Ground = GetActorTransform().InverseTransformPosition(Hit.ImpactPoint);
+		const float Flatness = Hit.ImpactNormal.Z;
+		const float Roll = Random.FRand();
+		if (bForest && !TreeMeshes.IsEmpty() && Flatness > 0.82f && Ground.Z < 60000.f && Roll < 0.7f)
+		{
+			UStaticMesh* Mesh = TreeMeshes[Random.RandHelper(TreeMeshes.Num())];
+			Placed.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Ground, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(1100.f, 2200.f), 0.02f));
+		}
+		else if (!GrassMeshes.IsEmpty() && Roll > 0.45f && Roll < 0.85f && Flatness > 0.85f && Distance < Extent * 0.5f + 60000.f)
+		{
+			// Tufts of grass and ferns on the gentle ground near the plot
+			UStaticMesh* Mesh = GrassMeshes[Random.RandHelper(GrassMeshes.Num())];
+			Placed.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Ground, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(40.f, 110.f), 0.05f, Hit.ImpactNormal, 0.8f));
+		}
+		else if (!RockMeshes.IsEmpty() && Roll < 0.85f)
+		{
+			UStaticMesh* Mesh = RockMeshes[Random.RandHelper(RockMeshes.Num())];
+			Placed.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Ground, Random.FRandRange(0.f, 360.f), Random.FRandRange(300.f, 1800.f), 0.f, 0.3f, Hit.ImpactNormal, 0.7f));
+		}
+		else if (!BushMeshes.IsEmpty() && Flatness > 0.8f)
+		{
+			UStaticMesh* Mesh = BushMeshes[Random.RandHelper(BushMeshes.Num())];
+			Placed.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Ground, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(80.f, 220.f), 0.08f, Hit.ImpactNormal, 0.5f));
+		}
+	}
+	int32 Total = 0;
+	for (TPair<UStaticMesh*, TArray<FTransform>>& Pair : Placed)
+	{
+		Total += Pair.Value.Num();
+		MakeArtInstances(Pair.Key, false)->AddInstances(Pair.Value, false);
+	}
+	UE_LOG(LogFWPlot, Log, TEXT("Scattered %d trees, rocks and bushes around the plot"), Total);
 }
 
 void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCodes)
 {
 	const float T = TileSize / ShapeSize;
+	const TArray<UStaticMesh*> RockMeshes = FWArt::Rocks();
+	const TArray<UStaticMesh*> TreeMeshes = FWArt::Trees();
+	const TArray<UStaticMesh*> BushMeshes = FWArt::Bushes();
+
 	UHierarchicalInstancedStaticMeshComponent* Trunks = MakeInstances(CylinderMesh, FLinearColor(0.12f, 0.07f, 0.04f), 0.9f, true);
 	UHierarchicalInstancedStaticMeshComponent* Crowns = MakeInstances(ConeMesh, FLinearColor(0.03f, 0.09f, 0.03f), 0.85f, false);
 	UHierarchicalInstancedStaticMeshComponent* Rocks = MakeInstances(SphereMesh, FLinearColor(0.13f, 0.125f, 0.115f), 0.8f, true);
@@ -231,27 +391,41 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 	Rails->SetMaterial(0, SurfaceMaterial(FLinearColor(0.25f, 0.24f, 0.24f), 0.35f, 1.f));
 
 	TArray<FTransform> TrunkT, CrownT, RockT, DuneT, BushT, RailT, SleeperT, PlatformT, MineT;
+	TMap<UStaticMesh*, TArray<FTransform>> ArtSolid, ArtSoft;
 	for (int32 Y = 0; Y < Size; ++Y)
 	{
 		for (int32 X = 0; X < Size; ++X)
 		{
 			const uint8 Code = Codes[Y * Size + X];
+			FRandomStream Random(Y * Size + X + 1);
 			if (Code == FWCatalog::Empty)
 			{
+				// Free ground: grass comes from UpdateGroundCover around the player
 				continue;
 			}
-			FRandomStream Random(Y * Size + X + 1);
 			const FVector Center = TileCenter(FIntPoint(X, Y));
 			const FVector Jitter(Random.FRandRange(-0.2f, 0.2f) * TileSize, Random.FRandRange(-0.2f, 0.2f) * TileSize, 0.f);
 			const FRotator Spin(0.f, Random.FRandRange(0.f, 360.f), 0.f);
 			if (TreeCodes.Contains(Code))
 			{
+				if (!TreeMeshes.IsEmpty())
+				{
+					UStaticMesh* Mesh = TreeMeshes[Random.RandHelper(TreeMeshes.Num())];
+					ArtSolid.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Center + Jitter, Spin.Yaw, 0.f, Random.FRandRange(900.f, 1600.f), 0.02f));
+					continue;
+				}
 				const float Height = Random.FRandRange(1.6f, 2.6f) * TileSize;
 				TrunkT.Add(FTransform(Spin, Center + Jitter + FVector(0, 0, Height * 0.25f), FVector(0.12f * T, 0.12f * T, Height * 0.5f / ShapeSize)));
 				CrownT.Add(FTransform(Spin, Center + Jitter + FVector(0, 0, Height * 0.65f), FVector(0.7f * T, 0.7f * T, Height * 0.8f / ShapeSize)));
 			}
 			else if (Code == FWCatalog::Rock)
 			{
+				if (!RockMeshes.IsEmpty())
+				{
+					UStaticMesh* Mesh = RockMeshes[Random.RandHelper(RockMeshes.Num())];
+					ArtSolid.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Center + Jitter, Spin.Yaw, Random.FRandRange(0.55f, 0.95f) * TileSize, 0.f, 0.2f));
+					continue;
+				}
 				const float S = Random.FRandRange(0.45f, 0.8f) * T;
 				RockT.Add(FTransform(FRotator(Random.FRandRange(-20.f, 20.f), Spin.Yaw, Random.FRandRange(-20.f, 20.f)), Center + Jitter + FVector(0, 0, S * ShapeSize * 0.2f),
 					FVector(S * Random.FRandRange(0.8f, 1.3f), S, S * Random.FRandRange(0.5f, 0.9f))));
@@ -262,6 +436,12 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 			}
 			else if (Code == FWCatalog::Bush)
 			{
+				if (!BushMeshes.IsEmpty())
+				{
+					UStaticMesh* Mesh = BushMeshes[Random.RandHelper(BushMeshes.Num())];
+					ArtSoft.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Center + Jitter, Spin.Yaw, 0.f, Random.FRandRange(90.f, 200.f), 0.05f));
+					continue;
+				}
 				const float S = Random.FRandRange(0.3f, 0.5f) * T;
 				BushT.Add(FTransform(Spin, Center + Jitter + FVector(0, 0, S * 30.f), FVector(S, S, S * 0.75f)));
 			}
@@ -283,6 +463,13 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 			}
 			else if (Code == FWCatalog::Mine)
 			{
+				if (!RockMeshes.IsEmpty())
+				{
+					// Big boulders heaped over the mine's tiles
+					UStaticMesh* Mesh = RockMeshes[Random.RandHelper(FMath::Min(3, RockMeshes.Num()))];
+					ArtSolid.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Center, Spin.Yaw, Random.FRandRange(1.3f, 1.8f) * TileSize, 0.f, 0.3f));
+					continue;
+				}
 				const float H = Random.FRandRange(0.9f, 1.6f);
 				MineT.Add(FTransform(FRotator(0, Spin.Yaw, 0), Center + FVector(0, 0, H * TileSize * 0.3f), FVector(0.95f * T, 0.95f * T, H * 0.6f * T)));
 			}
@@ -297,6 +484,14 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 	Sleepers->AddInstances(SleeperT, false);
 	Platform->AddInstances(PlatformT, false);
 	MineRock->AddInstances(MineT, false);
+	for (TPair<UStaticMesh*, TArray<FTransform>>& Pair : ArtSolid)
+	{
+		MakeArtInstances(Pair.Key, true)->AddInstances(Pair.Value, false);
+	}
+	for (TPair<UStaticMesh*, TArray<FTransform>>& Pair : ArtSoft)
+	{
+		MakeArtInstances(Pair.Key, false)->AddInstances(Pair.Value, false);
+	}
 
 	// A dark entrance on the front of each mine
 	for (const FFWMine& Mine : Mines)
@@ -716,9 +911,78 @@ void AFWPlot::ApplyLogistics(const TSharedPtr<FJsonObject>& State)
 	LocalAtSync = FPlatformTime::Seconds();
 }
 
+void AFWPlot::UpdateGroundCover()
+{
+	// Dense grass only around the player: thousands of tufts within a few tens of metres, laid out
+	// again when they have walked away and thinning towards the edge
+	const APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	const APawn* Viewer = PC ? PC->GetPawn() : nullptr;
+	if (!Viewer || GroundCoverMeshes.IsEmpty())
+	{
+		return;
+	}
+	const FVector Here = GetActorTransform().InverseTransformPosition(Viewer->GetActorLocation());
+	if (FVector::Dist2D(Here, GroundCoverCentre) < 1000.f)
+	{
+		return;
+	}
+	GroundCoverCentre = Here;
+	constexpr float Radius = 3500.f;
+	constexpr float Spacing = 45.f;
+	TArray<TArray<FTransform>> ByMesh;
+	ByMesh.SetNum(GroundCoverMeshes.Num());
+	const int32 Cells = FMath::CeilToInt(Radius / Spacing);
+	for (int32 GY = -Cells; GY <= Cells; ++GY)
+	{
+		for (int32 GX = -Cells; GX <= Cells; ++GX)
+		{
+			// Cells are fixed to the world grid, so a tuft stays put when the patch is laid again
+			const int32 WX = FMath::FloorToInt(Here.X / Spacing) + GX;
+			const int32 WY = FMath::FloorToInt(Here.Y / Spacing) + GY;
+			FRandomStream Random((WX * 73856093) ^ (WY * 19349663));
+			const FVector At(WX * Spacing + Random.FRandRange(0.f, Spacing), WY * Spacing + Random.FRandRange(0.f, Spacing), 0.f);
+			const float Distance = FVector::Dist2D(At, Here);
+			if (Distance > Radius || Random.FRand() > FMath::Lerp(0.85f, 0.1f, Distance / Radius))
+			{
+				continue;
+			}
+			const FIntPoint Tile = TileAt(GetActorTransform().TransformPosition(At));
+			if (!Contains(Tile) || TileCode(Tile) != FWCatalog::Empty || Occupied.Contains(Tile))
+			{
+				continue;
+			}
+			const int32 Index = Random.RandHelper(GroundCoverMeshes.Num());
+			ByMesh[Index].Add(ArtTransform(GroundCoverMeshes[Index], At, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(30.f, 85.f), 0.05f));
+		}
+	}
+	for (int32 i = 0; i < GroundCoverMeshes.Num(); ++i)
+	{
+		if (!GroundCoverParts.IsValidIndex(i))
+		{
+			UHierarchicalInstancedStaticMeshComponent* Part = MakeArtInstances(GroundCoverMeshes[i], false);
+			Part->SetCastShadow(false);
+			GroundCoverParts.Add(Part);
+		}
+		GroundCoverParts[i]->ClearInstances();
+		GroundCoverParts[i]->AddInstances(ByMesh[i], false);
+	}
+}
+
 void AFWPlot::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	UpdateGroundCover();
+	if (PendingScatterBiome >= 0 && TerrainMesh)
+	{
+		FHitResult Probe;
+		const FVector Corner = GetActorTransform().TransformPosition(FVector(-20000.f, -20000.f, 0.f));
+		if (TerrainMesh->LineTraceComponent(Probe, Corner + FVector(0, 0, 400000.f), Corner - FVector(0, 0, 100000.f), FCollisionQueryParams(TEXT("FWProbe"), true)))
+		{
+			const int32 Biome = PendingScatterBiome;
+			PendingScatterBiome = -1;
+			ScatterSurroundings(Biome);
+		}
+	}
 	if (SimTime <= 0.0 || !HasLogistics())
 	{
 		return;
