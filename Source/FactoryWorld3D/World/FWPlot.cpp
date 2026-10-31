@@ -927,44 +927,52 @@ void AFWPlot::UpdateGroundCover()
 		return;
 	}
 	GroundCoverCentre = Here;
-	constexpr float Radius = 3500.f;
-	constexpr float Spacing = 45.f;
-	TArray<TArray<FTransform>> ByMesh;
-	ByMesh.SetNum(GroundCoverMeshes.Num());
-	const int32 Cells = FMath::CeilToInt(Radius / Spacing);
-	for (int32 GY = -Cells; GY <= Cells; ++GY)
+	// Two layers: thick short grass close by, sparser bigger clumps out to 150 m so the meadow does
+	// not turn into flat ground just past the near patch
+	struct FLayer { float Inner, Radius, Spacing, NearDensity, FarDensity, MinSize, MaxSize; };
+	const FLayer CoverLayers[] = { { 0.f, 3500.f, 45.f, 0.85f, 0.1f, 30.f, 85.f }, { 3000.f, 15000.f, 220.f, 0.7f, 0.15f, 70.f, 150.f } };
+	for (int32 L = 0; L < 2; ++L)
 	{
-		for (int32 GX = -Cells; GX <= Cells; ++GX)
+		const FLayer& Layer = CoverLayers[L];
+		TArray<TArray<FTransform>> ByMesh;
+		ByMesh.SetNum(GroundCoverMeshes.Num());
+		const int32 Cells = FMath::CeilToInt(Layer.Radius / Layer.Spacing);
+		for (int32 GY = -Cells; GY <= Cells; ++GY)
 		{
-			// Cells are fixed to the world grid, so a tuft stays put when the patch is laid again
-			const int32 WX = FMath::FloorToInt(Here.X / Spacing) + GX;
-			const int32 WY = FMath::FloorToInt(Here.Y / Spacing) + GY;
-			FRandomStream Random((WX * 73856093) ^ (WY * 19349663));
-			const FVector At(WX * Spacing + Random.FRandRange(0.f, Spacing), WY * Spacing + Random.FRandRange(0.f, Spacing), 0.f);
-			const float Distance = FVector::Dist2D(At, Here);
-			if (Distance > Radius || Random.FRand() > FMath::Lerp(0.85f, 0.1f, Distance / Radius))
+			for (int32 GX = -Cells; GX <= Cells; ++GX)
 			{
-				continue;
+				// Cells are fixed to the world grid, so a tuft stays put when the patch is laid again
+				const int32 WX = FMath::FloorToInt(Here.X / Layer.Spacing) + GX;
+				const int32 WY = FMath::FloorToInt(Here.Y / Layer.Spacing) + GY;
+				FRandomStream Random((WX * 73856093) ^ (WY * 19349663) ^ (L * 83492791));
+				const FVector At(WX * Layer.Spacing + Random.FRandRange(0.f, Layer.Spacing), WY * Layer.Spacing + Random.FRandRange(0.f, Layer.Spacing), 0.f);
+				const float Distance = FVector::Dist2D(At, Here);
+				if (Distance > Layer.Radius || Distance < Layer.Inner
+					|| Random.FRand() > FMath::Lerp(Layer.NearDensity, Layer.FarDensity, Distance / Layer.Radius))
+				{
+					continue;
+				}
+				const FIntPoint Tile = TileAt(GetActorTransform().TransformPosition(At));
+				if (!Contains(Tile) || TileCode(Tile) != FWCatalog::Empty || Occupied.Contains(Tile))
+				{
+					continue;
+				}
+				const int32 Index = Random.RandHelper(GroundCoverMeshes.Num());
+				ByMesh[Index].Add(ArtTransform(GroundCoverMeshes[Index], At, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(Layer.MinSize, Layer.MaxSize), 0.05f));
 			}
-			const FIntPoint Tile = TileAt(GetActorTransform().TransformPosition(At));
-			if (!Contains(Tile) || TileCode(Tile) != FWCatalog::Empty || Occupied.Contains(Tile))
-			{
-				continue;
-			}
-			const int32 Index = Random.RandHelper(GroundCoverMeshes.Num());
-			ByMesh[Index].Add(ArtTransform(GroundCoverMeshes[Index], At, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(30.f, 85.f), 0.05f));
 		}
-	}
-	for (int32 i = 0; i < GroundCoverMeshes.Num(); ++i)
-	{
-		if (!GroundCoverParts.IsValidIndex(i))
+		for (int32 i = 0; i < GroundCoverMeshes.Num(); ++i)
 		{
-			UHierarchicalInstancedStaticMeshComponent* Part = MakeArtInstances(GroundCoverMeshes[i], false);
-			Part->SetCastShadow(false);
-			GroundCoverParts.Add(Part);
+			const int32 Part = L * GroundCoverMeshes.Num() + i;
+			if (!GroundCoverParts.IsValidIndex(Part))
+			{
+				UHierarchicalInstancedStaticMeshComponent* Component = MakeArtInstances(GroundCoverMeshes[i], false);
+				Component->SetCastShadow(L == 0);
+				GroundCoverParts.Add(Component);
+			}
+			GroundCoverParts[Part]->ClearInstances();
+			GroundCoverParts[Part]->AddInstances(ByMesh[i], false);
 		}
-		GroundCoverParts[i]->ClearInstances();
-		GroundCoverParts[i]->AddInstances(ByMesh[i], false);
 	}
 }
 

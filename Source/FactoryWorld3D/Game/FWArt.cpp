@@ -91,7 +91,6 @@ namespace FWArt
 		return Meshes({
 			FW_MODEL("grass_medium_01", "grass_medium_01_mid_a_LOD0"), FW_MODEL("grass_medium_01", "grass_medium_01_mid_b_LOD0"),
 			FW_MODEL("grass_medium_01", "grass_medium_01_small_a_LOD0"), FW_MODEL("grass_medium_01", "grass_medium_01_tall_a_LOD0"),
-			FW_MODEL("fern_02", "fern_02_a"), FW_MODEL("fern_02", "fern_02_b"),
 		});
 	}
 
