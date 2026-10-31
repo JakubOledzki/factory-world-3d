@@ -246,6 +246,11 @@ if os.path.isdir(FACTORY):
                         mel.set_material_instance_texture_parameter_value(asset, "ARM", rough)
                     mel.set_material_instance_scalar_parameter_value(asset, "MetalScale", 0.0)
                     mel.set_material_instance_vector_parameter_value(asset, "Tint", unreal.LinearColor(*PAINTED[slot], 1.0))
+                    # Chipped edges show the bare steel underneath
+                    bare = texture_set("metal_grate_rusty", "diff")
+                    if bare and slot != "FW_Steel":
+                        mel.set_material_instance_texture_parameter_value(asset, "Rust", bare)
+                        mel.set_material_instance_scalar_parameter_value(asset, "Wear", 1.0)
                     mel.set_material_instance_scalar_parameter_value(asset, "Grime", 0.85)
                 else:
                     unreal.log_warning(f"FWIMPORT factory: unknown material slot {slot} in {path}")
