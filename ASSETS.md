@@ -71,6 +71,10 @@ Licencja: dane Copernicus DEM GLO-30 są bezpłatne do każdego celu, także kom
 
 Opis danych i licencji: https://registry.opendata.aws/copernicus-dem/
 
+## Manekin UE5 (Epic Games, szablony silnika)
+
+Podgląd w kreatorze postaci to manekin `SKM_Manny_Simple` z animacją `MM_Idle`, z szablonów, które każda instalacja Unreal Engine 5 ma w `Templates/TemplateResources`. Licencja: treści Epic dla projektów Unreal Engine (Unreal Engine EULA), można ich używać w grze, ale nie rozpowszechniać osobno. Dlatego nie ma ich w gicie (`Content/Characters/`), a kopiuje je `Tools/copy_mannequins.ps1`. Wygląd postaci maluje nasz materiał, bez dodatkowych tekstur.
+
 ## Kosodrzewina (nasza)
 
 Krzewy kosodrzewiny tworzy nasz skrypt `Tools/blender/make_mugo_pine.py`: geometria jest w całości nasza. Kora używa tekstur z `pine_tree_01` (Poly Haven, CC0, w tabeli wyżej). Igły nie mają tekstury, tylko kolor z materiału.

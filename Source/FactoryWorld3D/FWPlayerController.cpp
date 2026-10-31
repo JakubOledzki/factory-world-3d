@@ -16,7 +16,9 @@
 #include "Game/FWGameSettings.h"
 #include "Net/FWNetSubsystem.h"
 #include "UI/SFWHud.h"
+#include "UI/SFWCharacterCreator.h"
 #include "UI/SFWLoginWidget.h"
+#include "World/FWCharacterStudio.h"
 #include "UI/SFWPromptWidget.h"
 #include "World/FWEnvironment.h"
 #include "World/FWPlot.h"
@@ -219,50 +221,131 @@ void AFWPlayerController::OnLoggedIn()
 
 void AFWPlayerController::AskForCharacter()
 {
+	// The creator offers exactly what the server allows
 	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
-	SAssignNew(Prompt, SFWPromptWidget)
-		.Title(LOCTEXT("NewCharacter", "Nowa postać"))
-		.Message(LOCTEXT("NewCharacterText", "Jak ma się nazywać twoja postać? Wygląd zmienisz później w edytorze postaci."))
-		.ShowInput(true)
-		.InputHint(LOCTEXT("NameHint", "Nazwa (litery, cyfry, _)"))
-		.ButtonText(LOCTEXT("Create", "Utwórz postać"))
-		.OnAccepted_Lambda([WeakThis](const FString& Name)
+	Net()->Request(TEXT("character.options"), nullptr, [WeakThis](const FFWNetReply& Reply)
+	{
+		if (AFWPlayerController* This = WeakThis.Get())
+		{
+			if (Reply.Type == TEXT("character.options") && Reply.Payload.IsValid())
+			{
+				This->OpenCreator(Reply.Payload);
+			}
+			else
+			{
+				This->ToastError(Reply);
+			}
+		}
+	});
+}
+
+void AFWPlayerController::OpenCreator(const TSharedPtr<FJsonObject>& Options)
+{
+	// The studio stands high above the land, out of the world's sight and light
+	FActorSpawnParameters Spawn;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	Studio = GetWorld()->SpawnActor<AFWCharacterStudio>(FVector(0, 0, 2000000.f), FRotator::ZeroRotator, Spawn);
+	if (Studio)
+	{
+		SetViewTarget(Studio);
+		if (!Studio->HasFigure())
+		{
+			UE_LOG(LogFWGame, Warning, TEXT("Character creator: no mannequin (run Tools/copy_mannequins.ps1); the preview is empty"));
+		}
+	}
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	SAssignNew(Creator, SFWCharacterCreator)
+		.Options(Options)
+		.Studio(Studio)
+		.OnCreate_Lambda([WeakThis](const FString& Name, TSharedPtr<FJsonObject> Appearance)
 		{
 			AFWPlayerController* This = WeakThis.Get();
-			if (!This || Name.IsEmpty())
+			if (!This || !This->Creator.IsValid())
 			{
 				return;
 			}
-			// The first option of everything: the editor in the 2D game can change it later
-			TSharedPtr<FJsonObject> Look = MakeShared<FJsonObject>();
-			for (const TCHAR* Field : { TEXT("skinTone"), TEXT("hairStyle"), TEXT("hairColor"), TEXT("shirtStyle"), TEXT("shirtColor"),
-				TEXT("pantsColor"), TEXT("shoesColor"), TEXT("faceStyle"), TEXT("eyeColor"), TEXT("facialHair") })
-			{
-				Look->SetNumberField(Field, 0);
-			}
 			TSharedPtr<FJsonObject> P = Payload();
 			P->SetStringField(TEXT("name"), Name);
-			P->SetObjectField(TEXT("appearance"), Look);
-			This->Prompt->SetBusy(true);
+			P->SetObjectField(TEXT("appearance"), Appearance);
+			This->Creator->SetBusy(true);
 			This->Net()->Request(TEXT("character.create"), P, [WeakThis](const FFWNetReply& Reply)
 			{
 				AFWPlayerController* Inner = WeakThis.Get();
-				if (!Inner || !Inner->Prompt.IsValid())
+				if (!Inner || !Inner->Creator.IsValid())
 				{
 					return;
 				}
-				Inner->Prompt->SetBusy(false);
+				Inner->Creator->SetBusy(false);
 				if (Reply.Type == TEXT("character"))
 				{
+					UE_LOG(LogFWGame, Log, TEXT("Character created"));
+					Inner->CloseCreator();
 					Inner->ChoosePlot();
 				}
 				else
 				{
-					Inner->Prompt->SetMessage(FWCatalog::ErrorText(Reply.ErrorCode(), Reply.ErrorMessage()), true);
+					Inner->Creator->SetError(FWCatalog::ErrorText(Reply.ErrorCode(), Reply.ErrorMessage()));
 				}
 			});
 		});
-	ShowWidget(Prompt.ToSharedRef(), Prompt->GetFocusTarget());
+	ShowWidget(Creator.ToSharedRef(), Creator->GetFocusTarget());
+	UE_LOG(LogFWGame, Log, TEXT("Character creator open"));
+}
+
+void AFWPlayerController::CloseCreator()
+{
+	HideWidget();
+	Creator.Reset();
+	if (Studio)
+	{
+		Studio->Destroy();
+		Studio = nullptr;
+	}
+	if (GetPawn())
+	{
+		SetViewTarget(GetPawn());
+	}
+}
+
+void AFWPlayerController::FWCreatorPick(const FString& Key, int32 Index)
+{
+	if (Creator.IsValid())
+	{
+		Creator->Pick(Key, Index);
+	}
+}
+
+void AFWPlayerController::FWCreatorName(const FString& Name)
+{
+	if (Creator.IsValid())
+	{
+		Creator->SetName(Name);
+	}
+}
+
+void AFWPlayerController::FWCreatorRandom()
+{
+	if (Creator.IsValid())
+	{
+		Creator->Randomize();
+	}
+}
+
+void AFWPlayerController::FWCreatorView(float Zoom, float Yaw)
+{
+	if (Studio)
+	{
+		Studio->SetZoom(Zoom);
+		Studio->Spin(Yaw);
+	}
+}
+
+void AFWPlayerController::FWCreatorCreate()
+{
+	if (Creator.IsValid())
+	{
+		Creator->Submit();
+	}
 }
 
 void AFWPlayerController::ChoosePlot()

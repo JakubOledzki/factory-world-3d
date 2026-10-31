@@ -5,7 +5,9 @@
 #include "GameFramework/PlayerController.h"
 #include "FWPlayerController.generated.h"
 
+class AFWCharacterStudio;
 class AFWPlot;
+class SFWCharacterCreator;
 class SFWHud;
 class SFWLoginWidget;
 class SFWPromptWidget;
@@ -94,6 +96,17 @@ public:
 	// Hovers above the belts of the plot, looking at them
 	UFUNCTION(Exec)
 	void FWViewBelts(float Height = 700.f);
+	// Character creator: pick an option (appearance key, index), type the name, randomize, zoom (0-1), create
+	UFUNCTION(Exec)
+	void FWCreatorPick(const FString& Key, int32 Index);
+	UFUNCTION(Exec)
+	void FWCreatorName(const FString& Name);
+	UFUNCTION(Exec)
+	void FWCreatorRandom();
+	UFUNCTION(Exec)
+	void FWCreatorView(float Zoom, float Yaw = 0.f);
+	UFUNCTION(Exec)
+	void FWCreatorCreate();
 
 protected:
 	virtual void BeginPlay() override;
@@ -106,6 +119,8 @@ private:
 	void HideWidget();
 	void OnLoggedIn();
 	void AskForCharacter();
+	void OpenCreator(const TSharedPtr<FJsonObject>& Options);
+	void CloseCreator();
 	void ChoosePlot();
 	void OfferStarterPlot(int32 Radius, int32 Index);
 	void EnterPlot(int32 X, int32 Y);
@@ -118,6 +133,10 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<AFWPlot> Plot;
+
+	UPROPERTY()
+	TObjectPtr<AFWCharacterStudio> Studio;
+	TSharedPtr<SFWCharacterCreator> Creator;
 
 	TSharedPtr<SFWLoginWidget> LoginWidget;
 	TSharedPtr<SFWPromptWidget> Prompt;

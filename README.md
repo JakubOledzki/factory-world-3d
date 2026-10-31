@@ -74,7 +74,7 @@ Polecenia konsoli (klawisz `~`) do testów:
 
 Po zalogowaniu:
 
-1. Konto bez postaci: gra pyta o nazwę i tworzy postać (`character.create`, wygląd domyślny).
+1. Konto bez postaci: otwiera się kreator postaci (opis niżej), a po kliknięciu „Utwórz postać” gra od razu przechodzi dalej.
 2. Gracz bez działki: gra szuka najbliższej wolnej działki wokół `StarterPlotX/Y` (domyślnie Tatry, gdzie są kopalnie, a zakup daje kilof) i proponuje jej kupno (`world.buy`). Nowe konto ma 0 $, więc pieniądze trzeba najpierw zarobić w garażu w grze 2D.
 3. `plot.enter`: działka powstaje w 3D. Teren z `tiles` to drzewa, skały, wydmy, krzaki, tory, stacja i kopalnie, a obiekty mają swoje rozmiary i obroty. Na razie to modele zastępcze, docelowe modele przyjdą w następnym kroku.
 
@@ -102,6 +102,18 @@ Testy bez klawiatury: polecenia konsoli `FWPrompt`, `FWGoto`, `FWMine`, `FWPlace
 Materiały bazowe (`Content/Materials`) tworzy skrypt `Tools/make_materials.py`.
 
 ![Tryb budowania](docs/screenshots/build_mode.png)
+
+## Kreator postaci
+
+Po założeniu konta, gdy serwer odpowie `character.none`, otwiera się kreator. Ma te same opcje co edytor w grze 2D, w tej samej kolejności: skóra, twarz, oczy, fryzura, kolor włosów, zarost, koszulka, kolor koszulki, spodnie i buty, a do tego imię. Listy kolorów i liczbę stylów podaje serwer (`character.options`), więc nowy kolor dodany na serwerze pojawi się bez aktualizacji gry. Imię sprawdzamy według reguły serwera (3–16 liter, cyfr lub _), a postać tworzy `character.create`.
+
+Obok jest podgląd 3D: manekin UE5 w ciemnym studiu z trzema światłami, na obracanym podeście. Przeciągnięcie myszą obraca postać, kółko przybliża twarz. Manekin jest malowany przez materiał `M_FWCharacter` (`Tools/character_material.hlsl`) według części ciała: kolory skóry, włosów, oczu i ubrań, fryzura, zarost, twarz i krój koszulki. Manekina nie ma w gicie, kopiuje go z szablonów silnika polecenie:
+
+```
+powershell -ExecutionPolicy Bypass -File Tools\copy_mannequins.ps1
+```
+
+Bez niego kreator działa, tylko podgląd jest pusty.
 
 ## Automatyczne logowanie (tylko do testów)
 

@@ -334,3 +334,40 @@ lib.connect_material_property(scalar_param(m, "Roughness", 0.35, -300, 300), "",
 lib.recompile_material(m)
 unreal.EditorAssetLibrary.save_asset(m.get_path_name())
 unreal.log("FW decal material saved")
+
+
+# The character creator's preview: the UE5 mannequin painted as the picked character (skin, hair, eyes, face,
+# facial hair, shirt, trousers, shoes) by body region in the bind pose (Tools/character_material.hlsl)
+m = fresh("M_FWCharacter")
+m.set_editor_property("used_with_skeletal_mesh", True)
+hlsl = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "character_material.hlsl"), encoding="utf-8").read()
+custom = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 0)
+custom.set_editor_property("code", "\n".join(line for line in hlsl.splitlines() if not line.startswith("//")))
+custom.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+colors = (("Skin", (0.87, 0.65, 0.53)), ("Hair", (0.1, 0.07, 0.05)), ("Eyes", (0.2, 0.12, 0.06)),
+          ("Shirt", (0.8, 0.78, 0.72)), ("Pants", (0.15, 0.15, 0.17)), ("Shoes", (0.3, 0.2, 0.12)))
+styles = ("HairStyle", "ShirtStyle", "FacialHair", "FaceStyle")
+inputs = []
+for name in ["P"] + [c[0] for c in colors] + list(styles):
+    item = unreal.CustomInput()
+    item.set_editor_property("input_name", name)
+    inputs.append(item)
+custom.set_editor_property("inputs", inputs)
+rough_out = unreal.CustomOutput()
+rough_out.set_editor_property("output_name", "RoughOut")
+rough_out.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
+custom.set_editor_property("additional_outputs", [rough_out])
+# The bind-pose position exists only per vertex: carried to the pixels by an interpolator
+pre_skinned = lib.create_material_expression(m, unreal.MaterialExpressionPreSkinnedPosition, -1100, -600)
+interpolator = lib.create_material_expression(m, unreal.MaterialExpressionVertexInterpolator, -900, -600)
+lib.connect_material_expressions(pre_skinned, "", interpolator, "")
+lib.connect_material_expressions(interpolator, "", custom, "P")
+for i, (name, default) in enumerate(colors):
+    lib.connect_material_expressions(vector_param(m, name, (*default, 1.0), -900, -500 + i * 90), "", custom, name)
+for i, name in enumerate(styles):
+    lib.connect_material_expressions(scalar_param(m, name, 1.0, -900, 100 + i * 80), "", custom, name)
+lib.connect_material_property(custom, "", unreal.MaterialProperty.MP_BASE_COLOR)
+lib.connect_material_property(custom, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
+lib.recompile_material(m)
+unreal.EditorAssetLibrary.save_asset(m.get_path_name())
+unreal.log("FW character material saved")
