@@ -2,14 +2,13 @@
 
 #include "EngineUtils.h"
 #include "FWPlayerController.h"
-#include "GameFramework/DefaultPawn.h"
+#include "Player/FWCharacter.h"
 #include "World/FWEnvironment.h"
 
 AFactoryWorld3DGameMode::AFactoryWorld3DGameMode()
 {
 	PlayerControllerClass = AFWPlayerController::StaticClass();
-	// Free-flying camera until the first-person character exists
-	DefaultPawnClass = ADefaultPawn::StaticClass();
+	DefaultPawnClass = AFWCharacter::StaticClass();
 }
 
 void AFactoryWorld3DGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)

@@ -69,3 +69,49 @@ Polecenia konsoli (klawisz `~`) do testów:
 ```
 "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "%CD%\FactoryWorld3D.uproject" -run=pythonscript -script="%CD%\Tools\make_test_level.py"
 ```
+
+## Gra na działce (demo)
+
+Po zalogowaniu:
+
+1. Konto bez postaci: gra pyta o nazwę i tworzy postać (`character.create`, wygląd domyślny).
+2. Gracz bez działki: gra szuka najbliższej wolnej działki wokół `StarterPlotX/Y` (domyślnie Tatry, gdzie są kopalnie, a zakup daje kilof) i proponuje jej kupno (`world.buy`). Nowe konto ma 0 $, więc pieniądze trzeba najpierw zarobić w garażu w grze 2D.
+3. `plot.enter`: działka powstaje w 3D. Teren z `tiles` to drzewa, skały, wydmy, krzaki, tory, stacja i kopalnie, a obiekty mają swoje rozmiary i obroty. Na razie to modele zastępcze, docelowe modele przyjdą w następnym kroku.
+
+Sterowanie:
+
+| Klawisz | Działanie |
+| --- | --- |
+| WASD, mysz | ruch i rozglądanie |
+| Shift, Spacja | bieg, skok |
+| E (przytrzymaj) | kopanie w kopalni (`plot.mine`, czas z `mineSeconds`); przy skrzyni wkłada do niej surowce (`storage.put`) |
+| PPM (przytrzymaj) | zabiera obiekt do ekwipunku (`plot.pickup`) |
+| B, 1–5 | tryb budowania i wybór przedmiotu z paska (`hotbar.get`); pusty pasek wypełnia się tym, co można postawić |
+| LPM, R | stawia przedmiot (`plot.place`) na polu pod celownikiem, R obraca (0 południe, 1 wschód, 2 północ, 3 zachód) |
+
+Taśmociągi i podajniki: gra co sekundę pyta o `logistics.get` (`compact: true`), a między odpowiedziami liczy ruch przedmiotów tymi samymi zasadami co serwer, więc przedmioty jadą płynnie. Podajniki potrzebują prądu (słup plus panel słoneczny lub wiatrak).
+
+Ustawienia w `Config/DefaultGame.ini`, sekcja `[/Script/FactoryWorld3D.FWGameSettings]`:
+
+- `TileSizeCm=400`: jak duże jest jedno pole działki. Pole na serwerze ma 20 m, co z perspektywy pierwszej osoby jest za duże, więc działka (250 × 250 pól) ma 1 km.
+- `StarterPlotX`, `StarterPlotY`: gdzie szukać pierwszej działki.
+- `LogisticsPollSeconds`: jak często pytać o taśmociągi.
+
+Testy bez klawiatury: polecenia konsoli `FWPrompt`, `FWGoto`, `FWMine`, `FWPlace`, `FWPickupAt`, `FWStoreAt`, `FWBuildLine`, `FWStoreLine`, `FWViewBelts`, `FWBuildMode` i `FWShot`. Plik poleceń uruchamia się z `-FWAutoTest=<ścieżka>` (przykład: `Tools/autotest_plot.txt`).
+
+Materiały bazowe (`Content/Materials`) tworzy skrypt `Tools/make_materials.py`.
+
+![Tryb budowania](docs/screenshots/build_mode.png)
+
+## Automatyczne logowanie (tylko do testów)
+
+Żeby gra od razu wchodziła na działkę, bez ekranu logowania, utwórz plik `Saved/DevLogin.ini`:
+
+```ini
+Email=explore3d@example.test
+Password=<hasło konta testowego>
+```
+
+Katalog `Saved/` nie trafia do gita, więc hasła nie ma w repozytorium. Plik jest pomijany w wersji Shipping. Żeby wyłączyć automatyczne logowanie, usuń plik albo zostaw puste `Email=`.
+
+Konto bez działki i bez pieniędzy dostaje propozycję kupna działki i przycisk „Rozejrzyj się (bez działki)”, więc gra nie utyka.

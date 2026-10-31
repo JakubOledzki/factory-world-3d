@@ -55,6 +55,8 @@ void SFWLoginWidget::Construct(const FArguments& InArgs)
 {
 	Net = InArgs._Net;
 	OnFinished = InArgs._OnFinished;
+	AutoEmail = InArgs._AutoEmail;
+	AutoPassword = InArgs._AutoPassword;
 
 	ChildSlot
 	[
@@ -244,7 +246,16 @@ void SFWLoginWidget::HandleStateChanged(EFWNetState State)
 	case EFWNetState::Ready:
 	{
 		UFWNetSubsystem* Subsystem = Net.Get();
-		if (Subsystem && !bTriedResume && Subsystem->HasSavedToken())
+		if (Subsystem && !AutoEmail.IsEmpty() && !bBusy)
+		{
+			// Development auto-login (Saved/DevLogin.ini): straight in, no form
+			EmailBox->SetText(FText::FromString(AutoEmail));
+			PasswordBox->SetText(FText::FromString(AutoPassword));
+			AutoEmail.Reset();
+			bTriedResume = true;
+			Submit(false);
+		}
+		else if (Subsystem && !bTriedResume && Subsystem->HasSavedToken())
 		{
 			// Log back in with the saved session before asking for a password
 			bTriedResume = true;
@@ -308,12 +319,8 @@ void SFWLoginWidget::AfterAuth()
 		}
 		else if (Reply.Type == TEXT("character.none"))
 		{
-			// Log out so the form can be used with another account
-			if (UFWNetSubsystem* Subsystem = This->Net.Get())
-			{
-				Subsystem->Logout();
-			}
-			This->SetStatus(LOCTEXT("NoCharacter", "To konto nie ma jeszcze postaci. Utwórz ją w grze Factory World."), true);
+			// The game asks for a name next
+			This->OnFinished.ExecuteIfBound();
 		}
 		else
 		{
@@ -329,6 +336,12 @@ void SFWLoginWidget::SetStatus(const FText& Text, bool bError)
 		StatusText->SetText(Text);
 		StatusText->SetColorAndOpacity(bError ? FLinearColor(1.f, 0.35f, 0.3f) : FLinearColor(0.75f, 0.85f, 0.95f));
 	}
+}
+
+
+TSharedPtr<SWidget> SFWLoginWidget::GetFocusTarget() const
+{
+	return EmailBox;
 }
 
 #undef LOCTEXT_NAMESPACE
