@@ -6,8 +6,14 @@ public class FactoryWorld3D : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
+		PublicIncludePaths.Add(ModuleDirectory);
+
 		PublicDependencyModuleNames.AddRange(new string[] {
 			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput"
+		});
+
+		PrivateDependencyModuleNames.AddRange(new string[] {
+			"Json", "Slate", "SlateCore", "WebSockets"
 		});
 	}
 }

@@ -11,4 +11,6 @@ class FACTORYWORLD3D_API AFactoryWorld3DGameMode : public AGameModeBase
 
 public:
 	AFactoryWorld3DGameMode();
+
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 };
