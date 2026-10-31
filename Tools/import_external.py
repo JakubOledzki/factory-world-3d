@@ -400,6 +400,22 @@ if os.path.isdir(GEAR) and skeleton and cloth_master and hair_master:
         slots = mesh.get_editor_property("materials")
         unreal.log_warning(f"FWIMPORT gear {name}: {[str(s.get_editor_property('material_slot_name')) for s in slots]}")
 
+# Hotbar icons from Tools/blender/render_icons.py: interface textures, no mipmaps
+ICONS = os.path.join(MODELS, "icons")
+if os.path.isdir(ICONS):
+    destination = "/Game/External/Icons"
+    if library.list_assets(destination, recursive=True):
+        library.delete_directory(destination)
+    run([os.path.join(ICONS, f) for f in sorted(os.listdir(ICONS)) if f.endswith(".png")], destination)
+    for path in library.list_assets(destination, recursive=False, include_folder=False):
+        texture = unreal.load_asset(path)
+        if isinstance(texture, unreal.Texture2D):
+            texture.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_EDITOR_ICON)
+            texture.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
+            texture.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_UI)
+            library.save_loaded_asset(texture)
+    unreal.log_warning(f"FWIMPORT icons: {len(library.list_assets(destination, recursive=False, include_folder=False))}")
+
 # Sounds from Tools/make_audio.py (synthesized, ours): /Game/External/Audio, with the mix set up around them:
 # sound classes Master > Ambience / SFX / UI, distance falloff for machines, and voice limits so a hundred belts
 # play as the few nearest

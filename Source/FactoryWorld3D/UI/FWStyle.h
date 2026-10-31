@@ -25,6 +25,8 @@ namespace FWStyle
 	const FSlateBrush* SideShade();
 	// A colour swatch with rounded corners (tinted by the caller)
 	const FSlateBrush* Swatch();
+	// The outline of a hotbar slot, and of the selected one
+	const FSlateBrush* SlotFrame(bool bSelected);
 	// Amber call-to-action button, and a quieter glass one
 	const FButtonStyle& PrimaryButton();
 	const FButtonStyle& SecondaryButton();

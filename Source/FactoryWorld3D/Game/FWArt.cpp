@@ -133,6 +133,56 @@ namespace FWArt
 		return Mesh(*FString::Printf(TEXT("/Game/External/Factory/%s/%s/StaticMeshes/%s.%s"), Name, Name, Name, Name));
 	}
 
+	UStaticMesh* ItemMesh(const FString& Item)
+	{
+		const TCHAR* Name = TEXT("crate");
+		if (Item.StartsWith(TEXT("tool_pickaxe")))
+		{
+			Name = TEXT("tool_pickaxe");
+		}
+		else if (Item.Contains(TEXT("belt")) || Item.Contains(TEXT("splitter")))
+		{
+			Name = TEXT("belt_straight");
+		}
+		else if (Item.Contains(TEXT("inserter")))
+		{
+			Name = TEXT("inserter_base");
+		}
+		else if (Item.Contains(TEXT("chest")) || Item.StartsWith(TEXT("storage_")))
+		{
+			Name = TEXT("chest");
+		}
+		else if (Item.Contains(TEXT("pole")) || Item.Contains(TEXT("pylon")) || Item.Contains(TEXT("substation")))
+		{
+			Name = TEXT("pole");
+		}
+		else if (Item.Contains(TEXT("solar")))
+		{
+			Name = TEXT("solar_panel");
+		}
+		else if (Item.Contains(TEXT("turbine")))
+		{
+			Name = TEXT("turbine_tower");
+		}
+		else if (Item.StartsWith(TEXT("furniture_")) || Item.StartsWith(TEXT("power_")))
+		{
+			Name = TEXT("machine");
+		}
+		else if (Item.EndsWith(TEXT("_ore")) || Item == TEXT("coal"))
+		{
+			Name = TEXT("chunk_ore");
+		}
+		else if (Item == TEXT("stone") || Item == TEXT("gravel") || Item == TEXT("sand"))
+		{
+			Name = TEXT("chunk_stone");
+		}
+		else if (Item.EndsWith(TEXT("_ingot")))
+		{
+			Name = TEXT("ingot");
+		}
+		return Factory(Name);
+	}
+
 	UStaticMesh* Terrain(int32 Biome, int32 PlotX, int32 PlotY)
 	{
 		const FString Real = FString::Printf(TEXT("terrain_dem_%d_%d"), PlotX, PlotY);

@@ -6,6 +6,7 @@
 #include "FWPlayerController.generated.h"
 
 class AFWCharacterStudio;
+class UTexture2D;
 class UAudioComponent;
 class AFWPlot;
 class SFWCharacterCreator;
@@ -57,6 +58,8 @@ public:
 	bool IsInWorld() const { return Plot != nullptr; }
 
 	void SelectSlot(int32 Slot);
+	// The icon of an item for the HUD, rendered from its model (Tools/blender/render_icons.py)
+	UTexture2D* GetIcon(const FString& Item) const;
 	void Toast(const FText& Text, bool bError = false);
 	void ToastError(const FFWNetReply& Reply);
 

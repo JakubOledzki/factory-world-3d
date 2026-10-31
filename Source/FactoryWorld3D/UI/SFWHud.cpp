@@ -2,7 +2,10 @@
 
 #include "FWPlayerController.h"
 #include "Player/FWCharacter.h"
+#include "Engine/Texture2D.h"
 #include "Styling/CoreStyle.h"
+#include "UI/FWStyle.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Notifications/SProgressBar.h"
@@ -35,7 +38,7 @@ void SFWHud::Construct(const FArguments& InArgs)
 	TSharedRef<SHorizontalBox> HotbarBox = SNew(SHorizontalBox);
 	for (int32 Slot = 0; Slot < AFWPlayerController::HotbarSize; ++Slot)
 	{
-		HotbarBox->AddSlot().AutoWidth().Padding(4, 0)[MakeSlot(Slot)];
+		HotbarBox->AddSlot().AutoWidth().VAlign(VAlign_Bottom).Padding(5, 0)[MakeSlot(Slot)];
 	}
 
 	ChildSlot
@@ -126,65 +129,104 @@ void SFWHud::Construct(const FArguments& InArgs)
 		// Hotbar
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0, 0, 0, 24)
 		[
-			HotbarBox
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 8)
+			[
+				SNew(STextBlock)
+				.Font(FWStyle::Font(14, TEXT("Bold")))
+				.ColorAndOpacity(FWStyle::Text)
+				.ShadowOffset(FVector2D(1, 1))
+				.ShadowColorAndOpacity(FLinearColor(0, 0, 0, 0.8f))
+				.Text_Lambda([this]()
+				{
+					const FString Id = Controller.IsValid() ? Controller->GetSelectedItem() : FString();
+					return Id.IsEmpty() ? FText::GetEmpty() : FText::FromString(Controller->ItemName(Id));
+				})
+			]
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				HotbarBox
+			]
 		]
 	];
 }
 
 TSharedRef<SWidget> SFWHud::MakeSlot(int32 Slot)
 {
-	const FSlateBrush* White = FCoreStyle::Get().GetBrush("WhiteBrush");
 	auto Item = [this, Slot]() -> FString
 	{
 		return Controller.IsValid() && Controller->GetHotbar().IsValidIndex(Slot) ? Controller->GetHotbar()[Slot] : FString();
 	};
-	return SNew(SBorder)
-		.BorderImage(White)
-		.Padding(2.f)
-		.BorderBackgroundColor_Lambda([this, Slot]()
-		{
-			return Controller.IsValid() && Controller->GetSelectedSlot() == Slot ? Accent : FLinearColor(0.f, 0.f, 0.f, 0.5f);
-		})
+	auto Selected = [this, Slot]() { return Controller.IsValid() && Controller->GetSelectedSlot() == Slot; };
+	return SNew(SBox)
+		.WidthOverride_Lambda([Selected]() { return Selected() ? 92.f : 80.f; })
+		.HeightOverride_Lambda([Selected]() { return Selected() ? 92.f : 80.f; })
 		[
 			SNew(SBorder)
-			.BorderImage(White)
-			.BorderBackgroundColor(Panel)
+			.BorderImage(FWStyle::Panel())
+			.BorderBackgroundColor_Lambda([Selected]() { return Selected() ? FLinearColor(1.f, 0.8f, 0.55f, 1.f) : FLinearColor::White; })
+			.Padding(0.f)
 			[
-				SNew(SBox).WidthOverride(150.f).HeightOverride(70.f).Padding(FMargin(8, 4))
+				SNew(SOverlay)
+				// The selected slot: an amber frame
+				+ SOverlay::Slot()
 				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight()
-					[
-						SNew(STextBlock)
-						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 10))
-						.ColorAndOpacity(FLinearColor(0.6f, 0.62f, 0.65f))
-						.Text(FText::AsNumber(Slot + 1))
-					]
-					+ SVerticalBox::Slot().FillHeight(1.f)
-					[
-						SNew(STextBlock)
-						.Font(FCoreStyle::GetDefaultFontStyle("Regular", 10))
-						.AutoWrapText(true)
-						.Text_Lambda([this, Item]()
-						{
-							const FString Id = Item();
-							return Id.IsEmpty() || !Controller.IsValid() ? FText::GetEmpty() : FText::FromString(Controller->ItemName(Id));
-						})
-					]
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
-					[
-						SNew(STextBlock)
-						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
-						.Text_Lambda([this, Item]()
-						{
-							const FString Id = Item();
-							const FFWStack* Stack = Controller.IsValid() && !Id.IsEmpty() ? Controller->FindStack(Id) : nullptr;
-							return Id.IsEmpty() ? FText::GetEmpty() : FText::AsNumber(Stack ? Stack->Quantity : 0);
-						})
-					]
+					SNew(SImage)
+					.Image_Lambda([Selected]() { return FWStyle::SlotFrame(Selected()); })
+				]
+				// The item's own model
+				+ SOverlay::Slot().Padding(6.f)
+				[
+					SNew(SImage)
+					.Image_Lambda([this, Item]() { return IconBrush(Item()); })
+					.Visibility_Lambda([this, Item]() { return IconBrush(Item()) ? EVisibility::HitTestInvisible : EVisibility::Hidden; })
+				]
+				+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(7.f, 4.f)
+				[
+					SNew(STextBlock)
+					.Font(FWStyle::Font(10, TEXT("Bold")))
+					.ColorAndOpacity_Lambda([Selected]() { return Selected() ? FWStyle::Accent : FWStyle::Muted; })
+					.ShadowOffset(FVector2D(1, 1))
+					.Text(FText::AsNumber(Slot + 1))
+				]
+				+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(7.f, 3.f)
+				[
+					SNew(STextBlock)
+					.Font(FWStyle::Font(13, TEXT("Bold")))
+					.ColorAndOpacity(FWStyle::Text)
+					.ShadowOffset(FVector2D(1, 1))
+					.Text_Lambda([this, Item]()
+					{
+						const FString Id = Item();
+						const FFWStack* Stack = Controller.IsValid() && !Id.IsEmpty() ? Controller->FindStack(Id) : nullptr;
+						return Id.IsEmpty() ? FText::GetEmpty() : FText::AsNumber(Stack ? Stack->Quantity : 0);
+					})
 				]
 			]
 		];
+}
+
+const FSlateBrush* SFWHud::IconBrush(const FString& Item) const
+{
+	if (Item.IsEmpty() || !Controller.IsValid())
+	{
+		return nullptr;
+	}
+	if (const TSharedPtr<FSlateBrush>* Found = Icons.Find(Item))
+	{
+		return Found->Get();
+	}
+	UTexture2D* Texture = Controller->GetIcon(Item);
+	TSharedPtr<FSlateBrush> Brush;
+	if (Texture)
+	{
+		Brush = MakeShared<FSlateBrush>();
+		Brush->SetResourceObject(Texture);
+		Brush->ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
+		Brush->DrawAs = ESlateBrushDrawType::Image;
+	}
+	Icons.Add(Item, Brush);
+	return Brush.Get();
 }
 
 AFWCharacter* SFWHud::GetCharacter() const

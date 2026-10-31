@@ -56,6 +56,9 @@ if (-not (Test-Path RawAssets\processed\factory\belt_straight.glb)) {
 if (-not (Test-Path RawAssets\processed\factory\tool_pickaxe.glb)) {
     & $Blender --background --factory-startup --python Tools\blender\make_tools.py
 }
+if (-not (Test-Path RawAssets\processed\icons\icon_tool_pickaxe.png)) {
+    & $Blender --background --factory-startup --python Tools\blender\render_icons.py
+}
 if (-not (Test-Path RawAssets\processed\terrain_mountains.glb)) {
     & $Blender --background --factory-startup --python Tools\blender\make_terrain.py
 }

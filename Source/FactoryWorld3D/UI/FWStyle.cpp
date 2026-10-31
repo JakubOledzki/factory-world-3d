@@ -30,6 +30,13 @@ namespace FWStyle
 		return &Brush;
 	}
 
+	const FSlateBrush* SlotFrame(bool bSelected)
+	{
+		static const FSlateRoundedBoxBrush Quiet(FLinearColor::Transparent, 10.f, FLinearColor(1.f, 1.f, 1.f, 0.14f), 1.f);
+		static const FSlateRoundedBoxBrush Lit(FLinearColor(1.f, 0.56f, 0.12f, 0.12f), 10.f, Accent, 2.f);
+		return bSelected ? &Lit : &Quiet;
+	}
+
 	namespace
 	{
 		FButtonStyle MakeButton(const FLinearColor& Normal, const FLinearColor& Hovered, const FLinearColor& Pressed, const FLinearColor& Edge)
