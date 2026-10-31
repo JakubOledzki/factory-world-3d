@@ -6,6 +6,8 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
 #include "Game/FWArt.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Game/FWCatalog.h"
 #include "Game/FWGameSettings.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -189,6 +191,7 @@ void AFWPlot::Build(const TSharedPtr<FJsonObject>& Plot)
 	}
 
 	BuildGround(Biome);
+	GroundCoverMeshes = FWArt::Grass();
 	BuildTerrain(Tiles, TreeCodes);
 
 	const TArray<TSharedPtr<FJsonValue>>* ObjectList = nullptr;
@@ -375,7 +378,6 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 	const TArray<UStaticMesh*> RockMeshes = FWArt::Rocks();
 	const TArray<UStaticMesh*> TreeMeshes = FWArt::Trees();
 	const TArray<UStaticMesh*> BushMeshes = FWArt::Bushes();
-	const TArray<UStaticMesh*> GrassMeshes = FWArt::Grass();
 
 	UHierarchicalInstancedStaticMeshComponent* Trunks = MakeInstances(CylinderMesh, FLinearColor(0.12f, 0.07f, 0.04f), 0.9f, true);
 	UHierarchicalInstancedStaticMeshComponent* Crowns = MakeInstances(ConeMesh, FLinearColor(0.03f, 0.09f, 0.03f), 0.85f, false);
@@ -398,16 +400,7 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 			FRandomStream Random(Y * Size + X + 1);
 			if (Code == FWCatalog::Empty)
 			{
-				// Ground cover on some free tiles: not solid, so building over it is fine
-				if (!GrassMeshes.IsEmpty() && Random.FRand() < 0.35f)
-				{
-					for (int32 Tuft = 0; Tuft < 3; ++Tuft)
-					{
-						UStaticMesh* Mesh = GrassMeshes[Random.RandHelper(GrassMeshes.Num())];
-						const FVector At = TileCenter(FIntPoint(X, Y)) + FVector(Random.FRandRange(-0.5f, 0.5f) * TileSize, Random.FRandRange(-0.5f, 0.5f) * TileSize, 0.f);
-						ArtSoft.FindOrAdd(Mesh).Add(ArtTransform(Mesh, At, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(25.f, 70.f), 0.05f));
-					}
-				}
+				// Free ground: grass comes from UpdateGroundCover around the player
 				continue;
 			}
 			const FVector Center = TileCenter(FIntPoint(X, Y));
@@ -918,9 +911,67 @@ void AFWPlot::ApplyLogistics(const TSharedPtr<FJsonObject>& State)
 	LocalAtSync = FPlatformTime::Seconds();
 }
 
+void AFWPlot::UpdateGroundCover()
+{
+	// Dense grass only around the player: thousands of tufts within a few tens of metres, laid out
+	// again when they have walked away and thinning towards the edge
+	const APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	const APawn* Viewer = PC ? PC->GetPawn() : nullptr;
+	if (!Viewer || GroundCoverMeshes.IsEmpty())
+	{
+		return;
+	}
+	const FVector Here = GetActorTransform().InverseTransformPosition(Viewer->GetActorLocation());
+	if (FVector::Dist2D(Here, GroundCoverCentre) < 1000.f)
+	{
+		return;
+	}
+	GroundCoverCentre = Here;
+	constexpr float Radius = 3500.f;
+	constexpr float Spacing = 45.f;
+	TArray<TArray<FTransform>> ByMesh;
+	ByMesh.SetNum(GroundCoverMeshes.Num());
+	const int32 Cells = FMath::CeilToInt(Radius / Spacing);
+	for (int32 GY = -Cells; GY <= Cells; ++GY)
+	{
+		for (int32 GX = -Cells; GX <= Cells; ++GX)
+		{
+			// Cells are fixed to the world grid, so a tuft stays put when the patch is laid again
+			const int32 WX = FMath::FloorToInt(Here.X / Spacing) + GX;
+			const int32 WY = FMath::FloorToInt(Here.Y / Spacing) + GY;
+			FRandomStream Random((WX * 73856093) ^ (WY * 19349663));
+			const FVector At(WX * Spacing + Random.FRandRange(0.f, Spacing), WY * Spacing + Random.FRandRange(0.f, Spacing), 0.f);
+			const float Distance = FVector::Dist2D(At, Here);
+			if (Distance > Radius || Random.FRand() > FMath::Lerp(0.85f, 0.1f, Distance / Radius))
+			{
+				continue;
+			}
+			const FIntPoint Tile = TileAt(GetActorTransform().TransformPosition(At));
+			if (!Contains(Tile) || TileCode(Tile) != FWCatalog::Empty || Occupied.Contains(Tile))
+			{
+				continue;
+			}
+			const int32 Index = Random.RandHelper(GroundCoverMeshes.Num());
+			ByMesh[Index].Add(ArtTransform(GroundCoverMeshes[Index], At, Random.FRandRange(0.f, 360.f), 0.f, Random.FRandRange(30.f, 85.f), 0.05f));
+		}
+	}
+	for (int32 i = 0; i < GroundCoverMeshes.Num(); ++i)
+	{
+		if (!GroundCoverParts.IsValidIndex(i))
+		{
+			UHierarchicalInstancedStaticMeshComponent* Part = MakeArtInstances(GroundCoverMeshes[i], false);
+			Part->SetCastShadow(false);
+			GroundCoverParts.Add(Part);
+		}
+		GroundCoverParts[i]->ClearInstances();
+		GroundCoverParts[i]->AddInstances(ByMesh[i], false);
+	}
+}
+
 void AFWPlot::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	UpdateGroundCover();
 	if (PendingScatterBiome >= 0 && TerrainMesh)
 	{
 		FHitResult Probe;

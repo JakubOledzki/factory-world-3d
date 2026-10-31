@@ -20,6 +20,9 @@ def fresh(name):
     material = assets.create_asset(name, FOLDER, unreal.Material, unreal.MaterialFactoryNew())
     # Drawn on instanced meshes (terrain, items on belts), so the usage must be set up front
     material.set_editor_property("used_with_instanced_static_meshes", True)
+    # Scans and the land are Nanite meshes; without this usage a cooked or -game run falls back to the
+    # default (flat grey) material
+    material.set_editor_property("used_with_nanite", True)
     return material
 
 
@@ -147,3 +150,44 @@ lib.delete_material_expression(m, arm)
 lib.recompile_material(m)
 unreal.EditorAssetLibrary.save_asset(m.get_path_name())
 unreal.log("FW terrain material saved")
+
+
+# Scanned models (rocks, plants): plain textured PBR, so their textures sample on Nanite meshes
+# (the glTF importer's own master did not). Tools/import_external.py points every scan at an instance.
+def scan_material(name, masked):
+    m = fresh(name)
+    if masked:
+        m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+        m.set_editor_property("two_sided", True)
+    color = lib.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -700, -300)
+    color.set_editor_property("parameter_name", "BaseColor")
+    color.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/DefaultTexture.DefaultTexture"))
+    tint = vector_param(m, "Tint", (1, 1, 1, 1), -700, -500)
+    mul = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -350, -300)
+    lib.connect_material_expressions(color, "RGB", mul, "A")
+    lib.connect_material_expressions(tint, "", mul, "B")
+    lib.connect_material_property(mul, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    if masked:
+        lib.connect_material_property(color, "A", unreal.MaterialProperty.MP_OPACITY_MASK)
+    normal = lib.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -700, 0)
+    normal.set_editor_property("parameter_name", "Normal")
+    normal.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+    normal.set_editor_property("texture", unreal.load_asset("/Engine/EngineMaterials/DefaultNormal.DefaultNormal"))
+    lib.connect_material_property(normal, "RGB", unreal.MaterialProperty.MP_NORMAL)
+    arm = lib.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -700, 300)
+    arm.set_editor_property("parameter_name", "ARM")
+    arm.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+    arm.set_editor_property("texture", unreal.load_asset("/Engine/EngineMaterials/DefaultWhiteGrain.DefaultWhiteGrain") or unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture"))
+    lib.connect_material_property(arm, "G", unreal.MaterialProperty.MP_ROUGHNESS)
+    # Some scans ship a roughness map instead of AO/rough/metal: MetalScale 0 then
+    metal = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -350, 350)
+    lib.connect_material_expressions(arm, "B", metal, "A")
+    lib.connect_material_expressions(scalar_param(m, "MetalScale", 1.0, -700, 550), "", metal, "B")
+    lib.connect_material_property(metal, "", unreal.MaterialProperty.MP_METALLIC)
+    lib.recompile_material(m)
+    unreal.EditorAssetLibrary.save_asset(m.get_path_name())
+
+
+scan_material("M_FWScan", False)
+scan_material("M_FWScanMasked", True)
+unreal.log("FW scan materials saved")

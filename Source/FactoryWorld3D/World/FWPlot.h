@@ -125,6 +125,7 @@ private:
 	void BuildGround(int32 Biome);
 	UMaterialInterface* MakeGroundMaterial(int32 Biome);
 	void ScatterSurroundings(int32 Biome);
+	void UpdateGroundCover();
 	UHierarchicalInstancedStaticMeshComponent* MakeArtInstances(UStaticMesh* Mesh, bool bCollide);
 	FTransform ArtTransform(UStaticMesh* Mesh, const FVector& Ground, float Yaw, float Size2D, float Height, float Sink,
 		const FVector& Normal = FVector::UpVector, float Tilt = 0.f) const;
@@ -173,6 +174,11 @@ private:
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> TerrainMesh;
 	int32 PendingScatterBiome = -1;
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMesh>> GroundCoverMeshes;
+	UPROPERTY()
+	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> GroundCoverParts;
+	FVector GroundCoverCentre = FVector(1e9);
 	UPROPERTY()
 	TMap<uint32, TObjectPtr<UMaterialInstanceDynamic>> Materials;
 	UPROPERTY()
