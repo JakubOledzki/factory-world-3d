@@ -22,6 +22,8 @@ public:
 	void Construct(const FArguments& InArgs);
 	virtual ~SFWLoginWidget() override;
 
+	TSharedPtr<SWidget> GetFocusTarget() const;
+
 private:
 	FReply OnLoginClicked();
 	FReply OnRegisterClicked();

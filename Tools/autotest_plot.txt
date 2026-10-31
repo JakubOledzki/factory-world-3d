@@ -1,0 +1,12 @@
+# Scripted run for -FWAutoTest=Tools/autotest_plot.txt (log in first, e.g. -ExecCmds="fw.Login <email> <hasło>").
+# Each line: seconds after the previous command, then a console command.
+# For an account without a character or plot, start with:
+#   8 FWPrompt <nazwa postaci>
+#   4 FWPrompt ok
+14 FWMine 4
+18 FWBuildLine 4
+5 FWStoreLine
+1 FWViewBelts 700
+3 FWShot belts_overview
+2 FWBuildMode
+2 FWShot build_mode

@@ -33,6 +33,8 @@ for mesh, loc, scale in blocks:
     actor = actors.spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(*loc))
     actor.static_mesh_component.set_static_mesh(mesh)
     actor.set_actor_scale3d(unreal.Vector(*scale))
+    # Hidden by the game once a plot is entered
+    actor.tags = ["FWTestBlock"]
 
 levels.save_current_level()
 unreal.log("TestLevel saved")
