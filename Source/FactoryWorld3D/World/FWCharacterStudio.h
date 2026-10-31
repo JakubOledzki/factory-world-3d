@@ -1,27 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Game/FWGear.h"
 #include "GameFramework/Actor.h"
 #include "FWCharacterStudio.generated.h"
 
 class UCameraComponent;
 class UMaterialInstanceDynamic;
 class USkeletalMeshComponent;
-
-// A character's look as the preview draws it: colours from the server's palettes, styles as indices
-struct FFWLook
-{
-	FLinearColor Skin = FLinearColor::White;
-	FLinearColor Hair = FLinearColor::Black;
-	FLinearColor Eyes = FLinearColor::Black;
-	FLinearColor Shirt = FLinearColor::White;
-	FLinearColor Pants = FLinearColor::Gray;
-	FLinearColor Shoes = FLinearColor::Gray;
-	int32 HairStyle = 0;
-	int32 ShirtStyle = 0;
-	int32 FacialHair = 0;
-	int32 FaceStyle = 0;
-};
 
 /**
  * The character creator's photo studio: a closed dark room high above the land (so nothing of the world shows
@@ -53,8 +39,6 @@ protected:
 
 private:
 	void UpdateCamera(float DeltaSeconds);
-	// Shows the piece (e.g. "hair_3"), loading it the first time, in the colour; hides the others of its kind
-	void Wear(const FString& Kind, const FString& Piece, const FLinearColor& Color);
 
 	UPROPERTY()
 	TObjectPtr<USceneComponent> Root;
@@ -64,8 +48,6 @@ private:
 	TObjectPtr<USkeletalMeshComponent> Figure;
 	UPROPERTY()
 	TObjectPtr<UCameraComponent> Camera;
-	UPROPERTY()
-	TObjectPtr<UMaterialInstanceDynamic> Paint;
 	UPROPERTY()
 	TMap<FString, TObjectPtr<USkeletalMeshComponent>> Gear;
 

@@ -140,11 +140,6 @@ void AFWCharacterStudio::BeginPlay()
 		// The mesh faces +Y; the room's camera looks from +X
 		Figure->SetRelativeLocationAndRotation(FVector(0, 0, PedestalHeight), FRotator(0, -90.f, 0));
 		Figure->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Paint = UMaterialInstanceDynamic::Create(Character, this);
-		for (int32 Slot = 0; Slot < Figure->GetNumMaterials(); ++Slot)
-		{
-			Figure->SetMaterial(Slot, Paint);
-		}
 		Figure->RegisterComponent();
 		if (UAnimSequence* Idle = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle.MM_Idle")))
 		{
@@ -161,81 +156,7 @@ bool AFWCharacterStudio::HasFigure() const
 
 void AFWCharacterStudio::SetLook(const FFWLook& Look)
 {
-	if (!Paint)
-	{
-		return;
-	}
-	Paint->SetVectorParameterValue(TEXT("Skin"), Look.Skin);
-	Paint->SetVectorParameterValue(TEXT("Hair"), Look.Hair);
-	Paint->SetVectorParameterValue(TEXT("Eyes"), Look.Eyes);
-	Paint->SetVectorParameterValue(TEXT("Shirt"), Look.Shirt);
-	Paint->SetVectorParameterValue(TEXT("Pants"), Look.Pants);
-	Paint->SetVectorParameterValue(TEXT("Shoes"), Look.Shoes);
-	Paint->SetScalarParameterValue(TEXT("HairStyle"), Look.HairStyle);
-	Paint->SetScalarParameterValue(TEXT("ShirtStyle"), Look.ShirtStyle);
-	Paint->SetScalarParameterValue(TEXT("FacialHair"), Look.FacialHair);
-	Paint->SetScalarParameterValue(TEXT("FaceStyle"), Look.FaceStyle);
-	// Modelled hair and clothes over the painted body (style 0 of hair and facial hair is none)
-	Wear(TEXT("hair"), Look.HairStyle > 0 ? FString::Printf(TEXT("hair_%d"), Look.HairStyle) : FString(), Look.Hair);
-	Wear(TEXT("beard"), Look.FacialHair > 0 ? FString::Printf(TEXT("beard_%d"), Look.FacialHair) : FString(), Look.Hair);
-	Wear(TEXT("shirt"), FString::Printf(TEXT("shirt_%d"), Look.ShirtStyle), Look.Shirt);
-	Wear(TEXT("pants"), TEXT("pants"), Look.Pants);
-	Wear(TEXT("shoes"), TEXT("shoes"), Look.Shoes);
-}
-
-void AFWCharacterStudio::Wear(const FString& Kind, const FString& Piece, const FLinearColor& Color)
-{
-	if (!Figure)
-	{
-		return;
-	}
-	for (TPair<FString, TObjectPtr<USkeletalMeshComponent>>& Pair : Gear)
-	{
-		if (Pair.Key.StartsWith(Kind) && Pair.Value)
-		{
-			Pair.Value->SetVisibility(Pair.Key == Piece);
-		}
-	}
-	if (Piece.IsEmpty())
-	{
-		return;
-	}
-	TObjectPtr<USkeletalMeshComponent>* Found = Gear.Find(Piece);
-	if (!Found)
-	{
-		USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/External/Character/%s.%s"), *Piece, *Piece));
-		USkeletalMeshComponent* Part = nullptr;
-		if (Mesh)
-		{
-			Part = NewObject<USkeletalMeshComponent>(this);
-			Part->SetupAttachment(Figure);
-			Part->SetSkeletalMesh(Mesh);
-			Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			Part->RegisterComponent();
-			Part->SetLeaderPoseComponent(Figure);
-			// Each slot is named after its material (FW_Hair, FW_Jersey...): MI_<slot> made by Tools/import_external.py
-			const TArray<FName> Slots = Part->GetMaterialSlotNames();
-			for (int32 Slot = 0; Slot < Slots.Num(); ++Slot)
-			{
-				const FString Name = FString::Printf(TEXT("MI_%s"), *Slots[Slot].ToString());
-				UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/External/Character/Materials/%s.%s"), *Name, *Name));
-				Part->SetMaterial(Slot, UMaterialInstanceDynamic::Create(Base ? Base : Part->GetMaterial(Slot), this));
-			}
-		}
-		// Missing pieces (Tools/setup_assets.ps1 not run) are remembered as none: the painted body shows instead
-		Found = &Gear.Add(Piece, Part);
-	}
-	if (USkeletalMeshComponent* Part = *Found)
-	{
-		Part->SetVisibility(true);
-		for (int32 Slot = 0; Slot < Part->GetNumMaterials(); ++Slot)
-		{
-			if (UMaterialInstanceDynamic* Material = Cast<UMaterialInstanceDynamic>(Part->GetMaterial(Slot)))
-			{
-				Material->SetVectorParameterValue(TEXT("Color"), Color);
-			}
-		}
-	}
+	FWGear::Dress(this, Figure, Gear, Look);
 }
 
 void AFWCharacterStudio::Spin(float DeltaYaw)

@@ -13,7 +13,7 @@ public class FactoryWorld3D : ModuleRules
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
-			"AudioMixer", "Json", "Slate", "SlateCore", "WebSockets"
+			"AnimationCore", "AudioMixer", "Json", "Slate", "SlateCore", "WebSockets"
 		});
 	}
 }
