@@ -1,5 +1,6 @@
 #include "World/FWPlot.h"
 
+#include "Components/DecalComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -78,6 +79,7 @@ AFWPlot::AFWPlot()
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Surface(TEXT("/Game/Materials/M_FWSurface.M_FWSurface"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Ground(TEXT("/Game/Materials/M_FWGround.M_FWGround"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Terrain(TEXT("/Game/Materials/M_FWTerrain.M_FWTerrain"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Decal(TEXT("/Game/Materials/M_FWDecal.M_FWDecal"));
 	CubeMesh = Cube.Object;
 	CylinderMesh = Cylinder.Object;
 	SphereMesh = Sphere.Object;
@@ -85,6 +87,7 @@ AFWPlot::AFWPlot()
 	SurfaceBase = Surface.Object;
 	GroundBase = Ground.Object;
 	TerrainBase = Terrain.Object;
+	DecalBase = Decal.Object;
 }
 
 UMaterialInterface* AFWPlot::SurfaceMaterial(const FLinearColor& Color, float Roughness, float Metallic)
@@ -657,6 +660,13 @@ void AFWPlot::RemoveObject(const FString& Id)
 	InserterArms.Remove(Id);
 	DrawnBends.Remove(Id);
 	ON_SCOPE_EXIT { RebuildCables(); };
+	for (UDecalComponent* Decal : Removed.Decals)
+	{
+		if (Decal)
+		{
+			Decal->DestroyComponent();
+		}
+	}
 	for (UStaticMeshComponent* Mesh : Removed.Meshes)
 	{
 		if (Mesh)
@@ -783,6 +793,66 @@ bool AFWPlot::DrawArtObject(FFWPlotObject& Object)
 		return true;
 	}
 	return false;
+}
+
+void AFWPlot::AddWear(FFWPlotObject& Object)
+{
+	static const TCHAR* const Leaks[] = { TEXT("Leaking007"), TEXT("Leaking008"), TEXT("Leaking009") };
+	if (!DecalBase)
+	{
+		return;
+	}
+	FRandomStream Random(GetTypeHash(Object.Id));
+	auto Make = [&](const FVector& Location, const FRotator& Rotation, const FVector& Extent, const FLinearColor& Tint, float Strength)
+	{
+		const TCHAR* Id = Leaks[Random.RandHelper(UE_ARRAY_COUNT(Leaks))];
+		UTexture2D* Color = FWArt::Texture(*FString::Printf(TEXT("/Game/External/Decals/%s/%s_2K-PNG_Color.%s_2K-PNG_Color"), Id, Id, Id));
+		UTexture2D* Mask = FWArt::Texture(*FString::Printf(TEXT("/Game/External/Decals/%s/%s_2K-PNG_Opacity.%s_2K-PNG_Opacity"), Id, Id, Id));
+		if (!Color || !Mask)
+		{
+			return;
+		}
+		UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(DecalBase, this);
+		Material->SetTextureParameterValue(TEXT("Color"), Color);
+		Material->SetTextureParameterValue(TEXT("Opacity"), Mask);
+		Material->SetVectorParameterValue(TEXT("Tint"), Tint);
+		Material->SetScalarParameterValue(TEXT("Strength"), Strength);
+		UDecalComponent* Decal = NewObject<UDecalComponent>(this);
+		Decal->SetDecalMaterial(Material);
+		Decal->DecalSize = Extent;
+		Decal->SetupAttachment(RootComponent);
+		Decal->SetRelativeLocationAndRotation(Location, Rotation);
+		Decal->SetFadeScreenSize(0.002f);
+		Decal->RegisterComponent();
+		Object.Decals.Add(Decal);
+	};
+	const float Fit = TileSize / 400.f;
+	const FVector Center = FootprintCenter(Object.Kind, Object.Tile);
+	const float N = FWCatalog::FootprintSize(Object.Kind);
+	if (FWCatalog::IsBelt(Object.Kind) || FWCatalog::IsInserter(Object.Kind))
+	{
+		// Oil drips on the ground under some belts and every inserter (projected straight down)
+		if (FWCatalog::IsInserter(Object.Kind) || Random.FRand() < 0.4f)
+		{
+			const float Spread = Random.FRandRange(90.f, 160.f) * Fit;
+			Make(Center + FVector(Random.FRandRange(-80.f, 80.f) * Fit, Random.FRandRange(-40.f, 40.f) * Fit, 0.f),
+				FRotator(-90.f, Random.FRandRange(0.f, 360.f), 0.f), FVector(60.f, Spread, Spread), FLinearColor(0.05f, 0.045f, 0.04f), 0.75f);
+		}
+	}
+	else if (FWCatalog::IsStorage(Object.Kind) || Object.Kind.StartsWith(TEXT("furniture_")))
+	{
+		// A streak down one or two sides: rain running off the top, rust below fixings
+		const int32 Count = 1 + Random.RandHelper(2);
+		for (int32 k = 0; k < Count; ++k)
+		{
+			const float Yaw = 90.f * Random.RandHelper(4);
+			const FVector Out = FRotator(0.f, Yaw, 0.f).Vector();
+			const float Half = (FWCatalog::IsStorage(Object.Kind) ? 85.f : 150.f * N) * Fit;
+			const float Height = (FWCatalog::IsStorage(Object.Kind) ? 120.f : 260.f) * Fit;
+			Make(Center + Out * Half + FVector(0.f, 0.f, Height * 0.55f), FRotator(0.f, Yaw + 180.f, 0.f),
+				FVector(30.f, Height * 0.45f, Random.FRandRange(50.f, 90.f) * Fit), FLinearColor(0.3f, 0.2f, 0.12f), 0.65f);
+		}
+	}
 }
 
 void AFWPlot::RefreshBeltArt()
@@ -939,6 +1009,7 @@ void AFWPlot::DrawObject(FFWPlotObject& Object)
 {
 	if (DrawArtObject(Object))
 	{
+		AddWear(Object);
 		return;
 	}
 	const float T = TileSize / ShapeSize;

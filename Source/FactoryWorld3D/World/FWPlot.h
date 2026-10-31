@@ -10,6 +10,7 @@ class UInstancedStaticMeshComponent;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UStaticMesh;
+class UDecalComponent;
 class UStaticMeshComponent;
 
 /** One object standing on the plot, with the components that draw it. */
@@ -21,6 +22,7 @@ struct FFWPlotObject
 	FIntPoint Tile = FIntPoint::ZeroValue;
 	int32 Rotation = 0;
 	TArray<TObjectPtr<UStaticMeshComponent>> Meshes;
+	TArray<TObjectPtr<UDecalComponent>> Decals;
 };
 
 struct FFWMine
@@ -134,6 +136,8 @@ private:
 	void DrawObject(FFWPlotObject& Object);
 	// The modelled version of an object, when the factory models are set up; false to draw a placeholder
 	bool DrawArtObject(FFWPlotObject& Object);
+	// Oil stains under belts and inserters, leaks down the sides of chests and machines
+	void AddWear(FFWPlotObject& Object);
 	UStaticMeshComponent* MakeArtMesh(UStaticMesh* Mesh, const FTransform& Transform, bool bCollide);
 	// Belts whose bend changed get the curved model (or the straight one back)
 	void RefreshBeltArt();
@@ -179,6 +183,8 @@ private:
 	TObjectPtr<UMaterialInterface> GroundBase;
 	UPROPERTY()
 	TObjectPtr<UMaterialInterface> TerrainBase;
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> DecalBase;
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> TerrainMesh;
 	int32 PendingScatterBiome = -1;
