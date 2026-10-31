@@ -186,8 +186,10 @@ unreal.log(f"FWIMPORT usage audit: {problems} problem(s)")
 # Factory models from Tools/blender/make_factory.py: their material slots (FW_*) are named after the
 # texture sets to use
 FACTORY = os.path.join(MODELS, "factory")
+# Painted parts are flat paint (a palette colour) with the subtle roughness of worn concrete, not a
+# photographed rusty plate, which tiled as blotches; grime darkens their lower parts
+PAINTED = {"FW_PaintedSteel": (0.12, 0.15, 0.12), "FW_Worn": (0.42, 0.3, 0.04), "FW_Steel": (0.2, 0.2, 0.21)}
 SLOT_TEXTURES = {
-    "FW_PaintedSteel": "blue_metal_plate", "FW_Steel": "metal_plate", "FW_Worn": "rusty_painted_metal",
     "FW_Rubber": "rubberized_track", "FW_Wood": "weathered_planks", "FW_Concrete": "concrete_floor_worn_001",
     "FW_Grate": "metal_grate_rusty",
 }
@@ -229,10 +231,22 @@ if os.path.isdir(FACTORY):
                 elif slot in SLOT_TEXTURES:
                     set_id = SLOT_TEXTURES[slot]
                     mel.set_material_instance_parent(asset, belt_master if slot == "FW_Rubber" else scan)
+                    if slot != "FW_Rubber":
+                        mel.set_material_instance_scalar_parameter_value(asset, "Grime", 0.85)
                     for param, kind in (("BaseColor", "diff"), ("Normal", "nor_gl"), ("ARM", "arm")):
                         texture = texture_set(set_id, kind)
                         if texture and not (slot == "FW_Rubber" and param == "ARM"):
                             mel.set_material_instance_texture_parameter_value(asset, param, texture)
+                elif slot in PAINTED:
+                    mel.set_material_instance_parent(asset, scan)
+                    white = unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture")
+                    mel.set_material_instance_texture_parameter_value(asset, "BaseColor", white)
+                    rough = texture_set("concrete_floor_worn_001", "arm")
+                    if rough:
+                        mel.set_material_instance_texture_parameter_value(asset, "ARM", rough)
+                    mel.set_material_instance_scalar_parameter_value(asset, "MetalScale", 0.0)
+                    mel.set_material_instance_vector_parameter_value(asset, "Tint", unreal.LinearColor(*PAINTED[slot], 1.0))
+                    mel.set_material_instance_scalar_parameter_value(asset, "Grime", 0.85)
                 else:
                     unreal.log_warning(f"FWIMPORT factory: unknown material slot {slot} in {path}")
                     continue

@@ -166,7 +166,41 @@ def scan_material(name, masked):
     mul = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -350, -300)
     lib.connect_material_expressions(color, "RGB", mul, "A")
     lib.connect_material_expressions(tint, "", mul, "B")
-    lib.connect_material_property(mul, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    # Grime: the first ~60 cm above the object's base get darker and browner, as dust and mud splash up
+    # (Grime 0 turns it off; rocks and plants keep 0)
+    grime_hlsl = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -350, -500)
+    grime_hlsl.set_editor_property("code", "float h = saturate((WP.z - Base.z) / 60.0); float n = frac(sin(dot(floor(WP.xy / 7.0), float2(12.9898, 78.233))) * 43758.5453); float g = (1.0 - h) * (1.0 - h) * Amount * (0.7 + 0.3 * n); return lerp(C, C * float3(0.55, 0.48, 0.4), g);")
+    grime_hlsl.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    grime_inputs = []
+    for name in ("C", "WP", "Base", "Amount"):
+        item = unreal.CustomInput()
+        item.set_editor_property("input_name", name)
+        grime_inputs.append(item)
+    grime_hlsl.set_editor_property("inputs", grime_inputs)
+    # Wear: where the baked vertex colour is dark (crevices, recesses), paint gives way to the Rust
+    # texture. Wear 0 (rocks, plants) ignores the vertex colour entirely.
+    rust = lib.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -1100, -300)
+    rust.set_editor_property("parameter_name", "Rust")
+    rust.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/DefaultTexture.DefaultTexture"))
+    wear_hlsl = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -550, -420)
+    wear_hlsl.set_editor_property("code", "float mask = saturate((0.22 - VC.r) * 6.0 + (noise - 0.5) * 0.5) * Wear; return lerp(Paint, RustC, mask);")
+    wear_hlsl.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    wear_inputs = []
+    for name in ("Paint", "RustC", "VC", "Wear", "noise"):
+        item = unreal.CustomInput()
+        item.set_editor_property("input_name", name)
+        wear_inputs.append(item)
+    wear_hlsl.set_editor_property("inputs", wear_inputs)
+    lib.connect_material_expressions(mul, "", wear_hlsl, "Paint")
+    lib.connect_material_expressions(rust, "RGB", wear_hlsl, "RustC")
+    lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionVertexColor, -1100, -500), "", wear_hlsl, "VC")
+    lib.connect_material_expressions(scalar_param(m, "Wear", 0.0, -1100, -580), "", wear_hlsl, "Wear")
+    lib.connect_material_expressions(rust, "R", wear_hlsl, "noise")
+    lib.connect_material_expressions(wear_hlsl, "", grime_hlsl, "C")
+    lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionWorldPosition, -700, -700), "", grime_hlsl, "WP")
+    lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionObjectPositionWS, -700, -620), "", grime_hlsl, "Base")
+    lib.connect_material_expressions(scalar_param(m, "Grime", 0.0, -700, -540), "", grime_hlsl, "Amount")
+    lib.connect_material_property(grime_hlsl, "", unreal.MaterialProperty.MP_BASE_COLOR)
     if masked:
         lib.connect_material_property(color, "A", unreal.MaterialProperty.MP_OPACITY_MASK)
     normal = lib.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -700, 0)
