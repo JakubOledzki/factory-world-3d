@@ -139,3 +139,13 @@ Skrypt kompiluje grę, przygotowuje zasoby (cook) i pakuje wszystko do `D:\Facto
 
 - Adres serwera: `FactoryWorld3D.exe -ServerUrl=ws://adres:5080/ws` albo `ServerUrl` w `Saved\Config\Windows\Game.ini`.
 - Wersja Shipping pomija `Saved/DevLogin.ini`, więc zawsze pokazuje ekran logowania. Wersja Development loguje się automatycznie, jeśli ten plik istnieje.
+
+## Las (Project Titan)
+
+Las świerkowo-sosnowy na zboczach wokół działki to drzewa Nanite z darmowego przykładu Epic **Project Titan** (Fab). Nie są w repozytorium (licencja pozwala używać ich w grze, ale nie rozpowszechniać osobno). Żeby je dodać, pobierz Titana w Epic Launcherze („Create Project”, UE 5.8) i uruchom:
+
+```
+powershell -ExecutionPolicy Bypass -File Toolsmigrate_titan.ps1 -Titan D:TitanProjectTitan
+```
+
+Las rośnie płatami do ok. 350 m nad działką, a wyżej rzednie i przechodzi w pojedyncze sosny z porostami (do ok. 480 m, granica lasu). Na skraju lasu rosną młode drzewka. Działka i pas 50 m wokół niej zostają wolne. Wiatr działa tylko na drzewa w promieniu 120 m. Las nie bierze udziału w ray tracingu.

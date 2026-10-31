@@ -71,6 +71,18 @@ Licencja: dane Copernicus DEM GLO-30 są bezpłatne do każdego celu, także kom
 
 Opis danych i licencji: https://registry.opendata.aws/copernicus-dem/
 
+## Project Titan (Epic Games, Fab)
+
+Sosny (`SM_Pine_A`, `SM_Pine_B`, wersje z porostami i sadzonki) z darmowego projektu przykładowego Epic Games **Project Titan** (Fab), razem z ich materiałami, teksturami i wtyczką `EasyImpostor`. Licencja: treści Epic z Fab dla projektów Unreal Engine, na warunkach Unreal Engine EULA i licencji Fab. Wolno ich używać w grze zbudowanej w Unreal Engine, w tym komercyjnej, ale **nie wolno ich rozpowszechniać osobno**, na przykład w publicznym repozytorium.
+
+Dlatego nie ma ich w gicie (`.gitignore`: `Content/Environment/`, `Content/Landscape/`, `Content/Blueprint/FoliageInteraction/`, `Plugins/EasyImpostor/`). Każdy kopiuje je u siebie z własnej kopii Titana:
+
+```
+powershell -ExecutionPolicy Bypass -File Toolsmigrate_titan.ps1 -Titan D:TitanProjectTitan
+```
+
+Skrypt sprawdza zależności w Titanie (`Tools/titan_dependencies.py`) i kopiuje tylko potrzebne pakiety (110), z zachowaniem ich ścieżek, bo odwołania w Unrealu opierają się na ścieżkach. Bez nich gra działa, tylko bez lasu.
+
 ## Narzędzia
 
 - Blender 5.2 (GPL) służy tylko do przygotowania plików. Licencja programu nie obejmuje tego, co się w nim tworzy.

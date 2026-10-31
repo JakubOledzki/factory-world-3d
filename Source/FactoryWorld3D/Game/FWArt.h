@@ -19,6 +19,8 @@ namespace FWArt
 	TArray<UStaticMesh*> Rocks();
 	TArray<UStaticMesh*> Trees();
 	TArray<UStaticMesh*> Saplings();
+	TArray<UStaticMesh*> TreeLineTrees();
+	TArray<UStaticMesh*> TitanSaplings();
 	TArray<UStaticMesh*> Bushes();
 	TArray<UStaticMesh*> Grass();
 	// A factory model made by Tools/blender/make_factory.py (belt_straight, inserter_arm, ...), real size for a 4 m tile

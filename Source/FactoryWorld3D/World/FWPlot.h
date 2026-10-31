@@ -127,6 +127,8 @@ private:
 	void BuildGround(int32 Biome);
 	UMaterialInterface* MakeGroundMaterial(int32 Biome);
 	void ScatterSurroundings(int32 Biome);
+	// Conifer forest on the slopes around the plot: thick in the valleys, thinning to the tree line
+	void PlantForest(int32 Biome);
 	void UpdateGroundCover();
 	UHierarchicalInstancedStaticMeshComponent* MakeArtInstances(UStaticMesh* Mesh, bool bCollide);
 	FTransform ArtTransform(UStaticMesh* Mesh, const FVector& Ground, float Yaw, float Size2D, float Height, float Sink,
