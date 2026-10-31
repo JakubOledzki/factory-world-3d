@@ -10,6 +10,7 @@ class UInstancedStaticMeshComponent;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UStaticMesh;
+class UAudioComponent;
 class UDecalComponent;
 class UStaticMeshComponent;
 
@@ -56,6 +57,10 @@ public:
 	float GetTileSize() const { return TileSize; }
 	bool IsBuilt() const { return Size > 0; }
 	TOptional<float> GetPlotElevation() const { return PlotElevationMeters; }
+	// How much forest stands at a world point (0..1), by the same rule the trees were planted with
+	float ForestAt(const FVector& World) const;
+	// Whether a component is the land itself (footsteps: grass or rock) rather than something built on it
+	bool IsLand(const UPrimitiveComponent* Component) const { return Component && Component == TerrainMesh; }
 
 	FVector TileCenter(FIntPoint Tile) const;
 	// Centre of the square an object of Kind covers when standing on Tile.
@@ -149,6 +154,9 @@ private:
 	// Belts whose bend changed get the curved model (or the straight one back)
 	void RefreshBeltArt();
 	void AnimateParts(float DeltaSeconds);
+	// Machine sounds: a few looping voices per kind moved to the machines nearest the listener, so a factory of
+	// a hundred belts costs as much as six
+	void UpdateMachineSounds(float DeltaSeconds);
 	// Sagging cables from each pole to the poles and powered objects in its reach
 	void RebuildCables();
 	void RebuildBelts();
@@ -194,6 +202,14 @@ private:
 	TObjectPtr<UMaterialInterface> DecalBase;
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> TerrainMesh;
+	struct FSoundPool
+	{
+		TArray<TObjectPtr<UAudioComponent>> Voices;
+	};
+	TMap<FString, FSoundPool> SoundPools;
+	double NextSoundUpdate = 0.0;
+	// Last swing target of each inserter, to hear it start a move
+	TMap<FString, int32> InserterSwingHeard;
 	int32 PendingScatterBiome = -1;
 	// Plot height above sea level when the land is real terrain (FWTerrainInfo on the mesh, or the config); unset otherwise
 	TOptional<float> PlotElevationMeters;

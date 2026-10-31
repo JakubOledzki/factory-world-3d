@@ -16,6 +16,9 @@
 #include "Game/FWGameSettings.h"
 #include "Net/FWNetSubsystem.h"
 #include "UI/SFWHud.h"
+#include "AudioMixerBlueprintLibrary.h"
+#include "Components/AudioComponent.h"
+#include "Game/FWAudio.h"
 #include "UI/SFWCharacterCreator.h"
 #include "UI/SFWLoginWidget.h"
 #include "World/FWCharacterStudio.h"
@@ -279,6 +282,7 @@ void AFWPlayerController::OpenCreator(const TSharedPtr<FJsonObject>& Options)
 				if (Reply.Type == TEXT("character"))
 				{
 					UE_LOG(LogFWGame, Log, TEXT("Character created"));
+					FWAudio::Play2D(Inner, TEXT("ui_confirm"), 0.7f);
 					Inner->CloseCreator();
 					Inner->ChoosePlot();
 				}
@@ -338,6 +342,21 @@ void AFWPlayerController::FWCreatorView(float Zoom, float Yaw)
 		Studio->SetZoom(Zoom);
 		Studio->Spin(Yaw);
 	}
+}
+
+void AFWPlayerController::FWRecordStart(float Seconds)
+{
+	UAudioMixerBlueprintLibrary::StartRecordingOutput(this, Seconds);
+}
+
+void AFWPlayerController::FWRecordStop(const FString& Name)
+{
+	UAudioMixerBlueprintLibrary::StopRecordingOutput(this, EAudioRecordingExportType::WavFile, Name, FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("BouncedWavFiles")));
+}
+
+void AFWPlayerController::FWWalk(float Seconds)
+{
+	WalkUntil = FPlatformTime::Seconds() + Seconds;
 }
 
 void AFWPlayerController::FWCreatorCreate()
@@ -690,6 +709,7 @@ void AFWPlayerController::Place(const FString& Kind, FIntPoint Tile, int32 Rotat
 		if (Reply.Type == TEXT("plot.placed") && Reply.Payload->TryGetObjectField(TEXT("object"), Object))
 		{
 			This->Plot->AddObject(*Object);
+			FWAudio::Play2D(This, TEXT("build_place"), 0.7f);
 			This->RefreshInventory();
 		}
 		else
@@ -714,6 +734,7 @@ void AFWPlayerController::Pickup(const FString& ObjectId)
 		if (Reply.Type == TEXT("plot.pickedUp"))
 		{
 			This->Plot->RemoveObject(ObjectId);
+			FWAudio::Play2D(This, TEXT("build_pickup"), 0.6f);
 			This->Toast(LOCTEXT("PickedUp", "Zabrano do ekwipunku."));
 			This->RefreshInventory();
 		}
@@ -739,6 +760,14 @@ void AFWPlayerController::PutAllInStorage(const FString& ObjectId)
 	{
 		Toast(LOCTEXT("NothingToPut", "Nie masz nic do włożenia."));
 		return;
+	}
+	// The lid opens and drops shut again
+	if (const FFWPlotObject* Chest = Plot->GetObjects().Find(ObjectId))
+	{
+		const FVector At = Plot->GetActorTransform().TransformPosition(Plot->FootprintCenter(Chest->Kind, Chest->Tile)) + FVector(0, 0, 60.f);
+		FWAudio::PlayAt(this, TEXT("chest_open"), At, 0.7f);
+		FTimerHandle Close;
+		GetWorldTimerManager().SetTimer(Close, FTimerDelegate::CreateWeakLambda(this, [this, At] { FWAudio::PlayAt(this, TEXT("chest_close"), At, 0.7f); }), 0.9f, false);
 	}
 	TSharedRef<int32> Left = MakeShared<int32>(ToPut.Num());
 	TSharedRef<TArray<FString>> Put = MakeShared<TArray<FString>>();
@@ -1053,6 +1082,69 @@ void AFWPlayerController::Tick(float DeltaSeconds)
 	{
 		NextPollAt = Now + UFWGameSettings::Get().LogisticsPollSeconds;
 		PollLogistics();
+	}
+	UpdateAmbience(DeltaSeconds);
+	if (Now < WalkUntil)
+	{
+		if (APawn* Walker = GetPawn())
+		{
+			Walker->AddMovementInput(Walker->GetActorForwardVector(), 1.f);
+		}
+	}
+}
+
+void AFWPlayerController::UpdateAmbience(float DeltaSeconds)
+{
+	if (!Plot || !PlayerCameraManager || !IsLocalController())
+	{
+		return;
+	}
+	if (!WindSound)
+	{
+		FWAudio::ApplyMasterVolume(UFWGameSettings::Get().MasterVolume);
+		WindSound = FWAudio::Loop(PlayerCameraManager->GetTransformComponent(), TEXT("amb_wind_loop"), 0.f);
+		ForestSound = FWAudio::Loop(PlayerCameraManager->GetTransformComponent(), TEXT("amb_forest_loop"), 0.f);
+		NextGustAt = FPlatformTime::Seconds() + 6.0;
+		NextBirdAt = FPlatformTime::Seconds() + 3.0;
+		if (!WindSound)
+		{
+			return;
+		}
+	}
+	const FVector Ear = PlayerCameraManager->GetCameraLocation();
+	// Forest around: a few samples about the listener
+	float Forest = 0.f;
+	for (int32 i = 0; i < 6; ++i)
+	{
+		const float Angle = i * PI / 3.f;
+		Forest += Plot->ForestAt(Ear + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * 2500.f);
+	}
+	Forest = FMath::Clamp(Forest / 6.f * 1.6f, 0.f, 1.f);
+	// Higher above the plot, more exposed: the wind grows; trees break it
+	const float Height = Plot->GetActorTransform().InverseTransformPosition(Ear).Z;
+	const float Exposure = FMath::Clamp(0.6f + Height / 25000.f, 0.5f, 1.4f);
+	const double Now = FPlatformTime::Seconds();
+	if (Now >= NextGustAt)
+	{
+		NextGustAt = Now + FMath::FRandRange(9.0, 22.0);
+		FWAudio::Play2D(this, TEXT("amb_gust"), 0.5f * Exposure * (1.f - 0.6f * Forest), 3);
+		GustBoost = 0.35f;
+	}
+	GustBoost = FMath::Max(0.f, GustBoost - DeltaSeconds * 0.08f);
+	WindLevel = FMath::FInterpTo(WindLevel, (0.6f + GustBoost) * Exposure * (1.f - 0.55f * Forest), DeltaSeconds, 1.5f);
+	ForestLevel = FMath::FInterpTo(ForestLevel, 0.06f + 0.8f * Forest, DeltaSeconds, 1.5f);
+	WindSound->SetVolumeMultiplier(WindLevel);
+	if (ForestSound)
+	{
+		ForestSound->SetVolumeMultiplier(ForestLevel);
+	}
+	// Birds sing from the trees: often in the forest, now and then out on the meadow
+	if (Now >= NextBirdAt)
+	{
+		NextBirdAt = Now + FMath::Lerp(18.0, 4.0, double(Forest)) * FMath::FRandRange(0.6, 1.4);
+		const float Angle = FMath::FRandRange(0.f, 2 * PI);
+		const FVector Where = Ear + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * FMath::FRandRange(1500.f, 4000.f) + FVector(0, 0, 600.f);
+		FWAudio::PlayAt(this, TEXT("amb_bird"), Where, 0.5f, 4, TEXT("ATT_World"), nullptr);
 	}
 }
 

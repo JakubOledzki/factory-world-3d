@@ -2,6 +2,7 @@
 
 #include "Brushes/SlateColorBrush.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
+#include "Sound/SoundBase.h"
 #include "Styling/CoreStyle.h"
 
 namespace FWStyle
@@ -39,6 +40,19 @@ namespace FWStyle
 			Style.SetPressed(FSlateRoundedBoxBrush(Pressed, 6.f, Edge, 1.f));
 			Style.SetDisabled(FSlateRoundedBoxBrush(Normal * FLinearColor(1.f, 1.f, 1.f, 0.35f), 6.f, Edge * FLinearColor(1.f, 1.f, 1.f, 0.35f), 1.f));
 			Style.SetNormalPadding(FMargin(12.f, 8.f));
+			// Clicks and hovers from Tools/make_audio.py, when they are set up
+			if (UObject* Click = LoadObject<USoundBase>(nullptr, TEXT("/Game/External/Audio/ui_click.ui_click"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+			{
+				FSlateSound Sound;
+				Sound.SetResourceObject(Click);
+				Style.SetPressedSound(Sound);
+			}
+			if (UObject* Hover = LoadObject<USoundBase>(nullptr, TEXT("/Game/External/Audio/ui_hover.ui_hover"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+			{
+				FSlateSound Sound;
+				Sound.SetResourceObject(Hover);
+				Style.SetHoveredSound(Sound);
+			}
 			Style.SetPressedPadding(FMargin(12.f, 9.f, 12.f, 7.f));
 			return Style;
 		}

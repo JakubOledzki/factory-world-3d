@@ -6,6 +6,7 @@
 #include "FWPlayerController.generated.h"
 
 class AFWCharacterStudio;
+class UAudioComponent;
 class AFWPlot;
 class SFWCharacterCreator;
 class SFWHud;
@@ -107,6 +108,14 @@ public:
 	void FWCreatorView(float Zoom, float Yaw = 0.f);
 	UFUNCTION(Exec)
 	void FWCreatorCreate();
+	// Records what the game plays to Saved/BouncedWavFiles/<Name>.wav (to check the mix without listening)
+	UFUNCTION(Exec)
+	void FWRecordStart(float Seconds = 10.f);
+	// Walks straight ahead for a while (footsteps without a keyboard)
+	UFUNCTION(Exec)
+	void FWWalk(float Seconds);
+	UFUNCTION(Exec)
+	void FWRecordStop(const FString& Name);
 
 protected:
 	virtual void BeginPlay() override;
@@ -130,6 +139,8 @@ private:
 	void ApplyHotbar(const TSharedPtr<FJsonObject>& Payload);
 	// Stands the pawn on a ground point (its feet there), walking and at rest
 	void PlaceOnGround(const FVector& Feet);
+	// Wind, forest, gusts and birds around the player, by height and how much forest stands about
+	void UpdateAmbience(float DeltaSeconds);
 
 	UPROPERTY()
 	TObjectPtr<AFWPlot> Plot;
@@ -137,6 +148,17 @@ private:
 	UPROPERTY()
 	TObjectPtr<AFWCharacterStudio> Studio;
 	TSharedPtr<SFWCharacterCreator> Creator;
+
+	UPROPERTY()
+	TObjectPtr<UAudioComponent> WindSound;
+	UPROPERTY()
+	TObjectPtr<UAudioComponent> ForestSound;
+	double NextGustAt = 0.0;
+	double NextBirdAt = 0.0;
+	float GustBoost = 0.f;
+	float WindLevel = 0.f;
+	float ForestLevel = 0.f;
+	double WalkUntil = 0.0;
 
 	TSharedPtr<SFWLoginWidget> LoginWidget;
 	TSharedPtr<SFWPromptWidget> Prompt;

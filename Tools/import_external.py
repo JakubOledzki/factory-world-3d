@@ -397,3 +397,54 @@ if os.path.isdir(GEAR) and skeleton and cloth_master and hair_master:
         # The game puts MI_<slot> on each slot when it shows the piece (AFWCharacterStudio::Wear)
         slots = mesh.get_editor_property("materials")
         unreal.log_warning(f"FWIMPORT gear {name}: {[str(s.get_editor_property('material_slot_name')) for s in slots]}")
+
+# Sounds from Tools/make_audio.py (synthesized, ours): /Game/External/Audio, with the mix set up around them:
+# sound classes Master > Ambience / SFX / UI, distance falloff for machines, and voice limits so a hundred belts
+# play as the few nearest
+AUDIO = os.path.join(MODELS, "audio")
+if os.path.isdir(AUDIO):
+    destination = "/Game/External/Audio"
+    if library.list_assets(destination, recursive=True):
+        library.delete_directory(destination)
+    run([os.path.join(AUDIO, f) for f in sorted(os.listdir(AUDIO)) if f.endswith(".wav")], destination)
+
+    def make(name, cls, factory):
+        return tools.create_asset(name, f"{destination}/Mix", cls, factory)
+
+    master = make("SC_Master", unreal.SoundClass, unreal.SoundClassFactory())
+    classes = {}
+    for name, volume in (("Ambience", 0.8), ("SFX", 1.0), ("UI", 0.7)):
+        sound_class = make(f"SC_{name}", unreal.SoundClass, unreal.SoundClassFactory())
+        properties = sound_class.get_editor_property("properties")
+        properties.set_editor_property("volume", volume)
+        sound_class.set_editor_property("properties", properties)
+        sound_class.set_editor_property("parent_class", master)
+        library.save_loaded_asset(sound_class)
+        classes[name] = sound_class
+    library.save_loaded_asset(master)
+    for name, limit in (("SCON_Belt", 6), ("SCON_Machine", 4), ("SCON_Footstep", 3)):
+        concurrency = make(name, unreal.SoundConcurrency, unreal.SoundConcurrencyFactory())
+        settings = concurrency.get_editor_property("concurrency")
+        settings.set_editor_property("max_count", limit)
+        settings.set_editor_property("resolution_rule", unreal.MaxConcurrentResolutionRule.STOP_FARTHEST_THEN_OLDEST)
+        concurrency.set_editor_property("concurrency", settings)
+        library.save_loaded_asset(concurrency)
+    for name, inner, falloff in (("ATT_Belt", 200.0, 1800.0), ("ATT_Machine", 300.0, 3500.0), ("ATT_World", 400.0, 6000.0)):
+        attenuation = make(name, unreal.SoundAttenuation, unreal.SoundAttenuationFactory())
+        settings = attenuation.get_editor_property("attenuation")
+        settings.set_editor_property("attenuation_shape_extents", unreal.Vector(inner, 0, 0))
+        settings.set_editor_property("falloff_distance", falloff)
+        settings.set_editor_property("spatialize", True)
+        settings.set_editor_property("enable_listener_focus", False)
+        attenuation.set_editor_property("attenuation", settings)
+        library.save_loaded_asset(attenuation)
+    for path in library.list_assets(destination, recursive=False, include_folder=False):
+        wave = unreal.load_asset(path)
+        if not isinstance(wave, unreal.SoundWave):
+            continue
+        name = wave.get_name()
+        wave.set_editor_property("looping", name.endswith("_loop"))
+        group = "Ambience" if name.startswith("amb_") else ("UI" if name.startswith("ui_") else "SFX")
+        wave.set_editor_property("sound_class_object", classes[group])
+        library.save_loaded_asset(wave)
+    unreal.log_warning(f"FWIMPORT audio: {len(library.list_assets(destination, recursive=False, include_folder=False))} sounds")

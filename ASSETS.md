@@ -75,6 +75,10 @@ Opis danych i licencji: https://registry.opendata.aws/copernicus-dem/
 
 Podgląd w kreatorze postaci to manekin `SKM_Manny_Simple` z animacją `MM_Idle`, z szablonów, które każda instalacja Unreal Engine 5 ma w `Templates/TemplateResources`. Licencja: treści Epic dla projektów Unreal Engine (Unreal Engine EULA), można ich używać w grze, ale nie rozpowszechniać osobno. Dlatego nie ma ich w gicie (`Content/Characters/`), a kopiuje je `Tools/copy_mannequins.ps1`. Wygląd postaci maluje nasz materiał. Fryzury, zarost i ubrania robi nasz skrypt `Tools/blender/make_character_gear.py` z ciała manekina (pliki też nie trafiają do gita). Tkaniny ubrań to tekstury CC0 z Poly Haven: [cotton_jersey](https://polyhaven.com/a/cotton_jersey), [knitted_fleece](https://polyhaven.com/a/knitted_fleece), [denim_fabric_05](https://polyhaven.com/a/denim_fabric_05) i [leather_white](https://polyhaven.com/a/leather_white).
 
+## Dźwięki (nasze)
+
+Wszystkie dźwięki gry są syntezowane przez nasz skrypt `Tools/make_audio.py` (szum, filtry, drgania tłumione, modulacja częstotliwości). Nie ma żadnych nagrań ani próbek z zewnątrz.
+
 ## Kosodrzewina (nasza)
 
 Krzewy kosodrzewiny tworzy nasz skrypt `Tools/blender/make_mugo_pine.py`: geometria jest w całości nasza. Kora używa tekstur z `pine_tree_01` (Poly Haven, CC0, w tabeli wyżej). Igły nie mają tekstury, tylko kolor z materiału.
