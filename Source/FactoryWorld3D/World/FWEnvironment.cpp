@@ -29,6 +29,10 @@ AFWEnvironment::AFWEnvironment()
 	Sun->SetLightSourceAngle(0.5357f);
 	Sun->SetAtmosphereSunLight(true);
 	Sun->bCastCloudShadows = true;
+	// The cloud shadow map costs ~1.9 ms at its default 512 px over 150 km. A quarter of the texels over 60 km
+	// is ~0.6 ms and still finer on the ground (234 m per texel instead of 293 m); the land ends ~10 km out
+	Sun->CloudShadowMapResolutionScale = 0.5f;
+	Sun->CloudShadowExtent = 60.f;
 	Sun->SetDynamicShadowCascades(4);
 
 	SkyAtmosphere = CreateDefaultSubobject<USkyAtmosphereComponent>(TEXT("SkyAtmosphere"));
