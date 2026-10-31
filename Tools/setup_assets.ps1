@@ -59,6 +59,9 @@ if (-not (Test-Path RawAssets\processed\terrain_mountains.glb)) {
 if (-not (Test-Path RawAssets\processed\mugo\mugo_pine_01.glb)) {
     & $Blender --background --factory-startup --python Tools\blender\make_mugo_pine.py
 }
+if (-not (Test-Path RawAssets\processed\audio\amb_wind_loop.wav)) {
+    & $Blender --background --factory-startup --python Tools\make_audio.py
+}
 
 Write-Host "== Unreal"
 $Cmd = Join-Path $Engine "Engine\Binaries\Win64\UnrealEditor-Cmd.exe"

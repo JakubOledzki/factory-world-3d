@@ -47,6 +47,8 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void PawnClientRestart() override;
+	virtual void OnJumped_Implementation() override;
+	virtual void Landed(const FHitResult& Hit) override;
 
 private:
 	void CreateInput();
@@ -67,6 +69,11 @@ private:
 	void UpdateGhost();
 	void UpdateHold(float DeltaSeconds);
 	void UpdateHeadBob(float DeltaSeconds);
+	// Footsteps by the surface underfoot: "grass", "rock" or "metal" (anything built)
+	void UpdateFootsteps(float DeltaSeconds);
+	FString SurfaceUnder(const FHitResult* Hit = nullptr) const;
+	float StepDistance = 0.f;
+	float MineSoundIn = 0.f;
 
 	AFWPlayerController* GetFWController() const;
 	AFWPlot* GetPlot() const;

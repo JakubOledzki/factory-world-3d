@@ -41,6 +41,10 @@ public:
 	UPROPERTY(Config)
 	int32 StarterPlotY = 357;
 
+	// Master volume of all the game's sounds, 0..1 (there is no settings menu yet)
+	UPROPERTY(Config)
+	float MasterVolume = 1.f;
+
 	// How often belts and inserters are fetched from the server.
 	UPROPERTY(Config)
 	float LogisticsPollSeconds = 1.f;

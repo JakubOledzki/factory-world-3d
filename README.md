@@ -117,6 +117,18 @@ Bez niego kreator działa, tylko podgląd jest pusty.
 
 Fryzury, zarost i ubrania to prawdziwe modele 3D (`Tools/blender/make_character_gear.py`): po jednym na każdy styl, który podaje serwer (5 fryzur, 3 rodzaje zarostu, t-shirt, bezrękawnik, bluza z kapturem, spodnie, buty). Każdy jest wycięty z ciała manekina, odsunięty od skóry i pogrubiony, więc ma te same wagi kości co ciało i porusza się razem z nim. Kucyk i kaptur to dodatkowe kształty. Włosy i zarost to warstwy pasków („hair cards”) z pasmami wyciętymi przezroczystością, anizotropowym połyskiem i jaśniejszymi końcówkami, na ciemnej warstwie spodniej. Kolory wybrane w kreatorze nakładają materiały `M_FWHairCard` i `M_FWHair` i `M_FWCloth` (tkaniny CC0 z Poly Haven: dzianina, polar, dżins, skóra). Modele tworzy `Tools/setup_assets.ps1` (eksport manekina z edytora, Blender, import), gdy manekin jest już skopiowany. Bez nich podgląd pokazuje malowanego manekina.
 
+## Dźwięk
+
+Wszystkie dźwięki (49) są syntezowane przez nasz skrypt `Tools/make_audio.py` (Python z numpy, uruchamiany w Blenderze), bez nagrań i bez licencji do pilnowania. Tworzy je `Tools/setup_assets.ps1` i nie ma ich w gicie.
+
+- **Otoczenie:** wiatr halny w stereo (szum i świst, które narastają w podmuchach), co jakiś czas osobny podmuch, szum liści w lesie i ptaki (4 rodzaje śpiewu). Wiatr jest głośniejszy wyżej i na otwartym terenie, a cichszy w lesie. Szum liści i ptaki są tam, gdzie las (ta sama reguła, według której sadzone są drzewa).
+- **Kroki** zależą od podłoża: trawa, skała (strome zbocza, głazy) albo metal (wszystko, co zbudowane). Do tego skok i lądowanie.
+- **Fabryka:** taśmociągi (szum, silnik, stukot rolek), serwo podajnika przy każdym ruchu ramienia i stuk chwytaka, skrzynia (otwarcie i zamknięcie), buczenie linii energetycznych, szum łopat turbin. Słychać tylko kilka najbliższych maszyn każdego rodzaju: 6 taśm, 3 słupy, 3 turbiny. Dlatego 100 taśm kosztuje tyle co 6.
+- **Budowanie i interfejs:** postawienie, obrót, zabranie, kopanie (uderzenia kilofa), „nie można tu postawić”, kliknięcia i najechanie na przyciski, dźwięk utworzenia postaci.
+- **Miks:** klasy dźwięku Master → Ambience / SFX / UI, wygaszanie z odległością i limity głosów. Głośność ogólną ustawia `MasterVolume` w `Config/DefaultGame.ini` (menu ustawień jeszcze nie ma).
+
+Do testów: `FWRecordStart <s>` i `FWRecordStop <nazwa>` nagrywają to, co gra gra, do `Saved/BouncedWavFiles`, a `FWWalk <s>` idzie prosto. Gra w tle jest wyciszona (domyślnie w Unrealu), więc do nagrań bez fokusu uruchom ją z `-ini:Engine:[Audio]:UnfocusedVolumeMultiplier=1.0`.
+
 ## Automatyczne logowanie (tylko do testów)
 
 Żeby gra od razu wchodziła na działkę, bez ekranu logowania, utwórz plik `Saved/DevLogin.ini`:

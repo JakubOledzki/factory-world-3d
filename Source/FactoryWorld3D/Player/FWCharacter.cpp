@@ -2,12 +2,14 @@
 
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/StaticMesh.h"
 #include "FWPlayerController.h"
+#include "Game/FWAudio.h"
 #include "Game/FWCatalog.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "InputAction.h"
@@ -263,6 +265,7 @@ void AFWCharacter::Primary()
 	}
 	if (!Plot->CanPlace(Kind, TargetTile))
 	{
+		FWAudio::Play2D(this, TEXT("build_invalid"), 0.6f);
 		PC->Toast(LOCTEXT("CantPlace", "Tu nie można tego postawić."), true);
 		return;
 	}
@@ -291,6 +294,10 @@ void AFWCharacter::ToggleBuild()
 void AFWCharacter::Rotate()
 {
 	BuildRotation = (BuildRotation + 1) & 3;
+	if (bBuildMode)
+	{
+		FWAudio::Play2D(this, TEXT("build_rotate"), 0.5f);
+	}
 }
 
 void AFWCharacter::SelectSlot(int32 Slot)
@@ -310,6 +317,67 @@ void AFWCharacter::Tick(float DeltaSeconds)
 	UpdateGhost();
 	UpdateHold(DeltaSeconds);
 	UpdateHeadBob(DeltaSeconds);
+	UpdateFootsteps(DeltaSeconds);
+}
+
+FString AFWCharacter::SurfaceUnder(const FHitResult* Hit) const
+{
+	FHitResult Below;
+	if (!Hit)
+	{
+		const FVector Feet = GetActorLocation() - FVector(0, 0, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+		FCollisionQueryParams Params(TEXT("FWStep"), false, this);
+		if (!GetWorld()->LineTraceSingleByChannel(Below, Feet + FVector(0, 0, 20.f), Feet - FVector(0, 0, 60.f), ECC_Visibility, Params))
+		{
+			return TEXT("grass");
+		}
+		Hit = &Below;
+	}
+	const AFWPlot* Plot = GetPlot();
+	if (Plot && Plot->IsLand(Hit->GetComponent()))
+	{
+		// Steep ground is bare rock and scree
+		return Hit->ImpactNormal.Z < 0.86f ? TEXT("rock") : TEXT("grass");
+	}
+	// Boulders and the forest's trunks are part of the plot actor too, but not built: rock; the rest is metal
+	const UPrimitiveComponent* Component = Hit->GetComponent();
+	return Component && Component->IsA<UInstancedStaticMeshComponent>() ? TEXT("rock") : TEXT("metal");
+}
+
+void AFWCharacter::UpdateFootsteps(float DeltaSeconds)
+{
+	const UCharacterMovementComponent* Movement = GetCharacterMovement();
+	if (!Movement || !Movement->IsMovingOnGround())
+	{
+		return;
+	}
+	const float Speed = GetVelocity().Size2D();
+	if (Speed < 40.f)
+	{
+		StepDistance = 0.f;
+		return;
+	}
+	StepDistance += Speed * DeltaSeconds;
+	// Longer strides when running
+	const float Stride = Speed > 500.f ? 105.f : 75.f;
+	if (StepDistance >= Stride)
+	{
+		StepDistance -= Stride;
+		FWAudio::Play2D(this, FString::Printf(TEXT("step_%s"), *SurfaceUnder()), Speed > 500.f ? 0.55f : 0.4f, 6);
+	}
+}
+
+void AFWCharacter::OnJumped_Implementation()
+{
+	Super::OnJumped_Implementation();
+	FWAudio::Play2D(this, TEXT("jump"), 0.4f);
+}
+
+void AFWCharacter::Landed(const FHitResult& Hit)
+{
+	Super::Landed(Hit);
+	FWAudio::Play2D(this, FString::Printf(TEXT("land_%s"), *SurfaceUnder(&Hit)), 0.6f);
+	StepDistance = 0.f;
 }
 
 void AFWCharacter::UpdateTarget()
@@ -389,6 +457,16 @@ void AFWCharacter::UpdateHold(float DeltaSeconds)
 	}
 
 	HoldTime += DeltaSeconds;
+	// The pickaxe strikes while digging
+	if (Hold == EHold::Mine)
+	{
+		MineSoundIn -= DeltaSeconds;
+		if (MineSoundIn <= 0.f)
+		{
+			MineSoundIn = FMath::FRandRange(0.55f, 0.75f);
+			FWAudio::Play2D(this, TEXT("mine_hit"), 0.55f, 3);
+		}
+	}
 	if (HoldTime < HoldNeeded)
 	{
 		return;

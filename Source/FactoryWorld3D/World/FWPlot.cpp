@@ -7,6 +7,8 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
 #include "Game/FWArt.h"
+#include "Game/FWAudio.h"
+#include "Components/AudioComponent.h"
 #include "World/FWTerrainInfo.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -1248,10 +1250,134 @@ void AFWPlot::AnimateParts(float DeltaSeconds)
 		{
 			continue;
 		}
+		// A new target: the servo whines up or down; reaching an end, the gripper clunks
+		int32& Heard = InserterSwingHeard.FindOrAdd(Inserter.Id, Inserter.Swing);
+		if (Heard != Inserter.Swing)
+		{
+			const FVector At = (*Arm)->GetComponentLocation();
+			FWAudio::PlayAt(this, Inserter.Swing > Heard ? TEXT("inserter_up") : TEXT("inserter_down"), At, 0.35f);
+			if (Inserter.Swing == 0 || Inserter.Swing >= Inserter.SwingTicks)
+			{
+				FWAudio::PlayAt(this, TEXT("inserter_clunk"), At, 0.5f);
+			}
+			Heard = Inserter.Swing;
+		}
 		const float Swing = FMath::Lerp(float(Inserter.Was), float(Inserter.Swing), Fraction) / FMath::Max(1, Inserter.SwingTicks);
 		// 0 points back at the tile it takes from, 1 forward at the tile it drops on
 		const float Yaw = YawOf(Inserter.Rotation) + 180.f * (1.f - FMath::SmoothStep(0.f, 1.f, Swing));
 		(*Arm)->SetRelativeRotation(FRotator(0.f, Yaw, 0.f));
+	}
+}
+
+float AFWPlot::ForestAt(const FVector& World) const
+{
+	if (!TerrainMesh)
+	{
+		return 0.f;
+	}
+	const FVector Local = GetActorTransform().InverseTransformPosition(World);
+	const float Extent = Size * TileSize;
+	const float Out = FMath::Max(FMath::Abs(Local.X - Extent / 2), FMath::Abs(Local.Y - Extent / 2)) - (Extent * 0.5f + ForestMargin);
+	if (Out < 0.f)
+	{
+		return 0.f;
+	}
+	const FVector2D Bands = UFWGameSettings::Get().ForestBandsAbovePlot(PlotElevationMeters) * 100.f;
+	const float Height = 1.f - FMath::SmoothStep(Bands.X, Bands.Y, Local.Z);
+	return Height * FMath::SmoothStep(0.38f, 0.48f, ForestStand(World)) * FMath::SmoothStep(0.f, 3000.f, Out);
+}
+
+void AFWPlot::UpdateMachineSounds(float DeltaSeconds)
+{
+	const double Now = FPlatformTime::Seconds();
+	if (Now < NextSoundUpdate)
+	{
+		return;
+	}
+	NextSoundUpdate = Now + 0.4;
+	const APlayerController* Player = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	if (!Player || !Player->PlayerCameraManager)
+	{
+		return;
+	}
+	const FVector Listener = Player->PlayerCameraManager->GetCameraLocation();
+	struct FKindSound
+	{
+		const TCHAR* Sound;
+		int32 Voices;
+		float Volume;
+		const TCHAR* Attenuation;
+		float Height;
+	};
+	auto SoundFor = [](const FString& Kind) -> const FKindSound*
+	{
+		static const FKindSound Belt { TEXT("belt_loop"), 6, 0.3f, TEXT("ATT_Belt"), 60.f };
+		static const FKindSound Pole { TEXT("pole_hum_loop"), 3, 0.1f, TEXT("ATT_Belt"), 600.f };
+		static const FKindSound Turbine { TEXT("turbine_loop"), 3, 0.7f, TEXT("ATT_World"), 900.f };
+		if (FWCatalog::IsBelt(Kind))
+		{
+			return &Belt;
+		}
+		if (Kind == TEXT("power_pole") || Kind == TEXT("power_substation") || Kind == TEXT("power_pylon"))
+		{
+			return &Pole;
+		}
+		if (Kind == TEXT("power_wind_turbine") || Kind == TEXT("power_large_wind_turbine"))
+		{
+			return &Turbine;
+		}
+		return nullptr;
+	};
+	// The machines of each sound, nearest first
+	TMap<const FKindSound*, TArray<TPair<float, FVector>>> Near;
+	for (const TPair<FString, FFWPlotObject>& Pair : Objects)
+	{
+		if (const FKindSound* Kind = SoundFor(Pair.Value.Kind))
+		{
+			const FVector At = GetActorTransform().TransformPosition(FootprintCenter(Pair.Value.Kind, Pair.Value.Tile)) + FVector(0, 0, Kind->Height);
+			Near.FindOrAdd(Kind).Add({ float(FVector::DistSquared(At, Listener)), At });
+		}
+	}
+	for (TPair<const FKindSound*, TArray<TPair<float, FVector>>>& Pair : Near)
+	{
+		const FKindSound& Kind = *Pair.Key;
+		Pair.Value.Sort([](const TPair<float, FVector>& A, const TPair<float, FVector>& B) { return A.Key < B.Key; });
+		FSoundPool& Pool = SoundPools.FindOrAdd(Kind.Sound);
+		while (Pool.Voices.Num() < FMath::Min(Kind.Voices, Pair.Value.Num()))
+		{
+			UAudioComponent* Voice = FWAudio::Loop(RootComponent, Kind.Sound, Kind.Volume, Kind.Attenuation);
+			if (!Voice)
+			{
+				break;
+			}
+			Pool.Voices.Add(Voice);
+		}
+		for (int32 i = 0; i < Pool.Voices.Num(); ++i)
+		{
+			UAudioComponent* Voice = Pool.Voices[i];
+			if (!Voice)
+			{
+				continue;
+			}
+			const bool bUsed = Pair.Value.IsValidIndex(i);
+			Voice->SetVolumeMultiplier(bUsed ? Kind.Volume : 0.f);
+			if (bUsed)
+			{
+				Voice->SetWorldLocation(Pair.Value[i].Value);
+			}
+		}
+	}
+	// Kinds that are gone (every belt picked up) fall silent
+	for (TPair<FString, FSoundPool>& Pair : SoundPools)
+	{
+		const bool bHeard = Near.Contains(SoundFor(Pair.Key == TEXT("belt_loop") ? TEXT("logistics_belt") : (Pair.Key == TEXT("pole_hum_loop") ? TEXT("power_pole") : TEXT("power_wind_turbine"))));
+		for (UAudioComponent* Voice : Pair.Value.Voices)
+		{
+			if (Voice && !bHeard)
+			{
+				Voice->SetVolumeMultiplier(0.f);
+			}
+		}
 	}
 }
 
@@ -1599,6 +1725,7 @@ void AFWPlot::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	UpdateGroundCover();
 	AnimateParts(DeltaSeconds);
+	UpdateMachineSounds(DeltaSeconds);
 	if (PendingScatterBiome >= 0 && TerrainMesh)
 	{
 		FHitResult Probe;
