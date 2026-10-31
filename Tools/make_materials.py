@@ -231,6 +231,47 @@ scan_material("M_FWScanMasked", True)
 unreal.log("FW scan materials saved")
 
 
+# Foliage made in Blender (dwarf pine, Tools/blender/make_mugo_pine.py): BaseColor x Tint x vertex colour (the
+# shade of each needle brush), and wind. The sway grows with height above the plant's base and is offset
+# per place, so neighbouring shrubs do not move in step; components switch it off past a short distance
+m = fresh("M_FWFoliage")
+color = lib.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -900, -300)
+color.set_editor_property("parameter_name", "BaseColor")
+color.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture"))
+tinted = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -600, -300)
+lib.connect_material_expressions(color, "RGB", tinted, "A")
+lib.connect_material_expressions(vector_param(m, "Tint", (1, 1, 1, 1), -900, -450), "", tinted, "B")
+shaded = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -400, -300)
+lib.connect_material_expressions(tinted, "", shaded, "A")
+lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionVertexColor, -600, -180), "", shaded, "B")
+lib.connect_material_property(shaded, "", unreal.MaterialProperty.MP_BASE_COLOR)
+normal = lib.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -900, 0)
+normal.set_editor_property("parameter_name", "Normal")
+normal.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+normal.set_editor_property("texture", unreal.load_asset("/Engine/EngineMaterials/DefaultNormal.DefaultNormal"))
+lib.connect_material_property(normal, "RGB", unreal.MaterialProperty.MP_NORMAL)
+lib.connect_material_property(scalar_param(m, "Roughness", 0.6, -600, 100), "", unreal.MaterialProperty.MP_ROUGHNESS)
+wind = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 300)
+wind.set_editor_property("code", "float h = saturate((WP.z - Base.z) / 220.0); float p = dot(Base.xy, float2(0.0011, 0.0017)) + dot(WP.xy, float2(0.004, 0.003)); "
+                                 "float sway = sin(T * 1.4 + p) + 0.5 * sin(T * 2.3 + p * 1.7); float flutter = sin(T * 7.0 + dot(WP.xyz, float3(0.09, 0.07, 0.11))) * 0.25; "
+                                 "return float3(sway, 0.6 * cos(T * 1.1 + p), 0.0) * (h * h * Amount) + float3(flutter, flutter, flutter * 0.5) * (h * Amount);")
+wind.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+wind_inputs = []
+for name in ("WP", "Base", "T", "Amount"):
+    item = unreal.CustomInput()
+    item.set_editor_property("input_name", name)
+    wind_inputs.append(item)
+wind.set_editor_property("inputs", wind_inputs)
+lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionWorldPosition, -900, 250), "", wind, "WP")
+lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionObjectPositionWS, -900, 330), "", wind, "Base")
+lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionTime, -900, 410), "", wind, "T")
+lib.connect_material_expressions(scalar_param(m, "Wind", 0.0, -900, 490), "", wind, "Amount")
+lib.connect_material_property(wind, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+lib.recompile_material(m)
+unreal.EditorAssetLibrary.save_asset(m.get_path_name())
+unreal.log("FW foliage material saved")
+
+
 # Conveyor band: textured like the scans, its UVs pan along the belt (U) at Speed repeats per second.
 # Belts move items 1 m per 0.2 s tick and the band's UV repeats every 2 m, so Speed = 2.5 for a plain belt.
 m = fresh("M_FWBelt")

@@ -90,6 +90,20 @@ namespace FWArt
 		});
 	}
 
+	TArray<UStaticMesh*> DwarfPines()
+	{
+		TArray<UStaticMesh*> Found;
+		for (int32 i = 1; i <= 5; ++i)
+		{
+			const FString Name = FString::Printf(TEXT("mugo_pine_%02d"), i);
+			if (UStaticMesh* Shrub = Mesh(*FString::Printf(TEXT("/Game/External/Mugo/%s/%s/StaticMeshes/%s.%s"), *Name, *Name, *Name, *Name)))
+			{
+				Found.Add(Shrub);
+			}
+		}
+		return Found;
+	}
+
 	TArray<UStaticMesh*> Saplings()
 	{
 		return Meshes({

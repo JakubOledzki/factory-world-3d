@@ -56,6 +56,9 @@ if (-not (Test-Path RawAssets\processed\factory\belt_straight.glb)) {
 if (-not (Test-Path RawAssets\processed\terrain_mountains.glb)) {
     & $Blender --background --factory-startup --python Tools\blender\make_terrain.py
 }
+if (-not (Test-Path RawAssets\processed\mugo\mugo_pine_01.glb)) {
+    & $Blender --background --factory-startup --python Tools\blender\make_mugo_pine.py
+}
 
 Write-Host "== Unreal"
 $Cmd = Join-Path $Engine "Engine\Binaries\Win64\UnrealEditor-Cmd.exe"

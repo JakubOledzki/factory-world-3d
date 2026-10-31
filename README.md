@@ -153,3 +153,11 @@ Las zaczyna się tuż za działką: gęsty do ok. 150 m nad działką, wyżej rz
 Wysokości lasu ustawia `Config/DefaultGame.ini`: `ForestTopAbovePlotMeters` i `TreeLineAbovePlotMeters`. Po ustawieniu `bForestRelativeToPlot=False` las wraca do prawdziwej granicy lasu w Tatrach (`ForestTopMeters=1300`, `TreeLineMeters=1580` m n.p.m.). Wysokość działki n.p.m. zapisuje `Tools/dem_extract.mjs`, a import dołącza ją do siatki terenu (działka testowa: 2020 m).
 
 Drzew jest najwyżej 28 000. Te dalej niż 1 km od działki nie rzucają cieni, a wiatr porusza tylko drzewa w promieniu 50 m. Drzewa do 400 m od działki mają kolizję: niewidoczny walec w miejscu pnia, dużo tańszy niż kolizja całego drzewa. Las nie bierze udziału w ray tracingu. Bez Titana gra działa normalnie, tylko bez drzew.
+
+## Kosodrzewina
+
+Nad lasem rośnie pas kosodrzewiny (Pinus mugo), jak w Tatrach. Zaczyna się na górnej granicy gęstego lasu i sięga 250 m wyżej (`DwarfPineBandMeters` w `Config/DefaultGame.ini`). Rośnie w zwartych płatach z przerwami między nimi. Niżej pojedyncze kępy zajmują polany w lesie, także tuż za pasem wolnym od budowy. Omija strome zbocza i skały.
+
+Krzewy robimy sami w Blenderze (`Tools/blender/make_mugo_pine.py`, 5 odmian). Z jednej nasady wychodzi wiele wygiętych pędów, które łukiem rozchodzą się na boki. Gęste szczotki igieł to prawdziwa geometria (Nanite), a nie płaskie karty z przezroczystością. Kora ma teksturę z modelu `pine_tree_01` z Poly Haven (CC0), a igły kolor z materiału `M_FWFoliage`. Ten materiał porusza krzewami na wietrze, ale tylko w promieniu 15 m od gracza. Kępy do 400 m od działki są nie do przejścia, tak jak prawdziwa kosodrzewina: dostają niewidoczny walec kolizji.
+
+Krzewy powstają razem z innymi zasobami (`Tools/setup_assets.ps1`) i nie ma ich w gicie. Bez nich gra działa normalnie, tylko bez kosodrzewiny.

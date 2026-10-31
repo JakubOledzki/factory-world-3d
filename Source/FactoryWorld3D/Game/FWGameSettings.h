@@ -62,6 +62,10 @@ public:
 	UPROPERTY(Config)
 	float TreeLineAbovePlotMeters = 300.f;
 
+	// Dwarf mountain pine (kosodrzewina) belt: from the forest top up this many metres
+	UPROPERTY(Config)
+	float DwarfPineBandMeters = 250.f;
+
 	// Real tree line in metres above sea level (Tatras: spruce up to ~1550 m, dwarf pine and grass above)
 	UPROPERTY(Config)
 	float ForestTopMeters = 1300.f;

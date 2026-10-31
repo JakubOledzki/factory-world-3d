@@ -71,6 +71,10 @@ Licencja: dane Copernicus DEM GLO-30 są bezpłatne do każdego celu, także kom
 
 Opis danych i licencji: https://registry.opendata.aws/copernicus-dem/
 
+## Kosodrzewina (nasza)
+
+Krzewy kosodrzewiny tworzy nasz skrypt `Tools/blender/make_mugo_pine.py`: geometria jest w całości nasza. Kora używa tekstur z `pine_tree_01` (Poly Haven, CC0, w tabeli wyżej). Igły nie mają tekstury, tylko kolor z materiału.
+
 ## Project Titan (Epic Games, Fab)
 
 Sosny (`SM_Pine_A`, `SM_Pine_B`, wersje z porostami i sadzonki) z darmowego projektu przykładowego Epic Games **Project Titan** (Fab), razem z ich materiałami, teksturami i wtyczką `EasyImpostor`. Licencja: treści Epic z Fab dla projektów Unreal Engine, na warunkach Unreal Engine EULA i licencji Fab. Wolno ich używać w grze zbudowanej w Unreal Engine, w tym komercyjnej, ale **nie wolno ich rozpowszechniać osobno**, na przykład w publicznym repozytorium.
