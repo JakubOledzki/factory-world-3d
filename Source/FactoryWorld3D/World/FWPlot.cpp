@@ -21,7 +21,8 @@ namespace
 {
 	// Basic shapes are 100 units across
 	constexpr float ShapeSize = 100.f;
-	constexpr float LaneOffset = 0.2f;
+	// Lanes on the ~1.3 m band of the modelled belt
+	constexpr float LaneOffset = 0.08f;
 	constexpr float BandHeight = 0.11f;
 
 	TArray<uint8> Gunzip(const FString& Base64)
@@ -367,7 +368,10 @@ void AFWPlot::ScatterSurroundings(int32 Biome)
 	for (TPair<UStaticMesh*, TArray<FTransform>>& Pair : Placed)
 	{
 		Total += Pair.Value.Num();
-		MakeArtInstances(Pair.Key, false)->AddInstances(Pair.Value, false);
+		// Scattered surroundings stay out of ray tracing: they would fill its always-resident memory
+		UHierarchicalInstancedStaticMeshComponent* Scatter = MakeArtInstances(Pair.Key, false);
+		Scatter->SetVisibleInRayTracing(false);
+		Scatter->AddInstances(Pair.Value, false);
 	}
 	UE_LOG(LogFWPlot, Log, TEXT("Scattered %d trees, rocks and bushes around the plot"), Total);
 }
@@ -428,7 +432,8 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 				if (!RockMeshes.IsEmpty())
 				{
 					UStaticMesh* Mesh = RockMeshes[Random.RandHelper(RockMeshes.Num())];
-					ArtSolid.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Center + Jitter, Spin.Yaw, Random.FRandRange(0.55f, 0.95f) * TileSize, 0.f, 0.2f));
+					// Kept inside their own tile, so they never reach into a neighbouring belt or machine
+					ArtSolid.FindOrAdd(Mesh).Add(ArtTransform(Mesh, Center + Jitter * 0.3f, Spin.Yaw, Random.FRandRange(0.5f, 0.75f) * TileSize, 0.f, 0.2f));
 					continue;
 				}
 				const float S = Random.FRandRange(0.45f, 0.8f) * T;
@@ -760,7 +765,9 @@ bool AFWPlot::DrawArtObject(FFWPlotObject& Object)
 		}
 		const float Scale = Kind == TEXT("power_large_wind_turbine") ? 2.f : 1.f;
 		Place(Tower, FVector::ZeroVector, FRotator::ZeroRotator, Scale, true);
-		TurbineRotors.Add(Place(Rotor, FVector(165.f, 0.f, 1440.f) * Scale, FRotator::ZeroRotator, Scale, false));
+		UStaticMeshComponent* Spinning = Place(Rotor, FVector(165.f, 0.f, 1440.f) * Scale, FRotator::ZeroRotator, Scale, false);
+		Spinning->SetVisibleInRayTracing(false);
+		TurbineRotors.Add(Spinning);
 		return true;
 	}
 	// Anything else that stands on the plot: the generic machine at the size of its footprint
@@ -1162,6 +1169,7 @@ void AFWPlot::UpdateGroundCover()
 			if (!GroundCoverParts.IsValidIndex(Part))
 			{
 				UHierarchicalInstancedStaticMeshComponent* Component = MakeArtInstances(GroundCoverMeshes[i], false);
+				Component->SetVisibleInRayTracing(false);
 				Component->SetCastShadow(L == 0);
 				GroundCoverParts.Add(Component);
 			}

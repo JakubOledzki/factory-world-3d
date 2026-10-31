@@ -137,37 +137,41 @@ def band_uv(obj, length_axis=0, length=4.0):
 
 
 # ---- Conveyor belt, straight: 4 m long, 2 m wide, band top 0.44 m ---------------------------------
+# Half the width of the band: belts are ~1.6 m wide with their frame, centred in the 4 m tile
+HW = 0.65
+
+
 def belt_frame(length=4.0):
     for side in (-1, 1):
-        box((length, 0.12, 0.32), (0, side * 1.04, 0.28), "FW_PaintedSteel", bevel=0.012)
-        box((length, 0.04, 0.06), (0, side * 1.1, 0.42), "FW_Steel", bevel=0.008)
+        box((length, 0.12, 0.32), (0, side * (HW + 0.1), 0.28), "FW_PaintedSteel", bevel=0.012)
+        box((length, 0.04, 0.06), (0, side * (HW + 0.16), 0.42), "FW_Steel", bevel=0.008)
         for x in (-length / 2 + 0.25, length / 2 - 0.25):
-            box((0.12, 0.12, 0.14), (x, side * 1.04, 0.07), "FW_Worn", bevel=0.01)
-            box((0.32, 0.26, 0.02), (x, side * 1.04, 0.01), "FW_Steel", bevel=0.004)
-            bolts([(x + dx, side * 1.04 + dy, 0.025) for dx in (-0.11, 0.11) for dy in (-0.08, 0.08)])
-        bolts([(x, side * 1.1, 0.3) for x in [i * 0.5 - length / 2 + 0.25 for i in range(int(length / 0.5))]], axis=(0, side, 0))
+            box((0.12, 0.12, 0.14), (x, side * (HW + 0.1), 0.07), "FW_Worn", bevel=0.01)
+            box((0.32, 0.26, 0.02), (x, side * (HW + 0.1), 0.01), "FW_Steel", bevel=0.004)
+            bolts([(x + dx, side * (HW + 0.1) + dy, 0.025) for dx in (-0.11, 0.11) for dy in (-0.08, 0.08)])
+        bolts([(x, side * (HW + 0.16), 0.3) for x in [i * 0.5 - length / 2 + 0.25 for i in range(int(length / 0.5))]], axis=(0, side, 0))
     # Carrying rollers under the band, with axle ends through the frame; return rollers below
     for i in range(int(length / 0.25)):
         x = -length / 2 + 0.125 + i * 0.25
-        cylinder(0.07, 1.9, (x, 0, 0.33), "FW_Steel", rotation=(math.pi / 2, 0, 0))
+        cylinder(0.07, 2 * HW, (x, 0, 0.33), "FW_Steel", rotation=(math.pi / 2, 0, 0))
         for side in (-1, 1):
-            cylinder(0.025, 0.2, (x, side * 1.02, 0.33), "FW_Worn", rotation=(math.pi / 2, 0, 0), vertices=16)
-            bolts([(x, side * 1.115, 0.33)], axis=(0, side, 0), radius=0.022)
+            cylinder(0.025, 0.2, (x, side * (HW + 0.08), 0.33), "FW_Worn", rotation=(math.pi / 2, 0, 0), vertices=16)
+            bolts([(x, side * (HW + 0.175), 0.33)], axis=(0, side, 0), radius=0.022)
     for i in range(int(length)):
         x = -length / 2 + 0.5 + i
-        cylinder(0.05, 1.9, (x, 0, 0.12), "FW_Steel", rotation=(math.pi / 2, 0, 0))
+        cylinder(0.05, 2 * HW, (x, 0, 0.12), "FW_Steel", rotation=(math.pi / 2, 0, 0))
     # Guard lips along the top of the frame and diagonal braces between the legs
     for side in (-1, 1):
-        box((length, 0.02, 0.1), (0, side * 0.98, 0.48), "FW_PaintedSteel", bevel=0.006)
+        box((length, 0.02, 0.1), (0, side * (HW + 0.04), 0.48), "FW_PaintedSteel", bevel=0.006)
         for x in (-length / 2 + 0.25, length / 2 - 0.25):
-            box((0.04, 0.24, 0.3), (x, side * 0.92, 0.2), "FW_PaintedSteel", bevel=0.006)  # gusset
+            box((0.04, 0.24, 0.3), (x, side * (HW - 0.02), 0.2), "FW_PaintedSteel", bevel=0.006)  # gusset
     for x0, x1 in ((-length / 2 + 0.25, 0.0), (0.0, length / 2 - 0.25)):
         mid = (x0 + x1) / 2
-        span = math.hypot(x1 - x0, 1.9)
-        box((0.05, span, 0.05), (mid, 0, 0.16), "FW_Steel", bevel=0.008, rotation=(0, 0, math.atan2(x1 - x0, 1.9)))
+        span = math.hypot(x1 - x0, 2 * HW)
+        box((0.05, span, 0.05), (mid, 0, 0.16), "FW_Steel", bevel=0.008, rotation=(0, 0, math.atan2(x1 - x0, 2 * HW)))
     # Cross braces
     for x in (-length / 2 + 0.25, 0.0, length / 2 - 0.25):
-        box((0.08, 2.0, 0.08), (x, 0, 0.16), "FW_PaintedSteel", bevel=0.01)
+        box((0.08, 2 * HW + 0.1, 0.08), (x, 0, 0.16), "FW_PaintedSteel", bevel=0.01)
 
 
 def belt_straight():
@@ -175,7 +179,7 @@ def belt_straight():
     belt_frame()
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.42))
     band = bpy.context.active_object
-    band.scale = (4.0, 1.92, 0.04)
+    band.scale = (4.0, 2 * HW, 0.04)
     finish(band, "FW_Rubber", bevel=0.008, uv=False)
     band_uv(band)
     export("belt_straight")
@@ -188,13 +192,13 @@ def belt_curve():
     steps = 12
     def arc_point(r, a, z):
         return corner + Vector((math.sin(a) * r, -math.cos(a) * r, z))
-    # Band: a ring segment between radii 1.04 and 2.96
+    # Band: a ring segment between radii 2 - HW and 2 + HW
     bm = bmesh.new()
     uv_layer = bm.loops.layers.uv.new("UVMap")
     rings = []
     for i in range(steps + 1):
         a = (math.pi / 2) * i / steps
-        rings.append([bm.verts.new(arc_point(r, a, z)) for r, z in ((1.04, 0.40), (2.96, 0.40), (2.96, 0.44), (1.04, 0.44))])
+        rings.append([bm.verts.new(arc_point(r, a, z)) for r, z in ((2 - HW, 0.40), (2 + HW, 0.40), (2 + HW, 0.44), (2 - HW, 0.44))])
     for i in range(steps):
         for k in range(4):
             face = bm.faces.new((rings[i][k], rings[i + 1][k], rings[i + 1][(k + 1) % 4], rings[i][(k + 1) % 4]))
@@ -211,7 +215,7 @@ def belt_curve():
     bpy.context.scene.collection.objects.link(band)
     finish(band, "FW_Rubber", uv=False)
     # Side walls along both edges
-    for r in (0.96, 3.04):
+    for r in (2 - HW - 0.08, 2 + HW + 0.08):
         for i in range(steps):
             a0, a1 = (math.pi / 2) * i / steps, (math.pi / 2) * (i + 1) / steps
             mid = (a0 + a1) / 2
@@ -220,7 +224,7 @@ def belt_curve():
             box((seg, 0.12, 0.32), p, "FW_PaintedSteel", bevel=0.01, rotation=(0, 0, mid))
     for a in (0.2, 0.75, 1.3):
         p = arc_point(2.0, a, 0.16)
-        box((0.08, 2.1, 0.08), p, "FW_PaintedSteel", bevel=0.01, rotation=(0, 0, a))
+        box((0.08, 2 * HW + 0.2, 0.08), p, "FW_PaintedSteel", bevel=0.01, rotation=(0, 0, a))
     export("belt_curve")
 
 
