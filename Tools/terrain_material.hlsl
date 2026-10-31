@@ -1,7 +1,8 @@
 // Body of the Custom node in M_FWTerrain (Tools/make_materials.py pastes it in; comment lines are dropped).
 // Inputs: WP (absolute world position, cm), N (vertex normal, world), Cam (camera position), the texture
 // objects BaseD/BaseN/BaseM, GrassD/GrassN/GrassM, CliffD/CliffN/CliffM, SnowD/SnowN/SnowM
-// (M = AO, roughness, metal), and the scalars Tint, GrassAmount, SnowHeight, Scale.
+// (M = AO, roughness, metal), and the scalars Tint, GrassAmount, SnowHeight, Scale, PlotElevation, ForestTop,
+// TreeLine (m above sea level) and ClearX, ClearY, ClearHalf (the square kept free of forest, world cm).
 // Normal maps sample raw (BC5 gives x, y in 0..1). Returns base colour; additional outputs NormalOut
 // (tangent space) and ArmOut (AO, roughness, metal).
 
@@ -58,15 +59,20 @@ color = lerp(color, snowD, snow);
 normal = lerp(normal, snowN, snow);
 arm = lerp(arm, snowM, snow);
 
-// Far forest: below the tree line (real terrain only, PlotElevation > 0) the ground takes a dark spruce
-// canopy colour in stands, so valleys kilometres away read as forest between the scattered trees
+// Forest: below the tree line (real terrain only, PlotElevation > 0), in the same stands pattern as the trees
+// (AFWPlot::PlantForest). Near, the ground under a stand is shaded needle litter and moss; far away it takes
+// the dark spruce canopy colour, so valleys kilometres off read as forest between the trees
 float altitude = PlotElevation + WP.z / 100.0;
 float stands = saturate(0.5 + 0.5 * sin(WP.x * 0.00011 + sin(WP.y * 0.00009) * 2.3) * cos(WP.y * 0.00013 - WP.x * 0.00004));
-float canopy = (PlotElevation > 0.0 ? 1.0 : 0.0) * (1.0 - smoothstep(ForestTop, TreeLine, altitude + (stands - 0.5) * 140.0))
-             * smoothstep(0.25, 0.5, stands) * (1.0 - cliff * 0.7) * smoothstep(0.15, 0.6, farMix);
+float forest = (PlotElevation > 0.0 ? 1.0 : 0.0) * (1.0 - smoothstep(ForestTop, TreeLine, altitude + (stands - 0.5) * 140.0))
+             * smoothstep(0.38, 0.5, stands) * (1.0 - cliff * 0.7)
+             * saturate((max(abs(WP.x - ClearX), abs(WP.y - ClearY)) - ClearHalf) / 1500.0);
+float canopy = forest * smoothstep(0.15, 0.6, farMix);
+float3 litter = lerp(baseD * float3(0.3, 0.24, 0.16), float3(0.05, 0.04, 0.025), 0.4 + 0.3 * patches);
+color = lerp(color, litter, forest * (1.0 - canopy) * 0.92);
+arm.g = lerp(arm.g, 0.85, forest);
 float3 spruce = float3(0.035, 0.055, 0.03) * lerp(0.75, 1.2, macro);
 color = lerp(color, spruce, canopy * 0.9);
-arm.g = lerp(arm.g, 0.9, canopy);
 
 // Large-scale brightness changes, so the ground does not look printed; flatter normals far away
 color *= lerp(0.82, 1.12, macro) * Tint;

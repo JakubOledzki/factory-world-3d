@@ -130,6 +130,8 @@ private:
 	void ScatterSurroundings(int32 Biome);
 	// Conifer forest on the slopes around the plot: thick in the valleys, thinning to the tree line
 	void PlantForest(int32 Biome);
+	// Clear strip between the plot and the forest (cm), left for building
+	static constexpr float ForestMargin = 4000.f;
 	void UpdateGroundCover();
 	UHierarchicalInstancedStaticMeshComponent* MakeArtInstances(UStaticMesh* Mesh, bool bCollide);
 	FTransform ArtTransform(UStaticMesh* Mesh, const FVector& Ground, float Yaw, float Size2D, float Height, float Sink,

@@ -50,12 +50,34 @@ public:
 	UPROPERTY(Config)
 	TArray<FFWPlotElevation> PlotElevations;
 
-	// Tree line in metres above sea level (Tatras: spruce up to ~1550 m, dwarf pine and grass above)
+	// Where the forest grows. Relative to the plot (default): dense up to ForestTopAbovePlotMeters above it,
+	// thinning to TreeLineAbovePlotMeters, so a high plot still stands at a forest edge. Off: the real tree
+	// line by altitude above sea level (needs real terrain), ForestTopMeters / TreeLineMeters
+	UPROPERTY(Config)
+	bool bForestRelativeToPlot = true;
+
+	UPROPERTY(Config)
+	float ForestTopAbovePlotMeters = 150.f;
+
+	UPROPERTY(Config)
+	float TreeLineAbovePlotMeters = 300.f;
+
+	// Real tree line in metres above sea level (Tatras: spruce up to ~1550 m, dwarf pine and grass above)
 	UPROPERTY(Config)
 	float ForestTopMeters = 1300.f;
 
 	UPROPERTY(Config)
 	float TreeLineMeters = 1580.f;
+
+	// Forest top and tree line in metres above the plot, for a plot at the given height above sea level (if known)
+	FVector2D ForestBandsAbovePlot(const TOptional<float>& PlotElevation) const
+	{
+		if (bForestRelativeToPlot || !PlotElevation.IsSet())
+		{
+			return FVector2D(ForestTopAbovePlotMeters, TreeLineAbovePlotMeters);
+		}
+		return FVector2D(ForestTopMeters, TreeLineMeters) - PlotElevation.GetValue();
+	}
 
 	const FFWPlotElevation* FindElevation(int32 PlotX, int32 PlotY) const
 	{

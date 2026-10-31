@@ -282,11 +282,18 @@ void AFWPlot::BuildGround(int32 Biome)
 		}
 		if (PlotElevationMeters.IsSet() && GroundMaterial)
 		{
-			// Far away the forest shows as canopy colour in the ground, by the same altitude rule as the trees
-			const UFWGameSettings& Settings = UFWGameSettings::Get();
-			GroundMaterial->SetScalarParameterValue(TEXT("PlotElevation"), PlotElevationMeters.GetValue());
-			GroundMaterial->SetScalarParameterValue(TEXT("ForestTop"), Settings.ForestTopMeters);
-			GroundMaterial->SetScalarParameterValue(TEXT("TreeLine"), Settings.TreeLineMeters);
+			// Forest floor under the stands and canopy colour far away, by the same rule as the trees
+			// (PlantForest); the plot and its margin stay clear
+			const float Height = PlotElevationMeters.GetValue();
+			const FVector2D Bands = UFWGameSettings::Get().ForestBandsAbovePlot(PlotElevationMeters);
+			const FVector Centre = GetActorTransform().TransformPosition(FVector(Extent / 2, Extent / 2, 0.f));
+			// The material reckons altitude from world Z: shift by the plot's own world height
+			GroundMaterial->SetScalarParameterValue(TEXT("PlotElevation"), Height - Centre.Z / 100.f);
+			GroundMaterial->SetScalarParameterValue(TEXT("ForestTop"), Height + Bands.X);
+			GroundMaterial->SetScalarParameterValue(TEXT("TreeLine"), Height + Bands.Y);
+			GroundMaterial->SetScalarParameterValue(TEXT("ClearX"), Centre.X);
+			GroundMaterial->SetScalarParameterValue(TEXT("ClearY"), Centre.Y);
+			GroundMaterial->SetScalarParameterValue(TEXT("ClearHalf"), Extent * 0.5f + ForestMargin);
 		}
 		TerrainMesh->SetMaterial(0, Ground);
 		TerrainMesh->SetRelativeScale3D(FVector(Fit, Fit, 1.f));
@@ -403,44 +410,47 @@ void AFWPlot::PlantForest(int32 Biome)
 	{
 		return;
 	}
-	// With real terrain the tree line is by altitude above sea level (the demo plot itself lies above it, at
-	// ~2000 m, so its forest is in the valleys below); otherwise up to ~350 m above the plot, thinning to ~480 m
-	const UFWGameSettings& Settings = UFWGameSettings::Get();
-	const bool bReal = PlotElevationMeters.IsSet();
-	const float ForestTop = bReal ? (Settings.ForestTopMeters - PlotElevationMeters.GetValue()) * 100.f : 35000.f;
-	const float TreeLineTop = bReal ? (Settings.TreeLineMeters - PlotElevationMeters.GetValue()) * 100.f : 48000.f;
+	// Dense up to the forest top, thinning to the tree line: by default bands above the plot, so the plot stands
+	// at a forest edge; or the real tree line by altitude (config, see UFWGameSettings)
+	const FVector2D Bands = UFWGameSettings::Get().ForestBandsAbovePlot(PlotElevationMeters) * 100.f;
+	const float ForestTop = Bands.X;
+	const float TreeLineTop = Bands.Y;
 	// A bounded budget, thinning past ~6 km where a tree is a few pixels and the canopy colour
 	// in the ground carries the forest
-	constexpr int32 Budget = 30000;
-	TArray<FTransform> Near;
-	UStaticMesh* NearMesh = nullptr;
+	constexpr int32 Budget = 28000;
+	// Past ~1 km trees cast no shadows: the canopy colour in the ground shades the far forest
+	constexpr float ShadowDistance = 100000.f;
+	int32 Count = 0;
+	TArray<FTransform> Trunks;
 	const float Extent = Size * TileSize;
 	const FVector Middle(Extent / 2, Extent / 2, 0.f);
 	FRandomStream Random(PlotX * 31337 + PlotY * 7);
-	TMap<UStaticMesh*, TArray<FTransform>> Placed;
-	for (int32 i = 0; i < 400000; ++i)
+	TMap<UStaticMesh*, TArray<FTransform>> Placed[2];
+	for (int32 i = 0; i < 1200000; ++i)
 	{
 		const float Angle = Random.FRandRange(0.f, 2 * PI);
 		// Out to the edge of the land (~9 km), the valleys where the real tree line lets trees grow included
-		const float Distance = Extent * 0.5f + 6000.f + FMath::Pow(Random.FRand(), 1.1f) * 780000.f;
+		const float Distance = Extent * 0.5f + 6000.f + FMath::Pow(Random.FRand(), 1.8f) * 780000.f;
 		if (Random.FRand() > FMath::Exp(-FMath::Max(0.f, Distance - 600000.f) / 250000.f))
 		{
 			continue;
 		}
 		const FVector At = Middle + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * Distance * 1.15f;
 		// Keep the plot and a strip around it clear, so the forest never covers the building area
-		if (FMath::Abs(At.X - Middle.X) < Extent * 0.5f + 5000.f && FMath::Abs(At.Y - Middle.Y) < Extent * 0.5f + 5000.f)
+		if (FMath::Abs(At.X - Middle.X) < Extent * 0.5f + ForestMargin && FMath::Abs(At.Y - Middle.Y) < Extent * 0.5f + ForestMargin)
 		{
 			continue;
 		}
-		// Woods grow in stands with clearings between them
-		const float Stand = FMath::PerlinNoise2D(FVector2D(At.X, At.Y) / 60000.f) * 0.5f + 0.5f;
-		if (Random.FRand() > FMath::SmoothStep(0.3f, 0.55f, Stand))
+		// Woods grow in closed stands with clearings between them. The pattern is the "stands" one in
+		// Tools/terrain_material.hlsl, so the ground under a stand is forest floor and far stands read as canopy
+		const FVector World = GetActorTransform().TransformPosition(At);
+		const float Stand = FMath::Clamp(0.5f + 0.5f * FMath::Sin(World.X * 0.00011f + FMath::Sin(World.Y * 0.00009f) * 2.3f)
+			* FMath::Cos(World.Y * 0.00013f - World.X * 0.00004f), 0.f, 1.f);
+		if (Random.FRand() > FMath::SmoothStep(0.4f, 0.48f, Stand))
 		{
 			continue;
 		}
 		FHitResult Hit;
-		const FVector World = GetActorTransform().TransformPosition(At);
 		if (!TerrainMesh->LineTraceComponent(Hit, World + FVector(0, 0, 400000.f), World - FVector(0, 0, 100000.f), FCollisionQueryParams(TEXT("FWForest"), true)))
 		{
 			continue;
@@ -461,50 +471,46 @@ void AFWPlot::PlantForest(int32 Biome)
 			: (!TreeLine.IsEmpty() && Line > 0.f && Random.FRand() < Line ? TreeLine : Trees);
 		UStaticMesh* Mesh = Pool[Random.RandHelper(Pool.Num())];
 		// Trees standing upright whatever the slope, a little smaller towards the tree line
-		const float Scale = Random.FRandRange(0.85f, 1.25f) * FMath::Lerp(1.f, 0.7f, Line);
+		const float Scale = Random.FRandRange(1.f, 1.45f) * FMath::Lerp(1.f, 0.7f, Line);
 		const FBoxSphereBounds Bounds = Mesh->GetBounds();
 		const float Bottom = (Bounds.Origin.Z - Bounds.BoxExtent.Z) * Scale;
 		const FTransform Tree(FRotator(0.f, Random.FRandRange(0.f, 360.f), 0.f), Ground - FVector(0, 0, Bottom + 40.f), FVector(Scale));
-		// Trees within walking reach get collision (kept in their own component); far ones none
-		if (Distance < Extent * 0.5f + 40000.f && Pool == Trees)
+		Placed[Distance > Extent * 0.5f + ShadowDistance ? 1 : 0].FindOrAdd(Mesh).Add(Tree);
+		// Grown trees within walking reach get a trunk: an invisible cylinder, much cheaper than the
+		// tree mesh as collision; far ones none
+		if (Distance < Extent * 0.5f + 40000.f && Pool != Young)
 		{
-			NearMesh = NearMesh ? NearMesh : Mesh;
-			Near.Add(Tree);
+			Trunks.Add(FTransform(FRotator::ZeroRotator, Ground + FVector(0, 0, 300.f * Scale), FVector(0.5f * Scale, 0.5f * Scale, 6.f * Scale)));
 		}
-		else
-		{
-			Placed.FindOrAdd(Mesh).Add(Tree);
-		}
-		int32 Count = Near.Num();
-		for (const TPair<UStaticMesh*, TArray<FTransform>>& Pair : Placed)
-		{
-			Count += Pair.Value.Num();
-		}
-		if (Count >= Budget)
+		if (++Count >= Budget)
 		{
 			break;
 		}
 	}
-	if (NearMesh && Near.Num() > 0)
+	UStaticMesh* Cylinder = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	if (Cylinder && Trunks.Num() > 0)
 	{
-		UHierarchicalInstancedStaticMeshComponent* Walkable = MakeArtInstances(NearMesh, true);
-		Walkable->SetWorldPositionOffsetDisableDistance(12000);
-		Walkable->SetVisibleInRayTracing(false);
-		Walkable->AddInstances(Near, false);
+		UHierarchicalInstancedStaticMeshComponent* Collision = MakeArtInstances(Cylinder, true);
+		Collision->SetVisibility(false);
+		Collision->SetHiddenInGame(true);
+		Collision->SetCastShadow(false);
+		Collision->AddInstances(Trunks, false);
 	}
-	int32 Total = 0;
-	for (TPair<UStaticMesh*, TArray<FTransform>>& Pair : Placed)
+	for (int32 Far = 0; Far < 2; ++Far)
 	{
-		UHierarchicalInstancedStaticMeshComponent* Forest = MakeArtInstances(Pair.Key, false);
-		// Wind (world position offset) only near the player: far trees stand still, which keeps their
-		// virtual shadow pages cached; and no ray tracing for thousands of foliage instances
-		Forest->SetWorldPositionOffsetDisableDistance(12000);
-		Forest->SetVisibleInRayTracing(false);
-		Forest->AddInstances(Pair.Value, false);
-		Total += Pair.Value.Num();
+		for (TPair<UStaticMesh*, TArray<FTransform>>& Pair : Placed[Far])
+		{
+			UHierarchicalInstancedStaticMeshComponent* Forest = MakeArtInstances(Pair.Key, false);
+			// Wind (world position offset) only near the player: far trees stand still, which keeps their
+			// virtual shadow pages cached; and no ray tracing for thousands of foliage instances
+			Forest->SetWorldPositionOffsetDisableDistance(5000);
+			Forest->SetVisibleInRayTracing(false);
+			Forest->SetCastShadow(Far == 0);
+			Forest->AddInstances(Pair.Value, false);
+		}
 	}
-	UE_LOG(LogFWPlot, Log, TEXT("Planted %d trees around the plot (%d with collision), tree line by %s"), Total + Near.Num(), Near.Num(),
-		bReal ? *FString::Printf(TEXT("altitude (plot at %.0f m)"), PlotElevationMeters.GetValue()) : TEXT("height above the plot"));
+	UE_LOG(LogFWPlot, Log, TEXT("Planted %d trees around the plot (%d with trunk collision), forest to %.0f m and tree line %.0f m above the plot"),
+		Count, Trunks.Num(), ForestTop / 100.f, TreeLineTop / 100.f);
 }
 
 void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCodes)
