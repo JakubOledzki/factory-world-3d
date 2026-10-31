@@ -132,6 +132,12 @@ private:
 	void BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCodes);
 	UHierarchicalInstancedStaticMeshComponent* MakeInstances(UStaticMesh* Mesh, const FLinearColor& Color, float Roughness, bool bCollide);
 	void DrawObject(FFWPlotObject& Object);
+	// The modelled version of an object, when the factory models are set up; false to draw a placeholder
+	bool DrawArtObject(FFWPlotObject& Object);
+	UStaticMeshComponent* MakeArtMesh(UStaticMesh* Mesh, const FTransform& Transform, bool bCollide);
+	// Belts whose bend changed get the curved model (or the straight one back)
+	void RefreshBeltArt();
+	void AnimateParts(float DeltaSeconds);
 	void RebuildBelts();
 	FBeltLink Connect(FIntPoint Tile, FIntPoint Way) const;
 	int32 BendOf(FIntPoint Tile) const;
@@ -174,6 +180,11 @@ private:
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> TerrainMesh;
 	int32 PendingScatterBiome = -1;
+	UPROPERTY()
+	TMap<FString, TObjectPtr<UStaticMeshComponent>> InserterArms;
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> TurbineRotors;
+	TMap<FString, int32> DrawnBends;
 	UPROPERTY()
 	TArray<TObjectPtr<UStaticMesh>> GroundCoverMeshes;
 	UPROPERTY()

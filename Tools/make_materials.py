@@ -191,3 +191,42 @@ def scan_material(name, masked):
 scan_material("M_FWScan", False)
 scan_material("M_FWScanMasked", True)
 unreal.log("FW scan materials saved")
+
+
+# Conveyor band: textured like the scans, its UVs pan along the belt (U) at Speed repeats per second.
+# Belts move items 1 m per 0.2 s tick and the band's UV repeats every 2 m, so Speed = 2.5 for a plain belt.
+m = fresh("M_FWBelt")
+coords = lib.create_material_expression(m, unreal.MaterialExpressionTextureCoordinate, -1100, 0)
+time = lib.create_material_expression(m, unreal.MaterialExpressionTime, -1100, 150)
+speed = scalar_param(m, "Speed", 2.5, -1100, 250)
+offset = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -900, 200)
+lib.connect_material_expressions(time, "", offset, "A")
+lib.connect_material_expressions(speed, "", offset, "B")
+pan = lib.create_material_expression(m, unreal.MaterialExpressionAppendVector, -750, 200)
+lib.connect_material_expressions(offset, "", pan, "A")
+zero = lib.create_material_expression(m, unreal.MaterialExpressionConstant, -900, 320)
+lib.connect_material_expressions(zero, "", pan, "B")
+uv = lib.create_material_expression(m, unreal.MaterialExpressionSubtract, -600, 50)
+lib.connect_material_expressions(coords, "", uv, "A")
+lib.connect_material_expressions(pan, "", uv, "B")
+for i, (name, kind, prop) in enumerate((("BaseColor", unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, unreal.MaterialProperty.MP_BASE_COLOR),
+                                         ("Normal", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL, unreal.MaterialProperty.MP_NORMAL))):
+    sample = lib.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -400, -200 + i * 250)
+    sample.set_editor_property("parameter_name", name)
+    sample.set_editor_property("sampler_type", kind)
+    sample.set_editor_property("texture", unreal.load_asset("/Engine/EngineMaterials/DefaultNormal.DefaultNormal" if name == "Normal" else "/Engine/EngineResources/DefaultTexture.DefaultTexture"))
+    lib.connect_material_expressions(uv, "", sample, "UVs")
+    if name == "BaseColor":
+        # The rubber texture is a red running track: keep its detail, make it black rubber
+        grey = lib.create_material_expression(m, unreal.MaterialExpressionDesaturation, -200, -200)
+        lib.connect_material_expressions(sample, "RGB", grey, "")
+        dark = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -50, -200)
+        lib.connect_material_expressions(grey, "", dark, "A")
+        lib.connect_material_expressions(scalar_param(m, "Brightness", 0.12, -200, -50), "", dark, "B")
+        lib.connect_material_property(dark, "", prop)
+    else:
+        lib.connect_material_property(sample, "RGB", prop)
+lib.connect_material_property(scalar_param(m, "Roughness", 0.85, -400, 350), "", unreal.MaterialProperty.MP_ROUGHNESS)
+lib.recompile_material(m)
+unreal.EditorAssetLibrary.save_asset(m.get_path_name())
+unreal.log("FW belt material saved")

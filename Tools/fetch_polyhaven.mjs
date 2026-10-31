@@ -17,6 +17,9 @@ const MODELS = [
 const TEXTURES = [
   ["rocky_terrain_02", "4k"], ["aerial_grass_rock", "4k"], ["gravel_ground_01", "2k"], ["snow_02", "2k"],
   ["forest_ground_04", "2k"], ["coast_sand_01", "2k"], ["rock_face_03", "4k"], ["dirt", "2k"],
+  // Factory materials (Tools/blender/make_factory.py names its material slots after these)
+  ["metal_plate", "2k"], ["blue_metal_plate", "2k"], ["rusty_painted_metal", "2k"], ["rubberized_track", "2k"],
+  ["weathered_planks", "2k"], ["concrete_floor_worn_001", "2k"], ["metal_grate_rusty", "2k"],
 ];
 const MAPS = { Diffuse: "diff", nor_gl: "nor_gl", arm: "arm" };
 

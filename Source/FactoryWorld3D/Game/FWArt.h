@@ -21,6 +21,8 @@ namespace FWArt
 	TArray<UStaticMesh*> Saplings();
 	TArray<UStaticMesh*> Bushes();
 	TArray<UStaticMesh*> Grass();
+	// A factory model made by Tools/blender/make_factory.py (belt_straight, inserter_arm, ...), real size for a 4 m tile
+	UStaticMesh* Factory(const TCHAR* Name);
 	// Real elevation around this plot (Tools/dem_extract.mjs) when made, otherwise a made-up land for the biome
 	UStaticMesh* Terrain(int32 Biome, int32 PlotX, int32 PlotY);
 

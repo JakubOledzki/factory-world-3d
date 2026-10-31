@@ -94,6 +94,11 @@ namespace FWArt
 		});
 	}
 
+	UStaticMesh* Factory(const TCHAR* Name)
+	{
+		return Mesh(*FString::Printf(TEXT("/Game/External/Factory/%s/%s/StaticMeshes/%s.%s"), Name, Name, Name, Name));
+	}
+
 	UStaticMesh* Terrain(int32 Biome, int32 PlotX, int32 PlotY)
 	{
 		const FString Real = FString::Printf(TEXT("terrain_dem_%d_%d"), PlotX, PlotY);
