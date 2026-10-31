@@ -65,5 +65,12 @@ $Cmd = Join-Path $Engine "Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 $Project = Join-Path $Root "FactoryWorld3D.uproject"
 # Materials first: the import re-parents the scans onto M_FWScan, which make_materials.py rebuilds
 & $Cmd $Project -run=pythonscript -script="$Root\Tools\make_materials.py" -unattended -nosplash | Out-Null
+# Character hair and clothes, built on the mannequin (Tools/copy_mannequins.ps1): export it from the editor
+# (the FBX exporter needs a renderer, so the full editor runs and closes itself), then build them in Blender
+if ((Test-Path "Content\Characters\Mannequins\Meshes\SKM_Manny_Simple.uasset") -and -not (Test-Path RawAssets\processed\character\shoes.fbx)) {
+    $Editor = Join-Path $Engine "Engine\Binaries\Win64\UnrealEditor.exe"
+    Start-Process $Editor -ArgumentList "`"$Project`"", "-ExecutePythonScript=`"$Root\Tools\export_mannequin.py`"", "-nosplash", "-unattended" -Wait
+    & $Blender --background --factory-startup --python Tools\blender\make_character_gear.py
+}
 & $Cmd $Project -run=pythonscript -script="$Root\Tools\import_external.py" -unattended -nosplash | Out-Null
 Write-Host "Done: Content/External is ready."

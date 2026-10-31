@@ -20,6 +20,8 @@ const TEXTURES = [
   // Factory materials (Tools/blender/make_factory.py names its material slots after these)
   ["metal_plate", "2k"], ["blue_metal_plate", "2k"], ["rusty_painted_metal", "2k"], ["rubberized_track", "2k"],
   ["weathered_planks", "2k"], ["concrete_floor_worn_001", "2k"], ["metal_grate_rusty", "2k"],
+  // Character clothes (Tools/blender/make_character_gear.py), tinted with the server's colours
+  ["cotton_jersey", "2k"], ["knitted_fleece", "2k"], ["denim_fabric_05", "2k"], ["leather_white", "2k"],
 ];
 const MAPS = { Diffuse: "diff", nor_gl: "nor_gl", arm: "arm" };
 

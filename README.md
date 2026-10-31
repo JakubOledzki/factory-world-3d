@@ -115,6 +115,8 @@ powershell -ExecutionPolicy Bypass -File Tools\copy_mannequins.ps1
 
 Bez niego kreator działa, tylko podgląd jest pusty.
 
+Fryzury, zarost i ubrania to prawdziwe modele 3D (`Tools/blender/make_character_gear.py`): po jednym na każdy styl, który podaje serwer (5 fryzur, 3 rodzaje zarostu, t-shirt, bezrękawnik, bluza z kapturem, spodnie, buty). Każdy jest wycięty z ciała manekina, odsunięty od skóry i pogrubiony, więc ma te same wagi kości co ciało i porusza się razem z nim. Kucyk i kaptur to dodatkowe kształty. Kolory wybrane w kreatorze nakładają materiały `M_FWHair` (pasma włosów, połysk) i `M_FWCloth` (tkaniny CC0 z Poly Haven: dzianina, polar, dżins, skóra). Modele tworzy `Tools/setup_assets.ps1` (eksport manekina z edytora, Blender, import), gdy manekin jest już skopiowany. Bez nich podgląd pokazuje malowanego manekina.
+
 ## Automatyczne logowanie (tylko do testów)
 
 Żeby gra od razu wchodziła na działkę, bez ekranu logowania, utwórz plik `Saved/DevLogin.ini`:

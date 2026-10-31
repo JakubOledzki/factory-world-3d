@@ -26,7 +26,8 @@ struct FFWLook
 /**
  * The character creator's photo studio: a closed dark room high above the land (so nothing of the world shows
  * or lights it), a pedestal, three-point lighting and the UE5 mannequin painted as the picked character
- * (M_FWCharacter). The figure turns slowly on its own until the player drags it; the camera zooms from the
+ * (M_FWCharacter), wearing the hair and clothes made in Blender (Tools/blender/make_character_gear.py) when they
+ * are imported: one skeletal mesh per style, following the body's pose. The figure turns slowly on its own until the player drags it; the camera zooms from the
  * whole figure to the face. Without the mannequin (Tools/copy_mannequins.ps1 not run) the room stays empty.
  */
 UCLASS()
@@ -52,6 +53,8 @@ protected:
 
 private:
 	void UpdateCamera(float DeltaSeconds);
+	// Shows the piece (e.g. "hair_3"), loading it the first time, in the colour; hides the others of its kind
+	void Wear(const FString& Kind, const FString& Piece, const FLinearColor& Color);
 
 	UPROPERTY()
 	TObjectPtr<USceneComponent> Root;
@@ -63,6 +66,8 @@ private:
 	TObjectPtr<UCameraComponent> Camera;
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> Paint;
+	UPROPERTY()
+	TMap<FString, TObjectPtr<USkeletalMeshComponent>> Gear;
 
 	float Yaw = 200.f;
 	float ZoomTarget = 0.f;
