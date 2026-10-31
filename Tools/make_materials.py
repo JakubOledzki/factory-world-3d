@@ -467,3 +467,44 @@ lib.connect_material_property(scalar_param(m, "Specular", 0.6, -900, -200), "", 
 lib.recompile_material(m)
 unreal.EditorAssetLibrary.save_asset(m.get_path_name())
 unreal.log("FW character gear materials saved")
+
+# Hair cards (make_character_gear.py): each card cut into strands by its UVs (U across, offset by a whole number
+# per card; V root -> tip), strands of staggered length tapering to the tip, darker at the root, anisotropic
+# sheen along the strands (dithered alpha: TSR softens the strand edges)
+m = fresh("M_FWHairCard")
+m.set_editor_property("used_with_skeletal_mesh", True)
+m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+m.set_editor_property("two_sided", True)
+m.set_editor_property("dither_opacity_mask", True)
+card = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 0)
+card.set_editor_property("code", "float card = floor(UV.x); float u = frac(UV.x); float v = saturate(UV.y); "
+                                 "float n = 14.0; float i = floor(u * n) + card * 31.0; "
+                                 "float h = frac(sin(i * 12.9898) * 43758.5453); float h2 = frac(sin(i * 78.233) * 24634.6345); "
+                                 "float w = abs(frac(u * n) - 0.5) * 2.0; "
+                                 "float reach = 0.7 + 0.3 * h; float taper = 1.0 - smoothstep(reach - 0.25, reach, v); "
+                                 "OpacityOut = step(w, lerp(0.75, 0.25, v)) * taper * (h2 > 0.12 ? 1.0 : 0.0); "
+                                 "return Color * lerp(0.45, 1.1, pow(v, 0.7)) * lerp(0.8, 1.15, h);")
+card.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+inputs = []
+for name in ("UV", "Color"):
+    item = unreal.CustomInput()
+    item.set_editor_property("input_name", name)
+    inputs.append(item)
+card.set_editor_property("inputs", inputs)
+outs = []
+for name in ("OpacityOut",):
+    item = unreal.CustomOutput()
+    item.set_editor_property("output_name", name)
+    item.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
+    outs.append(item)
+card.set_editor_property("additional_outputs", outs)
+lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionTextureCoordinate, -900, -300), "", card, "UV")
+lib.connect_material_expressions(vector_param(m, "Color", (0.1, 0.07, 0.05, 1), -900, -200), "", card, "Color")
+lib.connect_material_property(card, "", unreal.MaterialProperty.MP_BASE_COLOR)
+lib.connect_material_property(card, "OpacityOut", unreal.MaterialProperty.MP_OPACITY_MASK)
+lib.connect_material_property(scalar_param(m, "Roughness", 0.38, -900, -100), "", unreal.MaterialProperty.MP_ROUGHNESS)
+lib.connect_material_property(scalar_param(m, "Specular", 0.55, -900, -20), "", unreal.MaterialProperty.MP_SPECULAR)
+lib.connect_material_property(scalar_param(m, "Anisotropy", 0.75, -900, 60), "", unreal.MaterialProperty.MP_ANISOTROPY)
+m.set_editor_property("opacity_mask_clip_value", 0.4)
+lib.recompile_material(m)
+unreal.EditorAssetLibrary.save_asset(m.get_path_name())

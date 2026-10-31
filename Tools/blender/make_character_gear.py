@@ -8,7 +8,8 @@
 #   beard_1..3       moustache, goatee, full beard (0 = none)
 #   shirt_0..2       t-shirt, tank top, hoodie
 #   pants, shoes
-# Material slots, bound by Tools/import_external.py: FW_Hair, FW_Jersey, FW_Fleece, FW_Denim, FW_Leather.
+# Hair and facial hair are layered cards (FW_HairCard: alpha-tested strands) over a dark shell (FW_Hair).
+# Material slots, bound by the game (MI_<slot>): FW_Hair, FW_HairCard, FW_Jersey, FW_Fleece, FW_Denim, FW_Leather.
 # Run headless:
 #   blender --background --factory-startup --python Tools/blender/make_character_gear.py
 import math
@@ -249,9 +250,165 @@ def hair_bumps(style):
     return bumps
 
 
+# Hair cards: thin strips (UV: U across, V root -> tip) whose alpha cuts them into strands (M_FWHairCard), laid
+# in layers over the shell, which stays as a dark underlayer so no scalp shows between the cards. Each card grows
+# from a point of the style's region along a path that depends on the style, kept outside the skull.
+SKULL = Vector((0.0, 1.0, 170.0))
+CARDS = {
+    # style: (cards, length cm (min, max), width cm, layers cm out from the skin, droop, stiffness)
+    1: (900, (3.0, 5.5), 1.4, (1.0, 1.7), 0.25, 0.7),
+    2: (700, (4.0, 7.5), 1.2, (1.0, 1.8), 0.0, 1.0),
+    3: (1700, (16.0, 34.0), 1.3, (1.2, 1.9, 2.6), 2.2, 0.15),
+    4: (900, (5.0, 9.0), 1.4, (1.0, 1.7), 0.35, 0.6),
+    5: (1300, (3.0, 5.0), 1.1, (1.3, 2.0, 2.6), 0.15, 0.5),
+}
+BEARD_CARDS = {1: (160, (0.8, 1.6), 0.5), 2: (260, (1.0, 2.2), 0.6), 3: (1100, (1.0, 2.6), 0.7)}
+
+
+def surface_points(body, inside):
+    """Points of the body inside a region, in UE space, with their normals."""
+    points = []
+    matrix = body.matrix_world.to_3x3()
+    for v in body.data.vertices:
+        p = to_ue(body, v.co)
+        if inside(p):
+            n = matrix @ v.normal
+            points.append((p, Vector((n.x, -n.y, n.z)).normalized()))
+    return points
+
+
+def keep_out(q, layer):
+    """Pushes a point of a card outside the skull (a sphere) and the face (no cards hang in front of it)."""
+    d = q - SKULL
+    r = 10.4 + layer
+    if q.z > 156.0 and d.length < r:
+        q = SKULL + d.normalized() * r
+    if q.y > 4.0 and q.z > 158.0 and abs(q.x) < 7.5:
+        q.y = 4.0
+    # Below the brows nothing hangs in front of the face or out over the shoulders
+    if q.z < 168.0 and q.y > 1.0 and abs(q.x) < 10.5:
+        q.y = 1.0
+    if q.z < 162.0 and abs(q.x) > 12.0:
+        q.x = math.copysign(12.0 + (abs(q.x) - 12.0) * 0.3, q.x)
+    return q
+
+
+def card_path(style, p, n, length, layer, rng, droop, stiff):
+    """The spine of one card in UE space: from the root, along the flow of the style."""
+    away = Vector((p.x, p.y + 2.0, 0.0))
+    away = away.normalized() if away.length > 0.01 else Vector((0, -1, 0))
+    if style == 2:  # spiky: out and up from the crown
+        flow = (n * 1.4 + Vector((0, 0, 0.8)) + away * 0.2).normalized()
+    elif style == 4:  # ponytail cap: combed back to the band at the back of the head
+        flow = (Vector((0, -11.0, 167.0)) - p).normalized()
+    else:  # combed down and outwards from the crown, the fringe forward a little
+        crown = Vector((0.0, -1.0, 179.0))
+        flow = (p - crown)
+        flow = (flow - n * flow.dot(n)).normalized()
+    root = p + n * layer
+    steps = 6 if length < 10 else 10
+    spine = [root]
+    direction = flow
+    for k in range(1, steps + 1):
+        t = k / steps
+        bend = Vector((rng.uniform(-0.2, 0.2), rng.uniform(-0.2, 0.2), -droop * t)) * (1.0 - stiff * 0.7)
+        if style == 5:  # curly: the strand turns round as it goes
+            angle = t * 9.0 + rng.uniform(0, 6.28)
+            bend += (n.cross(flow) * math.cos(angle) + n * math.sin(angle)) * 0.6
+        direction = (direction + bend).normalized()
+        q = spine[-1] + direction * length / steps
+        spine.append(keep_out(q, layer))
+    return spine
+
+
+def cards_mesh(body, spines, width, name, slot, rng):
+    """Strips along the spines (UE space, cm) as one mesh in the body's space, weighted from the skin."""
+    inverse = body.matrix_world.inverted()
+    unit = 1.0 / (body.matrix_world.to_scale().x * 100.0)
+    bm = bmesh.new()
+    # The same UV layer name as the body's, so joined to the shell the cards keep their UVs in channel 0
+    uv_layer = bm.loops.layers.uv.new(body.data.uv_layers.active.name)
+    for spine, normal in spines:
+        # Each card a different stretch of the strand pattern: U offset by a whole number (the material hashes it)
+        offset = float(rng.randint(0, 63))
+        side_prev = None
+        rows = []
+        for k, q in enumerate(spine):
+            along = (spine[min(k + 1, len(spine) - 1)] - spine[max(k - 1, 0)]).normalized()
+            side = along.cross(normal).normalized()
+            if side_prev is not None and side.dot(side_prev) < 0:
+                side = -side
+            side_prev = side
+            half = width * 0.5 * (1.0 - 0.55 * k / (len(spine) - 1))  # narrower towards the tip
+            row = []
+            for sign in (-1.0, 1.0):
+                w = q + side * half * sign
+                row.append(bm.verts.new(inverse @ Vector((w.x / 100.0, -w.y / 100.0, w.z / 100.0))))
+            rows.append(row)
+        for k in range(len(rows) - 1):
+            face = bm.faces.new([rows[k][0], rows[k][1], rows[k + 1][1], rows[k + 1][0]])
+            v0, v1 = k / (len(rows) - 1), (k + 1) / (len(rows) - 1)
+            for loop, uv in zip(face.loops, ((offset, v0), (offset + 1, v0), (offset + 1, v1), (offset, v1))):
+                loop[uv_layer].uv = uv
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh)
+    bm.free()
+    piece = bpy.data.objects.new(name, mesh)
+    piece.parent = body.parent
+    piece.matrix_world = body.matrix_world.copy()
+    bpy.context.scene.collection.objects.link(piece)
+    mesh.materials.append(material(slot))
+    for poly in mesh.polygons:
+        poly.use_smooth = True
+    weigh_from(body, piece)
+    arm = piece.modifiers.new("Armature", "ARMATURE")
+    arm.object = next(m.object for m in body.modifiers if m.type == "ARMATURE")
+    return piece
+
+
+def hair_cards(body, style):
+    import random
+    rng = random.Random(style * 977)
+    count, (shortest, longest), width, layers, droop, stiff = CARDS[style]
+    roots = surface_points(body, HAIR[style])
+    spines = []
+    for i in range(count):
+        p, n = roots[rng.randrange(len(roots))]
+        layer = layers[i % len(layers)]
+        length = rng.uniform(shortest, longest)
+        if style == 3 and p.z < 160.0:
+            length *= 0.5  # the hair already lying on the back
+        spines.append((card_path(style, p, n, length, layer, rng, droop, stiff), n))
+    if style == 4:
+        # The tail: cards from the band down between the shoulder blades
+        for i in range(260):
+            a = rng.uniform(0, 2 * math.pi)
+            r = rng.uniform(0.3, 2.2)
+            start = Vector((math.cos(a) * r, -11.0 + math.sin(a) * r * 0.6, 167.0))
+            spine = [start + Vector((rng.uniform(-0.6, 0.6) * t, -3.0 * t - 0.5 * t * t, -30.0 * t ** 1.15)) for t in (k / 8 for k in range(9))]
+            spines.append((spine, Vector((0, -1, 0))))
+    return cards_mesh(body, spines, width, f"hair_{style}_cards", "FW_HairCard", rng)
+
+
+def beard_cards(body, style):
+    import random
+    rng = random.Random(style * 331 + 7)
+    count, (shortest, longest), width = BEARD_CARDS[style]
+    roots = surface_points(body, BEARD[style])
+    spines = []
+    for i in range(count):
+        p, n = roots[rng.randrange(len(roots))]
+        length = rng.uniform(shortest, longest)
+        flow = (n * 0.6 + Vector((0, 0.15, -1.0))).normalized()
+        root = p + n * 0.25
+        spine = [root + flow * length * t + Vector((rng.uniform(-0.15, 0.15), 0, 0)) * t for t in (k / 3 for k in range(4))]
+        spines.append((spine, n))
+    return cards_mesh(body, spines, width, f"beard_{style}_cards", "FW_HairCard", rng)
+
+
 os.makedirs(OUT, exist_ok=True)
 for kind, builders in (
-    ("hair", {s: (lambda s=s: (HAIR[s], 1.1 if s != 5 else 1.4, 0.4, "FW_Hair", hair_bumps(s))) for s in HAIR}),
+    ("hair", {s: (lambda s=s: (HAIR[s], 0.6 if s != 5 else 0.9, 0.3, "FW_Hair", hair_bumps(s))) for s in HAIR}),
     ("beard", {s: (lambda s=s: (BEARD[s], 0.35 if s == 1 else 0.45, 0.25, "FW_Hair",
                                 (lambda p: 0.25 * abs(noise.noise(p * 0.8))) if s == 3 else None)) for s in BEARD}),
     ("shirt", {s: (lambda s=s: (SHIRT[s], 1.6 if s == 2 else 0.6, 0.35 if s == 2 else 0.2,
@@ -262,6 +419,10 @@ for kind, builders in (
         inside, offset, thickness, slot, bumps = make()
         piece = cut(armature, body, f"{kind}_{style}", inside, offset, thickness, slot, bumps)
         extra = []
+        if kind == "hair":
+            extra.append(hair_cards(body, style))
+        if kind == "beard":
+            extra.append(beard_cards(body, style))
         if kind == "hair" and style == 4:
             # Ponytail: from the back of the head down between the shoulder blades
             points = [Vector((0, -9.0 - 3.0 * t, 169.0 - 32.0 * t ** 1.2)) for t in (i / 10 for i in range(11))]

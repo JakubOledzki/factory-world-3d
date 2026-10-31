@@ -348,6 +348,7 @@ GEAR = os.path.join(MODELS, "character")
 skeleton = unreal.load_asset("/Game/Characters/Mannequins/Meshes/SK_Mannequin") if library.does_asset_exist("/Game/Characters/Mannequins/Meshes/SK_Mannequin") else None
 cloth_master = unreal.load_asset("/Game/Materials/M_FWCloth.M_FWCloth")
 hair_master = unreal.load_asset("/Game/Materials/M_FWHair.M_FWHair")
+card_master = unreal.load_asset("/Game/Materials/M_FWHairCard.M_FWHairCard")
 # Slot -> fabric (Poly Haven, CC0) and cm per repeat
 FABRICS = {"FW_Jersey": ("cotton_jersey", 12.0), "FW_Fleece": ("knitted_fleece", 16.0), "FW_Denim": ("denim_fabric_05", 22.0),
            "FW_Leather": ("leather_white", 14.0)}
@@ -356,9 +357,9 @@ if os.path.isdir(GEAR) and skeleton and cloth_master and hair_master:
     if library.list_assets(destination, recursive=True):
         library.delete_directory(destination)  # always rebuilt from the script's latest output
     materials = {}
-    for slot in ["FW_Hair"] + list(FABRICS):
+    for slot in ["FW_Hair", "FW_HairCard"] + list(FABRICS):
         instance = tools.create_asset(f"MI_{slot}", f"{destination}/Materials", unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
-        mel.set_material_instance_parent(instance, hair_master if slot == "FW_Hair" else cloth_master)
+        mel.set_material_instance_parent(instance, {"FW_Hair": hair_master, "FW_HairCard": card_master}.get(slot, cloth_master))
         if slot in FABRICS:
             set_id, scale = FABRICS[slot]
             for param, kind in (("Diffuse", "diff"), ("NormalMap", "nor_gl"), ("ARM", "arm")):
