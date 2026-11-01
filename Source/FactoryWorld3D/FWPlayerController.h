@@ -111,6 +111,10 @@ public:
 	// Inventory moves, each answered by the server with the new state
 	void MoveTile(int32 From, int32 To);
 	void SetHotbarSlot(int32 Slot, const FString& Item);
+	// The garage (U): sorting trash, the sorting machine, upgrades, the wardrobe, furniture; and the character's look again
+	// after clothes changed
+	void OpenGarage();
+	void RefreshLook();
 	void StorageTransfer(bool bPut, const FString& Item, int32 Quantity);
 	void StorageTransferAll(bool bPut);
 	// A building that farms the land around it (farmstead, forester, beehive, feeder) and its window, as in the 2D game
@@ -208,6 +212,20 @@ public:
 	void FWPlace(const FString& Kind, int32 TileX, int32 TileY, int32 Rotation);
 	UFUNCTION(Exec)
 	void FWPickupAt(int32 TileX, int32 TileY);
+	// The garage for tests: a tab; sorting by hand on/off; furniture put in; trash into the sorting machine; an outfit
+	// worn (or saved with Save=1); a piece of clothing hung up
+	UFUNCTION(Exec)
+	void FWGarage(int32 Tab = 0);
+	UFUNCTION(Exec)
+	void FWGarageSort();
+	UFUNCTION(Exec)
+	void FWGaragePlace(const FString& Kind);
+	UFUNCTION(Exec)
+	void FWGarageSorter(int32 Quantity);
+	UFUNCTION(Exec)
+	void FWGarageOutfit(int32 Number, int32 Save = 0);
+	UFUNCTION(Exec)
+	void FWGarageHang(const FString& Item);
 	UFUNCTION(Exec)
 	void FWStoreAt(int32 TileX, int32 TileY);
 	UFUNCTION(Exec)
@@ -444,6 +462,7 @@ private:
 	TSharedPtr<class SFWShopWindow> Shop;
 	int32 SelectedSlot = 0;
 	int64 BalanceCents = 0;
+	TSharedPtr<class SFWGarageWindow> GarageWindow;
 	TArray<FFWToast> Toasts;
 	bool bHotbarFilled = false;
 	TSharedPtr<class SFWFactoryWindow> Factory;

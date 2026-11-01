@@ -559,6 +559,7 @@ void AFWCharacter::CreateInput()
 	Mapping->MapKey(MakeAction(TEXT("Company"), EInputActionValueType::Boolean), EKeys::K);
 	Mapping->MapKey(MakeAction(TEXT("Bank"), EInputActionValueType::Boolean), EKeys::Z);
 	Mapping->MapKey(MakeAction(TEXT("Interact"), EInputActionValueType::Boolean), EKeys::E);
+	Mapping->MapKey(MakeAction(TEXT("Garage"), EInputActionValueType::Boolean), EKeys::U);
 	Mapping->MapKey(MakeAction(TEXT("Pickup"), EInputActionValueType::Boolean), EKeys::RightMouseButton);
 	Mapping->MapKey(MakeAction(TEXT("Adventures"), EInputActionValueType::Boolean), EKeys::Y);
 	Mapping->MapKey(MakeAction(TEXT("Primary"), EInputActionValueType::Boolean), EKeys::LeftMouseButton);
@@ -653,6 +654,13 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	});
 	Input->BindAction(Actions[TEXT("Pickup")], ETriggerEvent::Started, this, &AFWCharacter::PickupStart);
 	Input->BindAction(Actions[TEXT("Pickup")], ETriggerEvent::Completed, this, &AFWCharacter::PickupStop);
+	Input->BindActionValueLambda(Actions[TEXT("Garage")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenGarage();
+		}
+	});
 	Input->BindAction(Actions[TEXT("Primary")], ETriggerEvent::Started, this, &AFWCharacter::Primary);
 	Input->BindActionValueLambda(Actions[TEXT("Company")], ETriggerEvent::Started, [this](const FInputActionValue&)
 	{
