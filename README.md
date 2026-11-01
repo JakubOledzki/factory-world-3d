@@ -229,6 +229,12 @@ Wysokości lasu ustawia `Config/DefaultGame.ini`: `ForestTopAbovePlotMeters` i `
 
 Drzew jest najwyżej 28 000. Te dalej niż 1 km od działki nie rzucają cieni, a wiatr porusza tylko drzewa w promieniu 50 m. Drzewa do 400 m od działki mają kolizję: niewidoczny walec w miejscu pnia, dużo tańszy niż kolizja całego drzewa. Las nie bierze udziału w ray tracingu. Bez Titana gra działa normalnie, tylko bez drzew.
 
+## Przygody
+
+Jak w grze 2D, klawisz **Y**: **Wydarzenie** (trwające święto, przysmaki i wymiana na dekoracje), **Album** znalezisk (strony z nagrodą XP), **Wyprawy** w dalekie regiony (zapasy, odliczanie, odbiór łupu), **Zagadki** inżynierskie (plansza: klik stawia wybrany element albo go obraca, prawy przycisk zabiera, R obraca następny; „Sprawdź” pokazuje przepływ na elementach i medal), **Mentor** nowego gracza i podopieczni, **Gablota** z trofeami – własna albo innego gracza (`season.*`, `album.*`, `expedition.*`, `puzzle.*`, `mentor.*`, `showcase.get`).
+
+Do testów: `FWAdventures <0–5> [gracz]`, `FWPuzzle <nr zagadki>`.
+
 ## Kosodrzewina
 
 Nad lasem rośnie pas kosodrzewiny (Pinus mugo), jak w Tatrach. Zaczyna się na górnej granicy gęstego lasu i sięga 250 m wyżej (`DwarfPineBandMeters` w `Config/DefaultGame.ini`). Rośnie w zwartych płatach z przerwami między nimi. Niżej pojedyncze kępy zajmują polany w lesie, także tuż za pasem wolnym od budowy. Omija strome zbocza i skały.
