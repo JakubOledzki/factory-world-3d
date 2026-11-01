@@ -6,6 +6,7 @@
 #include "FWPlayerController.generated.h"
 
 class AFWCharacterStudio;
+class SFWMarketWindow;
 class UTexture2D;
 class UAudioComponent;
 class AFWPlot;
@@ -85,6 +86,13 @@ public:
 	void SetHotbarSlot(int32 Slot, const FString& Item);
 	void StorageTransfer(bool bPut, const FString& Item, int32 Quantity);
 	void StorageTransferAll(bool bPut);
+	// The market, at the plot's computer
+	void OpenMarket();
+	// A request to the server for the windows; replies go to the callback
+	void Send(const TCHAR* Type, TSharedPtr<FJsonObject> Payload, TFunction<void(const FFWNetReply&)> OnReply);
+	void SetBalanceCents(int64 Cents) { BalanceCents = Cents; }
+	void PlayUiSound(const TCHAR* Sound);
+	void RefreshInventory();
 	// A work place's window (workbench, furnace, machine): its state as the server last sent it
 	void OpenStation(const FString& ObjectId, const FString& Kind);
 	TSharedPtr<FJsonObject> GetStationState() const { return StationState; }
@@ -166,6 +174,17 @@ public:
 	// Opens the nearest object of a kind (e.g. furniture_workbench) and stands by it
 	UFUNCTION(Exec)
 	void FWOpenNearest(const FString& Kind);
+	// Market for tests: open it, pick a tab (0-2), an item's board, trade with the NPC trader (1 buy / 0 sell)
+	UFUNCTION(Exec)
+	void FWMarket() { OpenMarket(); }
+	UFUNCTION(Exec)
+	void FWMarketTab(int32 Tab);
+	UFUNCTION(Exec)
+	void FWMarketItem(const FString& Item);
+	UFUNCTION(Exec)
+	void FWTrade(int32 Buy, const FString& Item, int32 Quantity);
+	UFUNCTION(Exec)
+	void FWMarketOffer(int32 Sell, int32 Quantity, float PriceDollars);
 	// Places an item on the nearest free spot around the player
 	UFUNCTION(Exec)
 	void FWPlaceNear(const FString& Kind);
@@ -206,7 +225,6 @@ private:
 	void ChoosePlot();
 	void OfferStarterPlot(int32 Radius, int32 Index);
 	void EnterPlot(int32 X, int32 Y);
-	void RefreshInventory();
 	void RefreshWallet();
 	void PollLogistics();
 	void ApplyHotbar(const TSharedPtr<FJsonObject>& Payload);
@@ -235,6 +253,7 @@ private:
 	float ForestLevel = 0.f;
 	double WalkUntil = 0.0;
 
+	TSharedPtr<SFWMarketWindow> Market;
 	TSharedPtr<SFWLoginWidget> LoginWidget;
 	TSharedPtr<SFWPromptWidget> Prompt;
 	TSharedPtr<SWidget> ShownWidget;

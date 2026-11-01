@@ -135,6 +135,18 @@ Do testów: `FWInventory`, `FWChestNearest`, `FWMoveTile <z> <do>`, `FWStorage <
 
 Do testów: `FWPlaceNear <rodzaj>`, `FWOpenNearest <rodzaj>`, `FWStationDo <typ> <pole> <wartość>`, `FWStationLoad <typ> <przedmiot> <ile>`.
 
+## Rynek
+
+Jak w grze 2D, rynek otwiera się klawiszem **E przy komputerze** na działce:
+
+- **Handlarz:** ceny kupna i sprzedaży u handlarza NPC ze zmianą względem zwykłej ceny i bieżącym wydarzeniem rynkowym. Kupujesz 1 albo 10 sztuk, sprzedajesz 1 albo wszystko (`market.prices/buy/sell`).
+- **Giełda graczy:** lista przedmiotów z najniższą ceną, a po wybraniu przedmiotu oferty sprzedaży i kupna innych graczy. Możesz kupić z oferty, sprzedać do zapytania albo wystawić własną ofertę: ile sztuk, po ile, sprzedaż albo kupno (`market.overview/item/purchase/fill/list/order`).
+- **Moje oferty:** twoje oferty z postępem i przyciskiem „Wycofaj” (`market.mine/unlist/cancelOrder`).
+
+U góry jest wyszukiwarka i stan konta.
+
+Do testów: `FWMarket`, `FWMarketTab <0–2>`, `FWMarketItem <przedmiot>`, `FWTrade <1 kup / 0 sprzedaj> <przedmiot> <ile>`, `FWMarketOffer <1 sprzedaż / 0 kupno> <ile> <cena $>`.
+
 ## Ręce i cień gracza
 
 W widoku z pierwszej osoby widać ręce postaci w jej ubraniu (rękawy koszulki, bluzy albo gołe ramiona przy bezrękawniku) i w jej kolorze skóry. Ręce trzyma przed kamerą dwukośćowe IK na manekinie, bez gotowych animacji:
