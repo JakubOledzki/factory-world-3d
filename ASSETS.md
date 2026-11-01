@@ -107,6 +107,10 @@ Kroki i lądowania to nagrania na licencji [CC0 1.0](https://creativecommons.org
 | 42 Snow and Gravel Footsteps (Corsica_S) | https://opengameart.org/content/42-snow-and-gravel-footsteps | śnieg |
 | Metal footsteps on concrete | https://opengameart.org/content/metal-footsteps-on-concrete | metal: taśmy, maszyny, tory |
 
+## Segregacja śmieci w garażu (nasze)
+
+Dziewięć rodzajów odpadów do minigry przy koszu (puszka po napoju, puszka po konserwie, metalowa nakrętka, butelka PET, kubek po jogurcie, butelka po płynie, szklana butelka, słoik, buteleczka po syropie) oraz trzy kosze (metal, plastik, szkło) modelujemy sami w skrypcie `Tools/blender/make_waste.py`. Ten sam skrypt renderuje ich ikony do okna gry. Uruchamia go `Tools/blender/make_garage.py`. Dźwięki minigry (wrzucenie do kosza z metalu, plastiku i szkła, zły kosz, koniec worka, wyjęcie przedmiotu) syntezuje `Tools/make_audio.py`. Modele, ikony i dźwięki są nasze i można ich używać bez ograniczeń (CC0).
+
 ## Kosodrzewina (nasza)
 
 Krzewy kosodrzewiny tworzy nasz skrypt `Tools/blender/make_mugo_pine.py`: geometria jest w całości nasza. Kora używa tekstur z `pine_tree_01` (Poly Haven, CC0, w tabeli wyżej). Igły nie mają tekstury, tylko kolor z materiału.

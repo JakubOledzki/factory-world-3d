@@ -16,6 +16,21 @@ public sealed partial class Bot
             return false;
         }
 
+        // The bag's pieces go one by one into their bins, as a player puts them.
+        if (reply.Payload.TryGetProperty("round", out var round) && round.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var piece in round.GetProperty("pieces").EnumerateArray())
+            {
+                var bin = WasteSorting.ById[piece.GetProperty("kind").GetString()!].Bin;
+                reply = await SendAsync("recycling.put", new { piece = piece.GetProperty("index").GetInt32(), bin }, cancellationToken);
+                if (!reply.Is("garage"))
+                {
+                    await SendAsync("recycling.stop", null, cancellationToken);
+                    return false;
+                }
+            }
+        }
+
         ParseGarage(reply.Payload);
         return true;
     }

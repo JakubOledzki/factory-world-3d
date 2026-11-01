@@ -40,7 +40,7 @@ public static class GarageUpgrades
     /// <summary>Extra slots of the shelf in the garage.</summary>
     public const string ShelfSlots = "shelf_slots";
 
-    /// <summary>Percent less time to sort a bag of trash, by hand and in the sorting machine.</summary>
+    /// <summary>Percent less time for the sorting machine to sort a bag of trash (by hand the bag is a game, not a wait).</summary>
     public const string Sorting = "sorting";
 
     private static UpgradeStep Step(string name, long dollars, (string, int)[] materials, params (string, int)[] requires) =>
@@ -91,7 +91,7 @@ public static class GarageUpgrades
             Step("Regał wysokiego składowania", 350_000, [(Items.SteelIngot, 150)]),
             Step("System magazynowy", 700_000, [(Items.SteelIngot, 200), (Items.CircuitBoard, 100)]),
         ]),
-        new(Heating, "Ogrzewanie", "Zimny garaż", Sorting, 8, "Segregacja szybsza o", "%",
+        new(Heating, "Ogrzewanie", "Zimny garaż", Sorting, 8, "Sortownia szybsza o", "%",
         [
             Step("Koza na drewno", 25_000, [(Items.Bricks, 200), (Items.IronIngot, 100)]),
             Step("Kaloryfery", 70_000, [(Items.IronIngot, 150), (Items.CopperIngot, 50)]),
