@@ -195,6 +195,8 @@ public:
 	UFUNCTION(Exec)
 	void FWPrompt(const FString& Text);
 	UFUNCTION(Exec)
+	void FWPromptSecondary();
+	UFUNCTION(Exec)
 	void FWGoto(int32 TileX, int32 TileY, float Yaw = 0.f, float Pitch = -30.f);
 	// Stands at a point of the land around the plot: metres from the plot's middle (+X east, +Y south)
 	UFUNCTION(Exec)
