@@ -604,7 +604,7 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	{
 		if (AFWPlayerController* PC = GetFWController())
 		{
-			PC->OpenGarage();
+			PC->ToggleGarageRoom();
 		}
 	});
 	Input->BindAction(Actions[TEXT("Primary")], ETriggerEvent::Started, this, &AFWCharacter::Primary);
@@ -665,6 +665,12 @@ void AFWCharacter::SprintStop()
 void AFWCharacter::InteractStart()
 {
 	bInteractHeld = true;
+	// In the garage room, E uses what is looked at there
+	if (AFWPlayerController* InGarage = GetFWController(); InGarage && InGarage->IsInGarage())
+	{
+		InGarage->GarageInteract();
+		return;
+	}
 	AFWPlot* Plot = GetPlot();
 	AFWPlayerController* PC = GetFWController();
 	if (!Plot || !PC || !bHasTarget || Hold != EHold::None)
@@ -1009,6 +1015,10 @@ float AFWCharacter::GetProgress() const
 
 FText AFWCharacter::GetTargetText() const
 {
+	if (const AFWPlayerController* InGarage = GetFWController(); InGarage && InGarage->IsInGarage())
+	{
+		return InGarage->GarageHint();
+	}
 	const AFWPlot* Plot = GetPlot();
 	const AFWPlayerController* PC = GetFWController();
 	if (!Plot || !PC || !bHasTarget)
