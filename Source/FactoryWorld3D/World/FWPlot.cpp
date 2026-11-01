@@ -261,6 +261,7 @@ UMaterialInterface* AFWPlot::MakeGroundMaterial(int32 Biome)
 	}
 	Ground->SetScalarParameterValue(TEXT("GrassAmount"), GroundSet.GrassAmount);
 	Ground->SetScalarParameterValue(TEXT("SnowHeight"), GroundSet.SnowHeightCm);
+	SnowHeightCm = GroundSet.SnowHeightCm;
 	Ground->SetScalarParameterValue(TEXT("Scale"), 600.f);
 	return Ground;
 }

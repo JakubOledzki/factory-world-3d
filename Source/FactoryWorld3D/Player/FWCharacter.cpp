@@ -944,14 +944,25 @@ FString AFWCharacter::SurfaceUnder(const FHitResult* Hit) const
 		Hit = &Below;
 	}
 	const AFWPlot* Plot = GetPlot();
-	if (Plot && Plot->IsLand(Hit->GetComponent()))
+	const UStaticMeshComponent* Model = Cast<UStaticMeshComponent>(Hit->GetComponent());
+	const FString Name = Model && Model->GetStaticMesh() ? Model->GetStaticMesh()->GetName().ToLower() : FString();
+	if ((Plot && Plot->IsLand(Hit->GetComponent())) || !Model || Name.StartsWith(TEXT("terrain")))
 	{
-		// Steep ground is bare rock and scree
-		return Hit->ImpactNormal.Z < 0.86f ? TEXT("rock") : TEXT("grass");
+		// The land (the plot's and the terrain around it): steep ground is bare rock and scree; high up, snow (as the
+		// ground material draws them); grass and earth elsewhere
+		return Hit->ImpactNormal.Z < 0.86f ? TEXT("rock") : Plot && Plot->IsSnowAt(Hit->ImpactPoint.Z) ? TEXT("snow") : TEXT("grass");
 	}
-	// Boulders and the forest's trunks are part of the plot actor too, but not built: rock; the rest is metal
-	const UPrimitiveComponent* Component = Hit->GetComponent();
-	return Component && Component->IsA<UInstancedStaticMeshComponent>() ? TEXT("rock") : TEXT("metal");
+	// Belts, machines, rails and the like ring as metal (by their model); boulders, trunks, foundations, floors and
+	// the rest are stone and concrete
+	for (const TCHAR* Metal : { TEXT("belt"), TEXT("machine"), TEXT("grate"), TEXT("rail"), TEXT("splitter"), TEXT("merger"),
+		TEXT("sorter"), TEXT("inserter"), TEXT("chest"), TEXT("assembler"), TEXT("turbine"), TEXT("panel"), TEXT("train") })
+	{
+		if (Name.Contains(Metal))
+		{
+			return TEXT("metal");
+		}
+	}
+	return TEXT("rock");
 }
 
 void AFWCharacter::UpdateFootsteps(float DeltaSeconds)
@@ -973,7 +984,7 @@ void AFWCharacter::UpdateFootsteps(float DeltaSeconds)
 	if (StepDistance >= Stride)
 	{
 		StepDistance -= Stride;
-		FWAudio::Play2D(this, FString::Printf(TEXT("step_%s"), *SurfaceUnder()), Speed > 500.f ? 0.55f : 0.4f, 6);
+		FWAudio::Play2D(this, FString::Printf(TEXT("step_%s"), *SurfaceUnder()), (Speed > 500.f ? 0.55f : 0.4f) * FMath::FRandRange(0.85f, 1.1f), 6);
 	}
 }
 

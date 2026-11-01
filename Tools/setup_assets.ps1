@@ -93,6 +93,24 @@ if (-not (Test-Path RawAssets\processed\crops\crop_wheat_ripe.glb)) {
 if (-not (Test-Path RawAssets\processed\audio\amb_wind_loop.wav)) {
     & $Blender --background --factory-startup --python Tools\make_audio.py
 }
+# Footstep recordings (CC0, OpenGameArt): grass and stone, snow, metal
+$Footsteps = @{
+    "Fantozzi-footsteps" = "https://opengameart.org/sites/default/files/Fantozzi-footsteps.7z"
+    "corsica_s-walking_in_snow" = "https://opengameart.org/sites/default/files/corsica_s-walking_in_snow.7z"
+    "metal_steps_48k24b" = "https://opengameart.org/sites/default/files/metal_steps_48k24b.7z"
+}
+foreach ($Pack in $Footsteps.Keys) {
+    $Folder = "RawAssets\footsteps\$Pack"
+    if (-not (Test-Path $Folder)) {
+        New-Item -ItemType Directory -Force $Folder | Out-Null
+        Invoke-WebRequest $Footsteps[$Pack] -OutFile "RawAssets\footsteps\$Pack.7z"
+        # Windows' own tar reads 7z
+        & "$env:SystemRoot\System32\tar.exe" -xf "RawAssets\footsteps\$Pack.7z" -C $Folder
+    }
+}
+if (-not (Test-Path RawAssets\processed\audio\step_snow_1.wav)) {
+    & $Blender --background --factory-startup --python Tools\make_footsteps.py
+}
 
 Write-Host "== Unreal"
 $Cmd = Join-Path $Engine "Engine\Binaries\Win64\UnrealEditor-Cmd.exe"

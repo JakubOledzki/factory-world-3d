@@ -448,7 +448,7 @@ if os.path.isdir(ICONS):
             library.save_loaded_asset(texture)
     unreal.log_warning(f"FWIMPORT icons: {len(library.list_assets(destination, recursive=False, include_folder=False))}")
 
-# Sounds from Tools/make_audio.py (synthesized, ours): /Game/External/Audio, with the mix set up around them:
+# Sounds from Tools/make_audio.py (synthesized, ours) and Tools/make_footsteps.py (CC0 recordings): /Game/External/Audio, with the mix set up around them:
 # sound classes Master > Ambience / SFX / UI, distance falloff for machines, and voice limits so a hundred belts
 # play as the few nearest
 AUDIO = os.path.join(MODELS, "audio")

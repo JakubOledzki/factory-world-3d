@@ -95,7 +95,17 @@ Bez tych plików gra działa dalej, z malowaną głową manekina.
 
 ## Dźwięki (nasze)
 
-Wszystkie dźwięki gry są syntezowane przez nasz skrypt `Tools/make_audio.py` (szum, filtry, drgania tłumione, modulacja częstotliwości). Nie ma żadnych nagrań ani próbek z zewnątrz.
+Dźwięki gry, oprócz kroków, są syntezowane przez nasz skrypt `Tools/make_audio.py` (szum, filtry, drgania tłumione, modulacja częstotliwości).
+
+## Kroki: nagrania z OpenGameArt, licencja CC0
+
+Kroki i lądowania to nagrania na licencji [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/): domena publiczna, użycie komercyjne dozwolone. `Tools/setup_assets.ps1` pobiera je do `RawAssets/footsteps` (poza gitem), a `Tools/make_footsteps.py` przycina je, wycisza na końcu, wyrównuje głośność i zapisuje jako `step_<nawierzchnia>_<n>.wav` i `land_<nawierzchnia>.wav`.
+
+| Zestaw | Adres | Nawierzchnia w grze |
+| --- | --- | --- |
+| Fantozzi's Footsteps (Grass/Sand & Stone) | https://opengameart.org/content/fantozzis-footsteps-grasssand-stone | trawa i ziemia (Sand), kamień, skała, beton (Stone) |
+| 42 Snow and Gravel Footsteps (Corsica_S) | https://opengameart.org/content/42-snow-and-gravel-footsteps | śnieg |
+| Metal footsteps on concrete | https://opengameart.org/content/metal-footsteps-on-concrete | metal: taśmy, maszyny, tory |
 
 ## Kosodrzewina (nasza)
 

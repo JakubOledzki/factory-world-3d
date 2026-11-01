@@ -1,6 +1,6 @@
-# Synthesizes every sound of the game (no recordings, so no licences): ambience, footsteps, factory machines and
-# UI, as 48 kHz WAV files in RawAssets/processed/audio (Tools/import_external.py imports them). Runs in Blender's
-# Python, which has numpy:
+# Synthesizes the game's sounds (no recordings, so no licences): ambience, jumps, factory machines and UI; the
+# footsteps are recordings (Tools/make_footsteps.py). Written as 48 kHz WAV files in RawAssets/processed/audio
+# (Tools/import_external.py imports them). Runs in Blender's Python, which has numpy:
 #   blender --background --factory-startup --python Tools/make_audio.py
 # Loops are made seamless by crossfading their end into their start. Deterministic (fixed seeds).
 import os
@@ -177,47 +177,7 @@ def bird(kind):
     return normalize(out, 0.7)
 
 
-# Footsteps ---------------------------------------------------------------------------------------------------
-
-def step(surface, variant):
-    """One footstep: heel and toe contact; the character of the surface in the noise and its modes."""
-    n = int(0.35 * RATE)
-    out = np.zeros(n)
-    for contact, (offset, level) in enumerate(((0.0, 1.0), (rng.uniform(0.05, 0.08), 0.6))):
-        s = int(offset * RATE)
-        k = n - s
-        if surface == "grass":
-            # Swish and crunch of stems
-            burst = band(white(k), 900, 7000) * env(k, 0.008, 0.09, 5)
-            crunch = np.zeros(k)
-            for start in rng.integers(0, int(0.08 * RATE), 40):
-                length = rng.integers(40, 300)
-                crunch[start:start + length] += white(length) * rng.uniform(0.3, 1.0)
-            thump = band(white(k), 60, 300) * env(k, 0.004, 0.05, 6)
-            sound = normalize(burst) * 0.6 + normalize(band(crunch, 2000, 9000)) * 0.35 + normalize(thump) * 0.5
-        elif surface == "rock":
-            # Hard heel on stone, grit scraping
-            click = modes(k / RATE, rng.uniform([900, 1700, 2900], [1100, 2100, 3400]), [0.012, 0.009, 0.006], [1, 0.6, 0.4])
-            grit = np.zeros(k)
-            for start in rng.integers(0, int(0.12 * RATE), 70):
-                length = rng.integers(20, 160)
-                grit[start:start + length] += white(length)
-            thump = band(white(k), 50, 250) * env(k, 0.002, 0.04, 6)
-            sound = normalize(click) * 0.5 + normalize(band(grit, 1500, 8000)) * 0.4 + normalize(thump) * 0.6
-        else:  # metal grating
-            ring = modes(k / RATE, rng.uniform([180, 410, 760, 1320, 2250], [200, 450, 820, 1400, 2400]),
-                         [0.25, 0.18, 0.12, 0.08, 0.05], [0.8, 1.0, 0.7, 0.5, 0.3])
-            clank = band(white(k), 1000, 6000) * env(k, 0.001, 0.02, 6)
-            sound = normalize(ring) * 0.7 + normalize(clank) * 0.5
-        out[s:] += sound * level
-    return normalize(out * env(n, 0.001, 0.3, 3), 0.85)
-
-
-def land(surface):
-    a = step(surface, 0) + 0.8 * np.roll(step(surface, 1), int(0.03 * RATE))
-    thud = band(white(len(a)), 40, 200) * env(len(a), 0.003, 0.12, 5)
-    return normalize(a + normalize(thud) * 0.8, 0.9)
-
+# Jumps -------------------------------------------------------------------------------------------------------
 
 def jump():
     n = int(0.25 * RATE)
@@ -365,10 +325,6 @@ for i in range(3):
 save("amb_forest_loop", forest_loop(), stereo=True)
 for i in range(4):
     save(f"amb_bird_{i + 1}", bird(i))
-for surface in ("grass", "rock", "metal"):
-    for i in range(6):
-        save(f"step_{surface}_{i + 1}", step(surface, i))
-    save(f"land_{surface}", land(surface))
 save("jump", jump())
 save("belt_loop", belt_loop())
 save("inserter_up", servo(0.6, True))
