@@ -211,6 +211,16 @@ Katalog `Saved/` nie trafia do gita, więc hasła nie ma w repozytorium. Plik je
 
 Konto bez działki i bez pieniędzy dostaje propozycję kupna działki i przycisk „Rozejrzyj się (bez działki)”, więc gra nie utyka.
 
+## Transport: stacja, kursy, trasy i eksport
+
+Jak w grze 2D:
+
+- **Stacja kolejowa** (T): **Trasy** między własnymi działkami (ze skrzyń ładujących do odbierających, nazwa działki), **Magazyn** stacji (ładowanie z ekwipunku i zdejmowanie), **Wyślij** jeden pociąg – albo statek z portu, ciężarówkę z bazy, sanie, wóz konny – na swoją działkę, do innego gracza (szukanie po nazwie) lub na podane X, Y, z wyliczeniem odległości, czasu i opłaty, opcjonalnie jako przemyt; **Rozkład** – kursy odjeżdżające same co kilka minut; **W drodze** – pociągi przyjeżdżające i odjechane z odliczaniem (`station.*`, `freight.*`).
+- **Skrzynia eksportowa** (E przy niej): ceny towarów, wkładanie i wyjmowanie, droga do najbliższego rynku skupu i pociągi w drodze (`export.get/load/unload/price`).
+- **Rynek skupu i port pociągowy** (E przy nich): prowizja rynku albo opłata portu, ustawiana przez właściciela, i zarobek (`export.post/setPost`).
+
+Do testów: `FWRail <0–4>`, `FWRailStock <1 załaduj / 0 zdejmij> <przedmiot> <ile>`, `FWExport [id rynku lub portu]`.
+
 ## Grafika: zasoby zewnętrzne
 
 Fotogrametryczne skały, drzewa, krzaki, tekstury gruntu (Poly Haven, CC0) i prawdziwe ukształtowanie terenu (Copernicus DEM) nie są w repozytorium, bo zajęłyby zbyt dużo miejsca w Git LFS. Tworzy je jedno polecenie:

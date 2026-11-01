@@ -33,6 +33,8 @@
 #include "UI/SFWMarketWindow.h"
 #include "UI/SFWStationWindow.h"
 #include "Engine/Texture2D.h"
+#include "UI/SFWExportWindow.h"
+#include "UI/SFWRailWindow.h"
 #include "Camera/CameraComponent.h"
 #include "UI/SFWBankWindow.h"
 #include "UI/SFWCompanyWindow.h"
@@ -659,6 +661,41 @@ void AFWPlayerController::RefreshInventory()
 			}
 		});
 	});
+}
+
+void AFWPlayerController::OpenRail()
+{
+	SAssignNew(Rail, SFWRailWindow).Controller(this);
+	ShowWidget(Rail.ToSharedRef(), Rail);
+}
+
+void AFWPlayerController::OpenExport(const FString& PostId)
+{
+	SAssignNew(Export, SFWExportWindow).Controller(this).Post(PostId);
+	ShowWidget(Export.ToSharedRef(), Export);
+}
+
+void AFWPlayerController::FWRail(int32 Tab)
+{
+	if (!Rail.IsValid())
+	{
+		OpenRail();
+	}
+	Rail->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWRailStock(int32 Load, const FString& Item, int32 Quantity)
+{
+	if (!Rail.IsValid())
+	{
+		OpenRail();
+	}
+	Rail->StockAction(Load != 0, Item, Quantity);
+}
+
+void AFWPlayerController::FWExport(const FString& PostId)
+{
+	OpenExport(PostId);
 }
 
 void AFWPlayerController::ApplyInventory(const TSharedPtr<FJsonObject>& InventoryPayload)
