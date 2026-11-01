@@ -10,6 +10,8 @@ class SFWMarketWindow;
 class UTexture2D;
 class UAudioComponent;
 class AFWPlot;
+class SFWRailWindow;
+class SFWExportWindow;
 class SFWCharacterCreator;
 class SFWHud;
 class SFWLoginWidget;
@@ -117,6 +119,9 @@ public:
 	void Mine(int32 MineId, TFunction<void(bool bOk)> Done);
 	void Place(const FString& Kind, FIntPoint Tile, int32 Rotation);
 	void Pickup(const FString& ObjectId);
+	// The plot's railway station (T), its export chest, and a buying market or a rail port by its object id, as in the 2D game
+	void OpenRail();
+	void OpenExport(const FString& PostId = FString());
 	void PutAllInStorage(const FString& ObjectId);
 
 	// Console commands for testing without mouse and keyboard; a file of "seconds command" lines passed
@@ -150,6 +155,13 @@ public:
 	// Hovers above the belts of the plot, looking at them
 	UFUNCTION(Exec)
 	void FWViewBelts(float Height = 700.f);
+	// Transport for tests: the station on a tab, loading (1) or unloading (0) the station, the export chest or a post
+	UFUNCTION(Exec)
+	void FWRail(int32 Tab = 0);
+	UFUNCTION(Exec)
+	void FWRailStock(int32 Load, const FString& Item, int32 Quantity);
+	UFUNCTION(Exec)
+	void FWExport(const FString& PostId = TEXT(""));
 	// Character creator: pick an option (appearance key, index), type the name, randomize, zoom (0-1), create
 	UFUNCTION(Exec)
 	void FWCreatorPick(const FString& Key, int32 Index);
@@ -269,6 +281,8 @@ private:
 	int32 StationVersion = 0;
 	double StationServerMs = 0.0;
 	double StationReceivedAt = 0.0;
+	TSharedPtr<SFWRailWindow> Rail;
+	TSharedPtr<SFWExportWindow> Export;
 	double NextStationPoll = 0.0;
 	void ApplyStation(const FFWNetReply& Reply);
 	void PollStation();

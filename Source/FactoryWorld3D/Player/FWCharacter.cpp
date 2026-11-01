@@ -551,6 +551,7 @@ void AFWCharacter::CreateInput()
 		Back.Modifiers.Add(NewObject<UInputModifierNegate>(this));
 	}
 	Mapping->MapKey(MakeAction(TEXT("Look"), EInputActionValueType::Axis2D), EKeys::Mouse2D);
+	Mapping->MapKey(MakeAction(TEXT("Rail"), EInputActionValueType::Boolean), EKeys::T);
 	Mapping->MapKey(MakeAction(TEXT("Jump"), EInputActionValueType::Boolean), EKeys::SpaceBar);
 	Mapping->MapKey(MakeAction(TEXT("Sprint"), EInputActionValueType::Boolean), EKeys::LeftShift);
 	Mapping->MapKey(MakeAction(TEXT("Interact"), EInputActionValueType::Boolean), EKeys::E);
@@ -591,6 +592,13 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(PlayerInputComponent);
 	Input->BindAction(Actions[TEXT("Move")], ETriggerEvent::Triggered, this, &AFWCharacter::Move);
 	Input->BindAction(Actions[TEXT("Look")], ETriggerEvent::Triggered, this, &AFWCharacter::Look);
+	Input->BindActionValueLambda(Actions[TEXT("Rail")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenRail();
+		}
+	});
 	Input->BindAction(Actions[TEXT("Jump")], ETriggerEvent::Started, this, &ACharacter::Jump);
 	Input->BindAction(Actions[TEXT("Jump")], ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 	Input->BindAction(Actions[TEXT("Sprint")], ETriggerEvent::Started, this, &AFWCharacter::SprintStart);
@@ -673,6 +681,14 @@ void AFWCharacter::InteractStart()
 	else if (const FFWPlotObject* Object = Plot->FindObjectAt(TargetTile); Object && FWCatalog::IsStorage(Object->Kind))
 	{
 		PC->OpenInventory(Object->Id);
+	}
+	else if (const FFWPlotObject* Chest = Plot->FindObjectAt(TargetTile); Chest && Chest->Kind == TEXT("furniture_export_chest"))
+	{
+		PC->OpenExport();
+	}
+	else if (const FFWPlotObject* Post = Plot->FindObjectAt(TargetTile); Post && (Post->Kind == TEXT("furniture_buy_market") || Post->Kind == TEXT("furniture_rail_port")))
+	{
+		PC->OpenExport(Post->Id);
 	}
 	else if (const FFWPlotObject* Computer = Plot->FindObjectAt(TargetTile); Computer && Computer->Kind == TEXT("furniture_computer"))
 	{
