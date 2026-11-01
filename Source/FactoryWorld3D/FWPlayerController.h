@@ -124,6 +124,10 @@ public:
 	TSharedPtr<FJsonObject> GetStationState() const { return StationState; }
 	int32 GetStationVersion() const { return StationVersion; }
 	FString GetStationName() const { return StationName; }
+	FString GetStationId() const { return StationId; }
+	// The filter of an inserter or a splitter (E at it), a storage or a machine (bMachine), as in the 2D game
+	static bool HasOwnFilter(const FString& Kind);
+	void OpenFilter(const FString& ObjectId, bool bMachine = false);
 	// Sends "<station>.<action>" for the open work place with one more field (string, or a number when >= 0)
 	void StationAction(const TCHAR* Type, const TCHAR* Field, const FString& Value, int64 Number = -1);
 	void StationLoad(const TCHAR* Type, const FString& Item, int32 Quantity, bool bFuel = false);
@@ -296,6 +300,9 @@ public:
 	void FWMoveTile(int32 From, int32 To) { MoveTile(From, To); }
 	UFUNCTION(Exec)
 	void FWStorage(int32 Put, const FString& Item, int32 Quantity) { StorageTransfer(Put != 0, Item, Quantity); }
+	// Walks to the nearest object of a kind and opens its filter; with an item, sets it (a splitter adds it on Side 0 / 1)
+	UFUNCTION(Exec)
+	void FWFilter(const FString& Kind, const FString& Item = TEXT(""), int32 Side = -1);
 	// Records what the game plays to Saved/BouncedWavFiles/<Name>.wav (to check the mix without listening)
 	UFUNCTION(Exec)
 	void FWRecordStart(float Seconds = 10.f);
@@ -389,6 +396,7 @@ private:
 
 	TArray<FFWStack> Inventory;
 	int32 InventorySlots = 0;
+	TSharedPtr<class SFWFilterWindow> FilterWindow;
 	FFWStorageView Storage;
 	FString StationId;
 	FString StationName;

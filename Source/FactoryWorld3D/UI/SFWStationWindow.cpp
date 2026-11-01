@@ -2,6 +2,7 @@
 
 #include "FWPlayerController.h"
 #include "UI/FWStyle.h"
+#include "UI/FWWidgets.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBackgroundBlur.h"
@@ -88,11 +89,26 @@ void SFWStationWindow::Construct(const FArguments& InArgs)
 			.BorderImage(FWStyle::Panel())
 			.Padding(24.f)
 			[
-				SAssignNew(Content, SBox)
-				.MinDesiredWidth(760.f)
-				.MaxDesiredHeight(760.f)
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()
 				[
-					SNew(STextBlock).Text(LOCTEXT("Loading", "Wczytywanie…")).Font(FWStyle::Font(13)).ColorAndOpacity(FWStyle::Muted)
+					SAssignNew(Content, SBox)
+					.MinDesiredWidth(760.f)
+					.MaxDesiredHeight(760.f)
+					[
+						SNew(STextBlock).Text(LOCTEXT("Loading", "Wczytywanie…")).Font(FWStyle::Font(13)).ColorAndOpacity(FWStyle::Muted)
+					]
+				]
+				// Furnaces and machines take only one item from inserters when they have a filter, as in the 2D game
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.f, 12.f, 0.f, 0.f)
+				[
+					Station == EFWStation::Crafting ? SNullWidget::NullWidget : FWUi::SmallButton(LOCTEXT("Filter", "Filtr"), [this]()
+					{
+						if (AFWPlayerController* PC = Controller.Get(); PC && !PC->GetStationId().IsEmpty())
+						{
+							PC->OpenFilter(PC->GetStationId(), true);
+						}
+					})
 				]
 			]
 		]

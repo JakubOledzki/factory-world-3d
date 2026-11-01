@@ -2,6 +2,7 @@
 
 #include "FWPlayerController.h"
 #include "UI/FWStyle.h"
+#include "UI/FWWidgets.h"
 #include "UI/SFWItemTile.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBackgroundBlur.h"
@@ -157,6 +158,17 @@ TSharedRef<SWidget> SFWInventoryWindow::MakeStoragePanel()
 					.Font(FWStyle::Font(20, TEXT("Bold")))
 					.ColorAndOpacity(FWStyle::Text)
 					.Text_Lambda([this]() { return Controller.IsValid() ? FText::FromString(Controller->GetStorage().Name) : FText::GetEmpty(); })
+				]
+				// The one item it lets in, as the "Filtr" button of the 2D game
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 14, 0)
+				[
+					FWUi::SmallButton(LOCTEXT("Filter", "Filtr"), [this]()
+					{
+						if (AFWPlayerController* PC = Controller.Get(); PC && !PC->GetStorage().Id.IsEmpty())
+						{
+							PC->OpenFilter(PC->GetStorage().Id);
+						}
+					})
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom)
 				[

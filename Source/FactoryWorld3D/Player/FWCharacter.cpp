@@ -751,7 +751,11 @@ void AFWCharacter::InteractStart()
 	{
 		return;
 	}
-	if (const FFWMine* Mine = Plot->FindMine(TargetTile))
+	if (const FFWPlotObject* Logistic = Plot->FindObjectAt(TargetTile); Logistic && AFWPlayerController::HasOwnFilter(Logistic->Kind))
+	{
+		PC->OpenFilter(Logistic->Id);
+	}
+	else if (const FFWMine* Mine = Plot->FindMine(TargetTile))
 	{
 		Hold = EHold::Mine;
 		HoldMine = Mine->Id;
