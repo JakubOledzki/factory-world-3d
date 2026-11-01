@@ -570,6 +570,7 @@ void AFWCharacter::CreateInput()
 	Mapping->MapKey(MakeAction(TEXT("Inventory"), EInputActionValueType::Boolean), EKeys::Tab);
 	Mapping->MapKey(Actions[TEXT("Inventory")], EKeys::I);
 	Mapping->MapKey(MakeAction(TEXT("Menu"), EInputActionValueType::Boolean), EKeys::Escape);
+	Mapping->MapKey(MakeAction(TEXT("Map"), EInputActionValueType::Boolean), EKeys::N);
 	// The mouse wheel steps through the hotbar
 	Mapping->MapKey(MakeAction(TEXT("Scroll"), EInputActionValueType::Axis1D), EKeys::MouseWheelAxis);
 	const FKey SlotKeys[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five };
@@ -687,6 +688,13 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		if (AFWPlayerController* PC = GetFWController())
 		{
 			PC->OpenSettings();
+		}
+	});
+	Input->BindActionValueLambda(Actions[TEXT("Map")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenWorldMap();
 		}
 	});
 	for (int32 Slot = 0; Slot < 5; ++Slot)
