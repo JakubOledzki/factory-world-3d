@@ -23,12 +23,12 @@
 #include "Game/FWAudio.h"
 #include "UI/SFWCharacterCreator.h"
 #include "UI/SFWInventoryWindow.h"
-#include "UI/SFWSettingsWindow.h"
-#include "UI/SFWMarketWindow.h"
-#include "UI/SFWStationWindow.h"
 #include "UI/SFWContractsWindow.h"
 #include "UI/SFWResearchWindow.h"
 #include "UI/SFWStatsWindow.h"
+#include "UI/SFWSettingsWindow.h"
+#include "UI/SFWMarketWindow.h"
+#include "UI/SFWStationWindow.h"
 #include "Engine/Texture2D.h"
 #include "Camera/CameraComponent.h"
 #include "UI/SFWLoginWidget.h"
@@ -929,13 +929,6 @@ void AFWPlayerController::FWOpenNearest(const FString& Kind)
 	}
 }
 
-void AFWPlayerController::OpenMarket()
-{
-	SAssignNew(Market, SFWMarketWindow).Controller(this);
-	ShowWidget(Market.ToSharedRef(), Market);
-	RefreshWallet();
-}
-
 void AFWPlayerController::OpenResearch()
 {
 	SAssignNew(Research, SFWResearchWindow).Controller(this);
@@ -1016,6 +1009,13 @@ void AFWPlayerController::FWStats(int32 Minutes, const FString& Item)
 	{
 		Stats->SelectItem(Item);
 	}
+}
+
+void AFWPlayerController::OpenMarket()
+{
+	SAssignNew(Market, SFWMarketWindow).Controller(this);
+	ShowWidget(Market.ToSharedRef(), Market);
+	RefreshWallet();
 }
 
 void AFWPlayerController::Send(const TCHAR* Type, TSharedPtr<FJsonObject> P, TFunction<void(const FFWNetReply&)> OnReply)
