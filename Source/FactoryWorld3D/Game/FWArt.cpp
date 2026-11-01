@@ -133,8 +133,46 @@ namespace FWArt
 		return Mesh(*FString::Printf(TEXT("/Game/External/Factory/%s/%s/StaticMeshes/%s.%s"), Name, Name, Name, Name));
 	}
 
+	UStaticMesh* FurnitureModel(const FString& Kind, int32& Tiles)
+	{
+		struct FModel
+		{
+			const TCHAR* Name;
+			int32 Tiles;
+		};
+		// Kinds alike enough to share a model (Tools/blender/make_factory.py builds each for its footprint)
+		static const TMap<FString, FModel> ByKind = {
+			{ TEXT("furniture_workbench"), { TEXT("workbench"), 1 } }, { TEXT("furniture_tailor"), { TEXT("workbench"), 1 } },
+			{ TEXT("furniture_jeweler"), { TEXT("workbench"), 1 } },
+			{ TEXT("furniture_anvil"), { TEXT("anvil"), 1 } },
+			{ TEXT("furniture_computer"), { TEXT("computer"), 1 } }, { TEXT("furniture_design_office"), { TEXT("computer"), 1 } },
+			{ TEXT("furniture_research_table"), { TEXT("research_table"), 1 } }, { TEXT("furniture_laboratory"), { TEXT("research_table"), 1 } },
+			{ TEXT("furniture_furnace"), { TEXT("furnace"), 2 } }, { TEXT("furniture_charcoal_kiln"), { TEXT("furnace"), 2 } },
+			{ TEXT("furniture_tar_kiln"), { TEXT("furnace"), 2 } }, { TEXT("furniture_coke_oven"), { TEXT("furnace"), 2 } },
+			{ TEXT("furniture_brick_furnace"), { TEXT("brick_furnace"), 3 } }, { TEXT("furniture_cement_kiln"), { TEXT("brick_furnace"), 3 } },
+			{ TEXT("furniture_glassworks"), { TEXT("brick_furnace"), 3 } },
+			{ TEXT("furniture_blast_furnace"), { TEXT("blast_furnace"), 4 } }, { TEXT("furniture_oxygen_converter"), { TEXT("blast_furnace"), 4 } },
+			{ TEXT("furniture_arc_furnace"), { TEXT("blast_furnace"), 4 } }, { TEXT("furniture_foundry"), { TEXT("blast_furnace"), 4 } },
+			{ TEXT("furniture_sawmill"), { TEXT("sawmill"), 2 } }, { TEXT("furniture_electric_sawmill"), { TEXT("sawmill"), 2 } },
+			{ TEXT("furniture_industrial_sawmill"), { TEXT("sawmill"), 2 } }, { TEXT("furniture_carpentry"), { TEXT("sawmill"), 2 } },
+			{ TEXT("furniture_assembler"), { TEXT("assembler"), 1 } }, { TEXT("furniture_fast_assembler"), { TEXT("assembler"), 1 } },
+			{ TEXT("furniture_express_assembler"), { TEXT("assembler"), 1 } }, { TEXT("furniture_machine_shop"), { TEXT("assembler"), 1 } },
+			{ TEXT("furniture_mill"), { TEXT("mill"), 2 } }, { TEXT("furniture_flour_works"), { TEXT("mill"), 2 } },
+			{ TEXT("furniture_roller_mill"), { TEXT("mill"), 2 } },
+		};
+		const FModel* Found = ByKind.Find(Kind);
+		UStaticMesh* Model = Found ? Factory(Found->Name) : nullptr;
+		Tiles = Model ? Found->Tiles : 1;
+		return Model;
+	}
+
 	UStaticMesh* ItemMesh(const FString& Item)
 	{
+		int32 Tiles = 1;
+		if (UStaticMesh* Furniture = FurnitureModel(Item, Tiles))
+		{
+			return Furniture;
+		}
 		const TCHAR* Name = TEXT("crate");
 		if (Item.StartsWith(TEXT("tool_pickaxe")))
 		{

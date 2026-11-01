@@ -886,6 +886,38 @@ void AFWPlayerController::FWPlaceNear(const FString& Kind)
 	}
 }
 
+void AFWPlayerController::FWLookAt(const FString& Kind, float Tiles, float Angle, float Pitch)
+{
+	if (!Plot || !GetPawn())
+	{
+		return;
+	}
+	const FIntPoint At = Plot->TileAt(GetPawn()->GetActorLocation());
+	const FFWPlotObject* Nearest = nullptr;
+	for (const TPair<FString, FFWPlotObject>& Pair : Plot->GetObjects())
+	{
+		if (Pair.Value.Kind == Kind && (!Nearest || (Pair.Value.Tile - At).SizeSquared() < (Nearest->Tile - At).SizeSquared()))
+		{
+			Nearest = &Pair.Value;
+		}
+	}
+	if (!Nearest)
+	{
+		UE_LOG(LogFWGame, Warning, TEXT("No %s on the plot"), *Kind);
+		return;
+	}
+	// The footprint's middle (plot space) to world, then a point that far out on that side, put on the ground
+	const float Radians = FMath::DegreesToRadians(Angle);
+	const FVector Middle = Plot->GetActorTransform().TransformPosition(Plot->FootprintCenter(Kind, Nearest->Tile));
+	const FVector Out = Middle + FVector(FMath::Cos(Radians), FMath::Sin(Radians), 0.f) * Tiles * Plot->GetTileSize();
+	FHitResult Hit;
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Out + FVector(0, 0, 100000.f), Out - FVector(0, 0, 100000.f), ECC_Visibility))
+	{
+		PlaceOnGround(Hit.ImpactPoint);
+	}
+	SetControlRotation(FRotator(Pitch, Angle + 180.f, 0.f));
+}
+
 void AFWPlayerController::FWOpenNearest(const FString& Kind)
 {
 	if (!Plot || !GetPawn())
