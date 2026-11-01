@@ -561,7 +561,7 @@ void AFWCharacter::CreateInput()
 	Mapping->MapKey(MakeAction(TEXT("Inventory"), EInputActionValueType::Boolean), EKeys::Tab);
 	Mapping->MapKey(Actions[TEXT("Inventory")], EKeys::I);
 	Mapping->MapKey(MakeAction(TEXT("Menu"), EInputActionValueType::Boolean), EKeys::Escape);
-	Mapping->MapKey(MakeAction(TEXT("Map"), EInputActionValueType::Boolean), EKeys::M);
+	Mapping->MapKey(MakeAction(TEXT("Map"), EInputActionValueType::Boolean), EKeys::N);
 	// The mouse wheel steps through the hotbar
 	Mapping->MapKey(MakeAction(TEXT("Scroll"), EInputActionValueType::Axis1D), EKeys::MouseWheelAxis);
 	const FKey SlotKeys[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five };

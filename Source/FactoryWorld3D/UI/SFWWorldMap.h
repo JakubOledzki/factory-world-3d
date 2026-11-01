@@ -10,7 +10,7 @@ struct FSlateBrush;
 struct FFWNetReply;
 
 /**
- * The world map (M), as in the 2D game: the Earth in 5 × 5 km plots coloured by biome with the countries' borders
+ * The world map (N), as in the 2D game: the Earth in 5 × 5 km plots coloured by biome with the countries' borders
  * (Tools/build_world_map.mjs), dragged to move, the wheel to zoom. On it the player's own plots, the plots others own
  * in view (world.area) and the larger towns. A click picks a plot: its biome, country, owner and price (world.plot),
  * with buying it (world.buy), going there (plot.enter) and naming an own plot (world.rename).

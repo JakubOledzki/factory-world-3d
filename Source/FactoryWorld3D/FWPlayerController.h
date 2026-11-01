@@ -89,7 +89,7 @@ public:
 	void StorageTransferAll(bool bPut);
 	// The market, at the plot's computer
 	void OpenMarket();
-	// The world map (M), and going to another plot from it
+	// The world map (N), and going to another plot from it
 	void OpenWorldMap();
 	void GoToPlot(FIntPoint Where) { EnterPlot(Where.X, Where.Y); }
 	// A request to the server for the windows; replies go to the callback

@@ -93,7 +93,7 @@ void SFWWorldMap::Construct(const FArguments& InArgs)
 				+ SVerticalBox::Slot().AutoHeight()
 				[
 					SNew(STextBlock).Font(FWStyle::Font(10)).ColorAndOpacity(FWStyle::Muted)
-					.Text(LOCTEXT("Hint", "Przeciągnij, aby przesunąć  ·  kółko: przybliż  ·  klik: działka  ·  M / Esc zamyka"))
+					.Text(LOCTEXT("Hint", "Przeciągnij, aby przesunąć  ·  kółko: przybliż  ·  klik: działka  ·  N / Esc zamyka"))
 				]
 			]
 		]
@@ -541,7 +541,7 @@ void SFWWorldMap::RebuildPanel()
 
 FReply SFWWorldMap::OnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event)
 {
-	if (Event.GetKey() == EKeys::Escape || Event.GetKey() == EKeys::M)
+	if (Event.GetKey() == EKeys::Escape || Event.GetKey() == EKeys::N)
 	{
 		if (AFWPlayerController* PC = Controller.Get())
 		{

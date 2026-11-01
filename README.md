@@ -149,7 +149,7 @@ Do testów: `FWMarket`, `FWMarketTab <0–2>`, `FWMarketItem <przedmiot>`, `FWTr
 
 ## Mapa świata
 
-Klawisz **M** otwiera mapę świata jak w grze 2D: cała Ziemia w działkach 5 × 5 km, kolory terenu i granice państw, nazwy miast (im bliżej, tym mniejsze miasta). Przeciągnij, aby przesunąć, kółkiem przybliżasz; mapa zawija się ze wschodu na zachód. Twoje działki są złote, działki innych graczy w widoku czerwone (`world.info`, `world.area`).
+Klawisz **N** (jak w grze 2D) otwiera mapę świata: cała Ziemia w działkach 5 × 5 km, kolory terenu i granice państw, nazwy miast (im bliżej, tym mniejsze miasta). Przeciągnij, aby przesunąć, kółkiem przybliżasz; mapa zawija się ze wschodu na zachód. Twoje działki są złote, działki innych graczy w widoku czerwone (`world.info`, `world.area`).
 
 Kliknięcie wybiera działkę: położenie, teren, państwo, właściciel i cena (`world.plot`). Wolną działkę można kupić (`world.buy`), na swoją albo publiczną wejść (`plot.enter`), a swoją nazwać (`world.rename`).
 
