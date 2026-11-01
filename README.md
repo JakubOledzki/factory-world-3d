@@ -166,6 +166,16 @@ Cień rzuca osobna, niewidoczna dla gracza pełna postać w tym samym wyglądzie
 
 Do testów: `FWSelect <0–4>`, `FWGesture place|rotate|pickup|swing|mine`, `FWDress <koszulka 0–2> <kolor hex>`, `FWWalk <s>`.
 
+## Czat, osiągnięcia i rywalizacja
+
+Jak w grze 2D:
+
+- **Czat** w lewym dolnym rogu: ostatnie linie same znikają po kilkunastu sekundach. **Enter** otwiera historię i pole do pisania: do graczy na działce albo do całego świata, z szybkimi zwrotami (Cześć!, Dzięki!...). Esc albo pusty Enter zamyka. Ogłoszenia serwera (meteoryt, pierwsi na świecie) są na złoto (`chat.get` co 2 s, `chat.send`).
+- **Osiągnięcia** (O): odznaki w grupach z postępem, rankingi najlepszych graczy z własnym miejscem, rywalizacja: wyzwanie tygodnia i zwycięzcy, meteoryt z kopaniem, cuda świata, pierwsi na świecie (`achievements.get`, `rankings.get`, `rivalry.get`, `meteor.get/dig`, `company.wonders`).
+- **Nowa odznaka**: karta wysuwa się z góry ekranu, gdy serwer zgłosi zdobycie (`achievements.watch` → `achievement.unlocked`); znaleziska do albumu jako komunikat (`album.found`).
+
+Do testów: `FWChatOpen`, `FWSay <plot/world> <tekst>`, `FWAchievements <0–2>`, `FWRanking <id>`, `FWBadgeTest <nazwa>`.
+
 ## Dźwięk
 
 Wszystkie dźwięki (49) są syntezowane przez nasz skrypt `Tools/make_audio.py` (Python z numpy, uruchamiany w Blenderze), bez nagrań i bez licencji do pilnowania. Tworzy je `Tools/setup_assets.ps1` i nie ma ich w gicie.

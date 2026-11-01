@@ -18,6 +18,9 @@ class SFWStatsWindow;
 class SFWLoginWidget;
 class SFWPromptWidget;
 class SWidget;
+class SFWChat;
+class SFWAchievementsWindow;
+class SFWBadgeToast;
 class UFWNetSubsystem;
 struct FFWNetReply;
 
@@ -116,6 +119,10 @@ public:
 	bool IsInWorld() const { return Plot != nullptr; }
 
 	void SelectSlot(int32 Slot);
+	// The chat in the corner (Enter opens it to write) and achievements, rankings and rivalry (O), as in the 2D game
+	void OpenChat();
+	void CloseChat();
+	void OpenAchievements();
 	// The icon of an item for the HUD, rendered from its model (Tools/blender/render_icons.py)
 	UTexture2D* GetIcon(const FString& Item) const;
 	void Toast(const FText& Text, bool bError = false);
@@ -233,6 +240,18 @@ public:
 	void FWWalk(float Seconds);
 	UFUNCTION(Exec)
 	void FWRecordStop(const FString& Name);
+	// Chat, achievements and badges for tests: open the chat, say something on a channel (plot/world), the window on a
+	// tab or a ranking, a made-up badge card
+	UFUNCTION(Exec)
+	void FWChatOpen() { OpenChat(); }
+	UFUNCTION(Exec)
+	void FWSay(const FString& Channel, const FString& Text);
+	UFUNCTION(Exec)
+	void FWAchievements(int32 Tab = 0);
+	UFUNCTION(Exec)
+	void FWRanking(const FString& Ranking);
+	UFUNCTION(Exec)
+	void FWBadgeTest(const FString& Name);
 
 protected:
 	virtual void BeginPlay() override;
@@ -267,6 +286,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<AFWCharacterStudio> Studio;
 	TSharedPtr<SFWCharacterCreator> Creator;
+	TSharedPtr<SFWChat> Chat;
+	TSharedPtr<SFWAchievementsWindow> Achievements;
+	TSharedPtr<SFWBadgeToast> BadgeToast;
 
 	UPROPERTY()
 	TObjectPtr<UAudioComponent> WindSound;
