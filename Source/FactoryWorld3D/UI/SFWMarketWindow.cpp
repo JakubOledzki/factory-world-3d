@@ -26,7 +26,7 @@ namespace
 		return FText::Format(LOCTEXT("Money", "{0} $"), FText::AsNumber(Cents / 100.0, &Options));
 	}
 
-	FString Str(const FJsonObject& Object, const TCHAR* Field)
+	FString JsonStr(const FJsonObject& Object, const TCHAR* Field)
 	{
 		FString Value;
 		Object.TryGetStringField(Field, Value);
@@ -306,14 +306,14 @@ TSharedRef<SWidget> SFWMarketWindow::MakeTrader()
 				SNew(SBorder).BorderImage(FWStyle::Panel()).Padding(10.f)
 				[
 					SNew(STextBlock).AutoWrapText(true).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Accent)
-					.Text(FText::Format(LOCTEXT("Event", "{0}: {1}"), FText::FromString(Str(**Event, TEXT("name"))), FText::FromString(Str(**Event, TEXT("description")))))
+					.Text(FText::Format(LOCTEXT("Event", "{0}: {1}"), FText::FromString(JsonStr(**Event, TEXT("name"))), FText::FromString(JsonStr(**Event, TEXT("description")))))
 				]
 			];
 		}
 		for (const TSharedPtr<FJsonObject>& Item : Objects(Prices, TEXT("items")))
 		{
-			const FString Id = Str(*Item, TEXT("id"));
-			const FString Name = Str(*Item, TEXT("name"));
+			const FString Id = JsonStr(*Item, TEXT("id"));
+			const FString Name = JsonStr(*Item, TEXT("name"));
 			if (!Matches(Name))
 			{
 				continue;
@@ -369,8 +369,8 @@ TSharedRef<SWidget> SFWMarketWindow::MakeExchange()
 	TSharedRef<SScrollBox> Items = SNew(SScrollBox);
 	for (const TSharedPtr<FJsonObject>& Item : Objects(Overview, TEXT("items")))
 	{
-		const FString Id = Str(*Item, TEXT("id"));
-		const FString Name = Str(*Item, TEXT("name"));
+		const FString Id = JsonStr(*Item, TEXT("id"));
+		const FString Name = JsonStr(*Item, TEXT("name"));
 		double Listed = 0.0, Wanted = 0.0, Lowest = 0.0;
 		Num(*Item, TEXT("listed"), Listed);
 		Num(*Item, TEXT("wanted"), Wanted);
@@ -404,7 +404,7 @@ TSharedRef<SWidget> SFWMarketWindow::MakeExchange()
 	}
 	else
 	{
-		const FString Name = Board.IsValid() ? Str(*Board, TEXT("name")) : BoardItem;
+		const FString Name = Board.IsValid() ? JsonStr(*Board, TEXT("name")) : BoardItem;
 		BoardBox->AddSlot().AutoHeight().Padding(0, 0, 0, 10)[SNew(STextBlock).Text(FText::FromString(Name)).Font(FWStyle::Font(18, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)];
 		auto Offers = [this](const TCHAR* Field, bool bListings)
 		{
@@ -426,7 +426,7 @@ TSharedRef<SWidget> SFWMarketWindow::MakeExchange()
 					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 					[
 						SNew(STextBlock).Font(FWStyle::Font(11)).ColorAndOpacity(bMine ? FWStyle::Accent : FWStyle::Text)
-						.Text(FText::Format(LOCTEXT("Offer", "{0} szt. × {1}  ·  {2}"), int32(Quantity), Money(Price), FText::FromString(Str(*Offer, TEXT("owner")))))
+						.Text(FText::Format(LOCTEXT("Offer", "{0} szt. × {1}  ·  {2}"), int32(Quantity), Money(Price), FText::FromString(JsonStr(*Offer, TEXT("owner")))))
 					]
 					+ SHorizontalBox::Slot().AutoWidth()
 					[
@@ -500,10 +500,10 @@ TSharedRef<SWidget> SFWMarketWindow::MakeMine()
 			Num(*Offer, TEXT("done"), Done);
 			Num(*Offer, TEXT("priceCents"), Price);
 			const int64 OfferId = int64(Id);
-			const FString Item = Str(*Offer, TEXT("item"));
+			const FString Item = JsonStr(*Offer, TEXT("item"));
 			List->AddSlot().Padding(0, 0, 8, 4)
 			[
-				ItemRow(Item, Str(*Offer, TEXT("name")),
+				ItemRow(Item, JsonStr(*Offer, TEXT("name")),
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 12, 0)
 					[
