@@ -1,6 +1,8 @@
 #include "UI/SFWWorldMap.h"
 
 #include "Engine/Texture2D.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "FWPlayerController.h"
 #include "Game/FWArt.h"
 #include "Game/FWWorldData.h"
@@ -25,6 +27,14 @@
 
 namespace FWMapUi
 {
+	// The detail pieces and the tile atlas as make_world_map.py and make_world_tiles.py lay them out; the tiles fade in
+	// from TilesFrom to TilesFull pixels a plot; the nearest zoom
+	constexpr int32 PieceRows = 2, PieceColumns = 3;
+	constexpr float TilesFrom = 7.f, TilesFull = 16.f;
+	// A biome's texture repeats every this many plots
+	constexpr float TileRepeat = 5.f;
+	constexpr float MaxZoom = 220.f;
+
 	FText Money(double Cents)
 	{
 		FNumberFormattingOptions Options;
@@ -61,27 +71,33 @@ void SFWWorldMap::Construct(const FArguments& InArgs)
 	{
 		MapSize = FVector2D(Size);
 	}
-	auto MakeBrush = [this](const TCHAR* Path)
+	OverviewBrush = MakeBrush(TEXT("world_overview"));
+	for (int32 Row = 0; Row < FWMapUi::PieceRows; ++Row)
 	{
-		TSharedPtr<FSlateBrush> Brush;
-		if (UTexture2D* Texture = FWArt::Texture(Path))
+		for (int32 Column = 0; Column < FWMapUi::PieceColumns; ++Column)
 		{
-			Brush = MakeShared<FSlateBrush>();
-			Brush->SetResourceObject(Texture);
-			Brush->ImageSize = MapSize;
-			Brush->DrawAs = ESlateBrushDrawType::Image;
-			Textures.Add(Texture);
+			DetailBrushes.Add(MakeBrush(*FString::Printf(TEXT("world_detail_%d_%d"), Row, Column)));
 		}
-		return Brush;
-	};
-	MapBrush = MakeBrush(TEXT("/Game/External/WorldMap/world_map.world_map"));
-	SharpBrush = MakeBrush(TEXT("/Game/External/WorldMap/world_map_sharp.world_map_sharp"));
+	}
+	if (UMaterialInterface* Biomes = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_FWWorldMap.M_FWWorldMap")))
+	{
+		BiomeMaterial = UMaterialInstanceDynamic::Create(Biomes, GetTransientPackage());
+		BiomeMaterial->SetScalarParameterValue(TEXT("MapW"), MapSize.X);
+		BiomeMaterial->SetScalarParameterValue(TEXT("MapH"), MapSize.Y);
+		BiomeMaterial->SetScalarParameterValue(TEXT("Repeat"), FWMapUi::TileRepeat);
+		BiomeBrush = MakeShared<FSlateBrush>();
+		BiomeBrush->SetResourceObject(BiomeMaterial);
+		BiomeBrush->ImageSize = FVector2D(1920, 1080);
+		BiomeBrush->DrawAs = ESlateBrushDrawType::Image;
+	}
+	CloudBrush = MakeBrush(TEXT("world_clouds"));
 	// Open on the plot the player stands on
 	if (const AFWPlayerController* PC = Controller.Get(); PC && PC->GetPlot())
 	{
 		Center = FVector2D(PC->GetPlot()->GetPlotX() + 0.5, PC->GetPlot()->GetPlotY() + 0.5);
 		Zoom = 6.f;
 	}
+	TargetZoom = Zoom;
 	ChildSlot
 	[
 		SNew(SOverlay)
@@ -151,6 +167,20 @@ void SFWWorldMap::Send(const TCHAR* Type, TSharedPtr<FJsonObject> Payload, TFunc
 	}
 }
 
+TSharedPtr<FSlateBrush> SFWWorldMap::MakeBrush(const TCHAR* Name)
+{
+	TSharedPtr<FSlateBrush> Brush;
+	if (UTexture2D* Texture = FWArt::Texture(*FString::Printf(TEXT("/Game/External/WorldMap/%s.%s"), Name, Name)))
+	{
+		Brush = MakeShared<FSlateBrush>();
+		Brush->SetResourceObject(Texture);
+		Brush->ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
+		Brush->DrawAs = ESlateBrushDrawType::Image;
+		Textures.Add(Texture);
+	}
+	return Brush;
+}
+
 FVector2D SFWWorldMap::ToScreen(FVector2D Plot) const
 {
 	return ViewSize * 0.5 + (Plot - Center) * Zoom;
@@ -163,8 +193,9 @@ FVector2D SFWWorldMap::ToPlot(FVector2D Local) const
 
 void SFWWorldMap::ClampView()
 {
-	// The whole Earth fits the screen at the farthest; up to 40 pixels a plot at the nearest
-	Zoom = FMath::Clamp(Zoom, float(FMath::Min(ViewSize.X / MapSize.X, ViewSize.Y / MapSize.Y)), 40.f);
+	// The whole Earth fits the screen at the farthest; a plot fills a good part of it at the nearest
+	Zoom = FMath::Clamp(Zoom, float(FMath::Min(ViewSize.X / MapSize.X, ViewSize.Y / MapSize.Y)), FWMapUi::MaxZoom);
+	TargetZoom = FMath::Clamp(TargetZoom, float(FMath::Min(ViewSize.X / MapSize.X, ViewSize.Y / MapSize.Y)), FWMapUi::MaxZoom);
 	Center.X = FMath::Fmod(Center.X + MapSize.X, MapSize.X);
 	Center.Y = FMath::Clamp(Center.Y, ViewSize.Y * 0.5 / Zoom, MapSize.Y - ViewSize.Y * 0.5 / Zoom);
 	if (MapSize.Y * Zoom < ViewSize.Y)
@@ -176,7 +207,7 @@ void SFWWorldMap::ClampView()
 void SFWWorldMap::CenterOn(FVector2D Plot, float PixelsPerPlot)
 {
 	Center = Plot;
-	Zoom = PixelsPerPlot;
+	Zoom = TargetZoom = PixelsPerPlot;
 	ClampView();
 	AreaAt = 0.0;
 }
@@ -185,6 +216,19 @@ void SFWWorldMap::Tick(const FGeometry& Geometry, const double CurrentTime, cons
 {
 	SCompoundWidget::Tick(Geometry, CurrentTime, DeltaTime);
 	ViewSize = Geometry.GetLocalSize();
+	Time = CurrentTime;
+	// Ease the zoom towards the wheel's, in log space, the anchor plot staying under the cursor
+	if (!FMath::IsNearlyEqual(Zoom, TargetZoom, TargetZoom * 0.002f))
+	{
+		const FVector2D Before = ToPlot(ZoomAnchor);
+		Zoom = FMath::Exp(FMath::FInterpTo(FMath::Loge(Zoom), FMath::Loge(TargetZoom), DeltaTime, 12.f));
+		ClampView();
+		Center += Before - ToPlot(ZoomAnchor);
+	}
+	else
+	{
+		Zoom = TargetZoom;
+	}
 	ClampView();
 	// Others' plots only close up, where they can be told apart; asked again a moment after the view settles
 	if (Zoom >= 1.5f && CurrentTime - AreaAt > 1.0)
@@ -227,21 +271,99 @@ int32 SFWWorldMap::OnPaint(const FPaintArgs& Args, const FGeometry& Geometry, co
 	int32 LayerId, const FWidgetStyle& WidgetStyle, bool bParentEnabled) const
 {
 	const FSlateBrush* White = FCoreStyle::Get().GetBrush("WhiteBrush");
-	FSlateDrawElement::MakeBox(Out, LayerId, Geometry.ToPaintGeometry(), White, ESlateDrawEffect::None, FLinearColor::FromSRGBColor(FColor(11, 20, 31)));
-	// The map, once more on either side so it wraps east to west
-	const FSlateBrush* Brush = Zoom >= 3.f && SharpBrush.IsValid() ? SharpBrush.Get() : MapBrush.Get();
-	if (Brush)
+	// The sky behind the Earth: deep blue above, paler towards the horizon below, clouds drifting slowly through it
 	{
-		for (int32 Copy = -1; Copy <= 1; ++Copy)
+		TArray<FSlateGradientStop> Stops;
+		Stops.Add(FSlateGradientStop(FVector2D(0.f, 0.f), FLinearColor::FromSRGBColor(FColor(20, 58, 112))));
+		Stops.Add(FSlateGradientStop(FVector2D(0.f, ViewSize.Y * 0.6f), FLinearColor::FromSRGBColor(FColor(78, 131, 186))));
+		Stops.Add(FSlateGradientStop(FVector2D(0.f, ViewSize.Y), FLinearColor::FromSRGBColor(FColor(168, 196, 222))));
+		FSlateDrawElement::MakeGradient(Out, LayerId, Geometry.ToPaintGeometry(), Stops, Orient_Horizontal);
+	}
+	auto Clouds = [&](int32 Layer, float TileSize, FVector2D Offset, float Alpha)
+	{
+		if (!CloudBrush.IsValid() || Alpha <= 0.01f)
 		{
-			const FVector2D Origin = ToScreen(FVector2D(Copy * MapSize.X, 0.0));
-			if (Origin.X > ViewSize.X || Origin.X + MapSize.X * Zoom < 0.0)
+			return;
+		}
+		// The texture is twice as wide as high and repeats seamlessly: laid side by side over the view
+		const FVector2D Size(TileSize * 2.f, TileSize);
+		const FVector2D Start(FMath::Fmod(FMath::Fmod(Offset.X, Size.X) - Size.X, Size.X), FMath::Fmod(FMath::Fmod(Offset.Y, Size.Y) - Size.Y, Size.Y));
+		for (double Y = Start.Y - Size.Y; Y < ViewSize.Y; Y += Size.Y)
+		{
+			for (double X = Start.X - Size.X; X < ViewSize.X; X += Size.X)
 			{
-				continue;
+				FSlateDrawElement::MakeBox(Out, Layer, Geometry.ToPaintGeometry(Size, FSlateLayoutTransform(FVector2D(X, Y))), CloudBrush.Get(),
+					ESlateDrawEffect::None, FLinearColor(1.f, 1.f, 1.f, Alpha));
 			}
-			FSlateDrawElement::MakeBox(Out, LayerId + 1, Geometry.ToPaintGeometry(MapSize * Zoom, FSlateLayoutTransform(Origin)), Brush);
+		}
+	};
+	// Far clouds in the sky, moving a little with the view (parallax)
+	Clouds(LayerId, 700.f, FVector2D(Time * 6.0, 0.0) - Center * Zoom * 0.08, 0.45f);
+
+	// The Earth from afar, its sharper pieces closer up (faded in between), each once more on either side so it wraps
+	const float Sharp = FMath::Clamp((Zoom - 1.2f) / 1.3f, 0.f, 1.f);
+	for (int32 Copy = -1; Copy <= 1; ++Copy)
+	{
+		const FVector2D Origin = ToScreen(FVector2D(Copy * MapSize.X, 0.0));
+		if (Origin.X > ViewSize.X || Origin.X + MapSize.X * Zoom < 0.0)
+		{
+			continue;
+		}
+		// A soft shadow under the Earth's edges, so it lies on the sky
+		FSlateDrawElement::MakeBox(Out, LayerId + 1, Geometry.ToPaintGeometry(MapSize * Zoom + FVector2D(16.f), FSlateLayoutTransform(Origin - FVector2D(8.f))),
+			White, ESlateDrawEffect::None, FLinearColor(0.f, 0.f, 0.05f, 0.35f));
+		if (OverviewBrush.IsValid() && Sharp < 1.f)
+		{
+			FSlateDrawElement::MakeBox(Out, LayerId + 1, Geometry.ToPaintGeometry(MapSize * Zoom, FSlateLayoutTransform(Origin)), OverviewBrush.Get());
+		}
+		if (Sharp > 0.f)
+		{
+			for (int32 Row = 0; Row < FWMapUi::PieceRows; ++Row)
+			{
+				for (int32 Column = 0; Column < FWMapUi::PieceColumns; ++Column)
+				{
+					const TSharedPtr<FSlateBrush>& Piece = DetailBrushes[Row * FWMapUi::PieceColumns + Column];
+					if (!Piece.IsValid())
+					{
+						continue;
+					}
+					// The pieces split the map's pixels as make_world_map.py did (rounded down), 3 pixels a plot
+					const FVector2D Low(FMath::FloorToDouble(MapSize.X * 3.0 * Column / FWMapUi::PieceColumns) / 3.0, FMath::FloorToDouble(MapSize.Y * 3.0 * Row / FWMapUi::PieceRows) / 3.0);
+					const FVector2D High(FMath::FloorToDouble(MapSize.X * 3.0 * (Column + 1) / FWMapUi::PieceColumns) / 3.0, FMath::FloorToDouble(MapSize.Y * 3.0 * (Row + 1) / FWMapUi::PieceRows) / 3.0);
+					const FVector2D At = ToScreen(Low + FVector2D(Copy * MapSize.X, 0.0)), To = ToScreen(High + FVector2D(Copy * MapSize.X, 0.0));
+					if (At.X > ViewSize.X || At.Y > ViewSize.Y || To.X < 0.0 || To.Y < 0.0)
+					{
+						continue;
+					}
+					FSlateDrawElement::MakeBox(Out, LayerId + 1, Geometry.ToPaintGeometry(To - At, FSlateLayoutTransform(At)), Piece.Get(), ESlateDrawEffect::None,
+						FLinearColor(1.f, 1.f, 1.f, Sharp));
+				}
+			}
 		}
 	}
+
+	// Closest: each plot's biome from above, a little larger than the plot with faded edges so neighbours blend; the
+	// water first, the land over it
+	const float TileFade = FMath::Clamp((Zoom - FWMapUi::TilesFrom) / (FWMapUi::TilesFull - FWMapUi::TilesFrom), 0.f, 1.f);
+	if (TileFade > 0.f && BiomeBrush.IsValid())
+	{
+		BiomeMaterial->SetScalarParameterValue(TEXT("CenterX"), Center.X);
+		BiomeMaterial->SetScalarParameterValue(TEXT("CenterY"), Center.Y);
+		BiomeMaterial->SetScalarParameterValue(TEXT("Zoom"), Zoom);
+		BiomeMaterial->SetScalarParameterValue(TEXT("ViewW"), ViewSize.X);
+		BiomeMaterial->SetScalarParameterValue(TEXT("ViewH"), ViewSize.Y);
+		BiomeMaterial->SetScalarParameterValue(TEXT("Fade"), TileFade);
+		// Only over the map: above and below it the sky shows
+		const double Top = FMath::Max(0.0, ToScreen(FVector2D(0.0, 0.0)).Y), Bottom = FMath::Min(ViewSize.Y, ToScreen(MapSize).Y);
+		if (Bottom > Top)
+		{
+			FSlateDrawElement::MakeBox(Out, LayerId + 1, Geometry.ToPaintGeometry(ViewSize, FSlateLayoutTransform(FVector2D(0.0, 0.0))), BiomeBrush.Get());
+		}
+	}
+
+	// Clouds over the Earth from afar, thinning out as the view comes down through them
+	const float Over = FMath::Clamp((1.6f - Zoom) / 1.1f, 0.f, 1.f);
+	Clouds(LayerId + 2, 1400.f, FVector2D(Time * 14.0, Time * 2.0) - Center * Zoom * 1.15, 0.6f * Over);
 	auto Mark = [&](FIntPoint Plot, const FLinearColor& Color, float MinSize, int32 Layer)
 	{
 		for (int32 Copy = -1; Copy <= 1; ++Copy)
@@ -358,11 +480,8 @@ FReply SFWWorldMap::OnMouseButtonUp(const FGeometry& Geometry, const FPointerEve
 FReply SFWWorldMap::OnMouseWheel(const FGeometry& Geometry, const FPointerEvent& Event)
 {
 	// Zoom about the cursor: the plot under it stays under it
-	const FVector2D Local = Geometry.AbsoluteToLocal(Event.GetScreenSpacePosition());
-	const FVector2D Before = ToPlot(Local);
-	Zoom *= FMath::Pow(1.25f, Event.GetWheelDelta());
-	ClampView();
-	Center += Before - ToPlot(Local);
+	ZoomAnchor = Geometry.AbsoluteToLocal(Event.GetScreenSpacePosition());
+	TargetZoom *= FMath::Pow(1.35f, Event.GetWheelDelta());
 	ClampView();
 	return FReply::Handled();
 }

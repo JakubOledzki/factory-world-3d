@@ -9,11 +9,15 @@ class AFWPlayerController;
 class SBox;
 struct FSlateBrush;
 class UTexture2D;
+class UMaterialInstanceDynamic;
 struct FFWNetReply;
 
 /**
- * The world map (N), as in the 2D game: the Earth in 5 × 5 km plots coloured by biome with the countries' borders
- * (Tools/build_world_map.mjs), dragged to move, the wheel to zoom. On it the player's own plots, the plots others own
+ * The world map (N), as in the 2D game: the Earth in 5 × 5 km plots, dragged to move, the wheel to zoom (smoothly). From
+ * afar a picture of the Earth as from orbit: the biomes' colours shaded by the real relief, shallow seas along the
+ * coasts, the countries' borders, clouds drifting over it and the sky behind; closer up sharper pieces of the same
+ * picture, and closest each plot shows its biome from above: forests of trees, fields in rows, rock and snow on the
+ * mountains, glaciers with crevasses, towns (Tools/blender/make_world_map.py and make_world_tiles.py). On it the player's own plots, the plots others own
  * in view (world.area) and the larger towns. A click picks a plot: its biome, country, owner and price (world.plot),
  * with buying it (world.buy), going there (plot.enter) and naming an own plot (world.rename).
  */
@@ -41,7 +45,7 @@ public:
 	void CenterOn(FVector2D Plot, float PixelsPerPlot);
 	void Select(FIntPoint Plot);
 
-	virtual void AddReferencedObjects(FReferenceCollector& Collector) override { Collector.AddReferencedObjects(Textures); }
+	virtual void AddReferencedObjects(FReferenceCollector& Collector) override { Collector.AddReferencedObjects(Textures); Collector.AddReferencedObject(BiomeMaterial); }
 	virtual FString GetReferencerName() const override { return TEXT("SFWWorldMap"); }
 
 private:
@@ -53,9 +57,18 @@ private:
 	void Send(const TCHAR* Type, TSharedPtr<FJsonObject> Payload, TFunction<void(const FFWNetReply&)> OnReply);
 
 	TWeakObjectPtr<AFWPlayerController> Controller;
-	// Smooth from afar; each plot a crisp square close up
-	TSharedPtr<FSlateBrush> MapBrush;
-	TSharedPtr<FSlateBrush> SharpBrush;
+	TSharedPtr<FSlateBrush> MakeBrush(const TCHAR* Name);
+	// The Earth from afar; its sharper pieces (rows x columns) closer up; closest the biomes from above (M_FWWorldMap,
+	// told the view every frame); the clouds
+	TSharedPtr<FSlateBrush> OverviewBrush;
+	TArray<TSharedPtr<FSlateBrush>> DetailBrushes;
+	TSharedPtr<FSlateBrush> BiomeBrush;
+	TObjectPtr<UMaterialInstanceDynamic> BiomeMaterial;
+	TSharedPtr<FSlateBrush> CloudBrush;
+	// Zoom eases towards where the wheel set it, keeping the plot under the cursor under it
+	float TargetZoom = 0.3f;
+	FVector2D ZoomAnchor = FVector2D::ZeroVector;
+	double Time = 0.0;
 	// Their textures, held while the map is open: Slate does not keep them from the garbage collector
 	TArray<TObjectPtr<UTexture2D>> Textures;
 	TSharedPtr<SBox> Panel;
