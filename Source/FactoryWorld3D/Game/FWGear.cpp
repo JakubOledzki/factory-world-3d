@@ -29,7 +29,7 @@ namespace FWGear
 			{ FVector(0, 0.4f, 0.5f), FVector(0, -1.2f, -1.2f) },
 			{ FVector(0, -1.f, -1.5f), FVector(0, -4.f, -1.8f) },
 		};
-		constexpr float HairScale = 1.06f;
+		constexpr float HairScale = 1.1f;
 		// The head's centre in the mannequin's bind pose: the hair grows from there
 		const FVector HeadCentre(0, 2.f, 170.f);
 
