@@ -214,6 +214,8 @@ PAINTED.update({"FW_PaintBlue": (0.02, 0.09, 0.3), "FW_PaintRed": (0.32, 0.03, 0
 SLOT_TEXTURES = {
     "FW_Rubber": "rubberized_track", "FW_Wood": "weathered_planks", "FW_Concrete": "concrete_floor_worn_001",
     "FW_Grate": "metal_grate_rusty",
+    # Workshop furniture and kilns
+    "FW_Brick": "red_brick_03", "FW_Stone": "castle_wall_slates", "FW_TableWood": "wood_table_001",
     # Hand tools (Tools/blender/make_tools.py)
     "FW_ToolSteel": "metal_plate", "FW_Grip": "rubberized_track",
 }
