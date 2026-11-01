@@ -317,8 +317,8 @@ if os.path.isdir(MUGO) and foliage:
                     mel.set_material_instance_scalar_parameter_value(asset, "Roughness", 0.85)
                     mel.set_material_instance_scalar_parameter_value(asset, "Wind", 3.0)
                 elif slot == "FW_MugoNeedles":
-                    # Dark, slightly blue-green needles (Pinus mugo); the vertex colour lightens young tips
-                    mel.set_material_instance_vector_parameter_value(asset, "Tint", unreal.LinearColor(0.028, 0.055, 0.04, 1))
+                    # Dark, slightly blue-green needles (Pinus mugo); the vertex colour (0.4-0.9) darkens the base of each brush and lightens young tips
+                    mel.set_material_instance_vector_parameter_value(asset, "Tint", unreal.LinearColor(0.042, 0.08, 0.058, 1))
                     mel.set_material_instance_scalar_parameter_value(asset, "Roughness", 0.55)
                     mel.set_material_instance_scalar_parameter_value(asset, "Wind", 5.0)
                 else:

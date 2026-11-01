@@ -188,6 +188,11 @@ def shrub(name, seed, stems, spread, height):
     mesh = bpy.data.meshes.new(name)
     b.bm.to_mesh(mesh)
     b.bm.free()
+    # The colour attribute must be the active one, or the glTF exporter leaves it out (and the needles lose their shading)
+    colors = mesh.color_attributes.get("Color")
+    if colors:
+        mesh.color_attributes.active_color = colors
+        mesh.color_attributes.render_color_index = mesh.color_attributes.active_color_index
     mesh.materials.append(material("FW_MugoBark"))
     mesh.materials.append(material("FW_MugoNeedles"))
     obj = bpy.data.objects.new(name, mesh)
