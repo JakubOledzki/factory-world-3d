@@ -33,6 +33,7 @@
 #include "Player/FWCharacter.h"
 #include "UI/SFWPromptWidget.h"
 #include "World/FWEnvironment.h"
+#include "World/FWGrowth.h"
 #include "World/FWPlot.h"
 
 #define LOCTEXT_NAMESPACE "FWGame"
@@ -1630,6 +1631,16 @@ void AFWPlayerController::Tick(float DeltaSeconds)
 	{
 		NextPollAt = Now + UFWGameSettings::Get().LogisticsPollSeconds;
 		PollLogistics();
+	}
+	// What grows on the plot by itself, for the plot stood on
+	if (Plot && (!Growth || Growth->GetPlot() != Plot))
+	{
+		if (Growth)
+		{
+			Growth->Destroy();
+		}
+		Growth = GetWorld()->SpawnActor<AFWGrowth>();
+		Growth->Init(this, Plot);
 	}
 	UpdateAmbience(DeltaSeconds);
 	if (!StationId.IsEmpty() && Now >= NextStationPoll)

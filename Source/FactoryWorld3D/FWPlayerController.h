@@ -6,6 +6,7 @@
 #include "FWPlayerController.generated.h"
 
 class AFWCharacterStudio;
+class AFWGrowth;
 class SFWMarketWindow;
 class UTexture2D;
 class UAudioComponent;
@@ -237,6 +238,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<AFWPlot> Plot;
+	// The farmsteads' fields and the foresters' trees on the plot, drawn as they grow
+	UPROPERTY()
+	TObjectPtr<AFWGrowth> Growth;
 
 	UPROPERTY()
 	TObjectPtr<AFWCharacterStudio> Studio;

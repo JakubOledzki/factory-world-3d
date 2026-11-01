@@ -326,6 +326,34 @@ if os.path.isdir(MUGO) and foliage:
                 library.save_loaded_asset(asset)
         unreal.log(f"FWIMPORT mugo {name}")
 
+# Crops on the fields, from Tools/blender/make_crops.py: one tile of plants per crop and stage, coloured by the vertex
+# colour, swaying a little in the wind (M_FWFoliage); the tilled soil under them does not sway
+CROPS = os.path.join(MODELS, "crops")
+if os.path.isdir(CROPS) and foliage:
+    for file in sorted(os.listdir(CROPS)):
+        if not file.endswith(".glb"):
+            continue
+        name = file[:-4]
+        destination = f"/Game/External/Crops/{name}"
+        if library.list_assets(destination, recursive=True):
+            library.delete_directory(destination)  # always rebuilt from the script's latest output
+        run([os.path.join(CROPS, file)], destination)
+        for path in library.list_assets(destination, recursive=True, include_folder=False):
+            asset = unreal.load_asset(path)
+            if isinstance(asset, unreal.StaticMesh):
+                settings = asset.get_editor_property("nanite_settings")
+                settings.set_editor_property("enabled", True)
+                asset.set_editor_property("nanite_settings", settings)
+                library.save_loaded_asset(asset)
+            elif isinstance(asset, unreal.MaterialInstanceConstant):
+                mel.set_material_instance_parent(asset, foliage)
+                mel.set_material_instance_vector_parameter_value(asset, "Tint", unreal.LinearColor(1, 1, 1, 1))
+                mel.set_material_instance_scalar_parameter_value(asset, "Roughness", 0.7)
+                mel.set_material_instance_scalar_parameter_value(asset, "Wind", 0.0 if name == "crop_soil" else 1.2)
+                mel.update_material_instance(asset)
+                library.save_loaded_asset(asset)
+        unreal.log(f"FWIMPORT crops {name}")
+
 # Leak and stain decal textures (ambientCG, CC0): RawAssets/ambientcg/<id>/<id>_2K-PNG_{Color,Opacity}.png
 DECALS = os.path.join(ROOT, "ambientcg")
 if os.path.isdir(DECALS):
