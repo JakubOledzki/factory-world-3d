@@ -61,6 +61,8 @@ public:
 	float ForestAt(const FVector& World) const;
 	// Whether a component is the land itself (footsteps: grass or rock) rather than something built on it
 	bool IsLand(const UPrimitiveComponent* Component) const { return Component && Component == TerrainMesh; }
+	// Whether the land at a world height lies under snow, as the ground material draws it
+	bool IsSnowAt(float WorldZ) const { return WorldZ > SnowHeightCm + 4000.f; }
 
 	FVector TileCenter(FIntPoint Tile) const;
 	// Centre of the square an object of Kind covers when standing on Tile.
@@ -202,6 +204,8 @@ private:
 	TObjectPtr<UMaterialInterface> DecalBase;
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> TerrainMesh;
+	// Where the ground material's snow begins (world height, cm)
+	float SnowHeightCm = 1e7f;
 	struct FSoundPool
 	{
 		TArray<TObjectPtr<UAudioComponent>> Voices;
