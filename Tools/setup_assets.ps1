@@ -57,6 +57,21 @@ if (-not (Test-Path RawAssets\processed\pine_tree_01.glb)) {
 if (-not (Test-Path RawAssets\processed\factory\belt_straight.glb)) {
     & $Blender --background --factory-startup --python Tools\blender\make_factory.py
 }
+if (-not (Test-Path RawAssets\processed\factory\garage_walls.glb)) {
+    & $Blender --background --factory-startup --python Tools\blender\make_garage.py
+}
+# The world map's relief: Natural Earth shaded relief (public domain)
+if (-not (Test-Path RawAssets\naturalearth\SR_HR.tif)) {
+    New-Item -ItemType Directory -Force RawAssets\naturalearth | Out-Null
+    Invoke-WebRequest "https://naciscdn.org/naturalearth/10m/raster/SR_HR.zip" -OutFile RawAssets\naturalearth\SR_HR.zip
+    Expand-Archive -Force RawAssets\naturalearth\SR_HR.zip RawAssets\naturalearth
+}
+if (-not (Test-Path RawAssets\processed\worldmap\world_overview.png)) {
+    & $Blender --background --factory-startup --python Tools\blender\make_world_map.py
+}
+if (-not (Test-Path RawAssets\processed\worldmap\world_tiles.png)) {
+    & $Blender --background --factory-startup --python Tools\blender\make_world_tiles.py
+}
 if (-not (Test-Path RawAssets\processed\factory\train_locomotive.glb)) {
     & $Blender --background --factory-startup --python Tools\blender\make_trains.py
 }
