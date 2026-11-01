@@ -2,11 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Dom/JsonObject.h"
+#include "UObject/GCObject.h"
 #include "Widgets/SCompoundWidget.h"
 
 class AFWPlayerController;
 class SBox;
 struct FSlateBrush;
+class UTexture2D;
 struct FFWNetReply;
 
 /**
@@ -15,7 +17,7 @@ struct FFWNetReply;
  * in view (world.area) and the larger towns. A click picks a plot: its biome, country, owner and price (world.plot),
  * with buying it (world.buy), going there (plot.enter) and naming an own plot (world.rename).
  */
-class SFWWorldMap : public SCompoundWidget
+class SFWWorldMap : public SCompoundWidget, public FGCObject
 {
 public:
 	SLATE_BEGIN_ARGS(SFWWorldMap) {}
@@ -39,6 +41,9 @@ public:
 	void CenterOn(FVector2D Plot, float PixelsPerPlot);
 	void Select(FIntPoint Plot);
 
+	virtual void AddReferencedObjects(FReferenceCollector& Collector) override { Collector.AddReferencedObjects(Textures); }
+	virtual FString GetReferencerName() const override { return TEXT("SFWWorldMap"); }
+
 private:
 	FVector2D ToScreen(FVector2D Plot) const;
 	FVector2D ToPlot(FVector2D Local) const;
@@ -51,6 +56,8 @@ private:
 	// Smooth from afar; each plot a crisp square close up
 	TSharedPtr<FSlateBrush> MapBrush;
 	TSharedPtr<FSlateBrush> SharpBrush;
+	// Their textures, held while the map is open: Slate does not keep them from the garbage collector
+	TArray<TObjectPtr<UTexture2D>> Textures;
 	TSharedPtr<SBox> Panel;
 	FVector2D MapSize = FVector2D(6933, 2942);
 	// The plot at the centre of the view, and how many screen pixels a plot takes

@@ -23,7 +23,7 @@
 
 #define LOCTEXT_NAMESPACE "FWWorldMap"
 
-namespace
+namespace FWMapUi
 {
 	FText Money(double Cents)
 	{
@@ -70,6 +70,7 @@ void SFWWorldMap::Construct(const FArguments& InArgs)
 			Brush->SetResourceObject(Texture);
 			Brush->ImageSize = MapSize;
 			Brush->DrawAs = ESlateBrushDrawType::Image;
+			Textures.Add(Texture);
 		}
 		return Brush;
 	};
@@ -406,14 +407,14 @@ void SFWWorldMap::RebuildPanel()
 		[
 			SNew(STextBlock).Font(FWStyle::Font(18, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)
 			.Text(PlotInfo.IsValid() && !PlotInfo->GetStringField(TEXT("name")).IsEmpty()
-				? FText::FromString(PlotInfo->GetStringField(TEXT("name"))) : FText::Format(LOCTEXT("PlotTitle", "Działka {0}"), PlotText(Plot)))
+				? FText::FromString(PlotInfo->GetStringField(TEXT("name"))) : FText::Format(LOCTEXT("PlotTitle", "Działka {0}"), FWMapUi::PlotText(Plot)))
 		]
-		+ SVerticalBox::Slot().AutoHeight().Padding(0, 2)[Row(LOCTEXT("Where", "Położenie"), FWWorldData::Geo(Plot))]
-		+ SVerticalBox::Slot().AutoHeight().Padding(0, 2)[Row(LOCTEXT("Biome", "Teren"), FWWorldData::BiomeName(PlotInfo.IsValid() ? int32(PlotInfo->GetNumberField(TEXT("biome"))) : FWWorldData::Biome(Plot)))];
+		+ SVerticalBox::Slot().AutoHeight().Padding(0, 2)[FWMapUi::Row(LOCTEXT("Where", "Położenie"), FWWorldData::Geo(Plot))]
+		+ SVerticalBox::Slot().AutoHeight().Padding(0, 2)[FWMapUi::Row(LOCTEXT("Biome", "Teren"), FWWorldData::BiomeName(PlotInfo.IsValid() ? int32(PlotInfo->GetNumberField(TEXT("biome"))) : FWWorldData::Biome(Plot)))];
 	const FString Country = FWWorldData::Country(Plot);
 	if (!Country.IsEmpty())
 	{
-		Box->AddSlot().AutoHeight().Padding(0, 2)[Row(LOCTEXT("Country", "Państwo"), FText::FromString(Country))];
+		Box->AddSlot().AutoHeight().Padding(0, 2)[FWMapUi::Row(LOCTEXT("Country", "Państwo"), FText::FromString(Country))];
 	}
 	if (!PlotInfo.IsValid())
 	{
@@ -430,12 +431,12 @@ void SFWWorldMap::RebuildPanel()
 		PlotInfo->TryGetBoolField(TEXT("canEnter"), bCanEnter);
 		Box->AddSlot().AutoHeight().Padding(0, 2)
 		[
-			Row(LOCTEXT("Owner", "Właściciel"), bMine ? LOCTEXT("You", "ty") : bOwned ? FText::FromString((*Owner)->GetStringField(TEXT("name"))) : LOCTEXT("Nobody", "nikt"))
+			FWMapUi::Row(LOCTEXT("Owner", "Właściciel"), bMine ? LOCTEXT("You", "ty") : bOwned ? FText::FromString((*Owner)->GetStringField(TEXT("name"))) : LOCTEXT("Nobody", "nikt"))
 		];
 		if (bForSale)
 		{
 			const int64 Balance = PC.IsValid() ? PC->GetBalanceCents() : 0;
-			Box->AddSlot().AutoHeight().Padding(0, 2)[Row(LOCTEXT("Price", "Cena"), Money(Price))];
+			Box->AddSlot().AutoHeight().Padding(0, 2)[FWMapUi::Row(LOCTEXT("Price", "Cena"), FWMapUi::Money(Price))];
 			Box->AddSlot().AutoHeight().Padding(0, 14, 0, 0)
 			[
 				SNew(SButton).ButtonStyle(&FWStyle::PrimaryButton()).HAlign(HAlign_Center).IsEnabled(Balance >= Price)
@@ -462,14 +463,14 @@ void SFWWorldMap::RebuildPanel()
 							Inner->SetBalanceCents(int64(Balance));
 						}
 						Inner->PlayUiSound(TEXT("build_place"));
-						Inner->Toast(FText::Format(LOCTEXT("Bought", "Kupiono działkę {0}"), PlotText(Plot)));
+						Inner->Toast(FText::Format(LOCTEXT("Bought", "Kupiono działkę {0}"), FWMapUi::PlotText(Plot)));
 						Mine.AddUnique(Plot);
 						Select(Plot);
 					});
 					return FReply::Handled();
 				})
 				[
-					SNew(STextBlock).Text(Balance >= Price ? FText::Format(LOCTEXT("Buy", "Kup za {0}"), Money(Price)) : LOCTEXT("TooDear", "Za mało pieniędzy"))
+					SNew(STextBlock).Text(Balance >= Price ? FText::Format(LOCTEXT("Buy", "Kup za {0}"), FWMapUi::Money(Price)) : LOCTEXT("TooDear", "Za mało pieniędzy"))
 					.Font(FWStyle::Font(13, TEXT("Bold"))).ColorAndOpacity(FLinearColor::White)
 				]
 			];
@@ -541,7 +542,10 @@ void SFWWorldMap::RebuildPanel()
 
 FReply SFWWorldMap::OnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event)
 {
-	if (Event.GetKey() == EKeys::Escape || Event.GetKey() == EKeys::N)
+	// N closes it too, unless it is being typed into the plot name
+	const TSharedPtr<SWidget> Focused = FSlateApplication::Get().GetKeyboardFocusedWidget();
+	const bool bTyping = Focused.IsValid() && Focused->GetType().ToString().Contains(TEXT("EditableText"));
+	if (Event.GetKey() == EKeys::Escape || (Event.GetKey() == EKeys::N && !bTyping))
 	{
 		if (AFWPlayerController* PC = Controller.Get())
 		{
