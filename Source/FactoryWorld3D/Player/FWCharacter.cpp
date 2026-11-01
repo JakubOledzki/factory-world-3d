@@ -554,6 +554,7 @@ void AFWCharacter::CreateInput()
 	Mapping->MapKey(MakeAction(TEXT("Jump"), EInputActionValueType::Boolean), EKeys::SpaceBar);
 	Mapping->MapKey(MakeAction(TEXT("Sprint"), EInputActionValueType::Boolean), EKeys::LeftShift);
 	Mapping->MapKey(MakeAction(TEXT("Interact"), EInputActionValueType::Boolean), EKeys::E);
+	Mapping->MapKey(MakeAction(TEXT("Garage"), EInputActionValueType::Boolean), EKeys::U);
 	Mapping->MapKey(MakeAction(TEXT("Pickup"), EInputActionValueType::Boolean), EKeys::RightMouseButton);
 	Mapping->MapKey(MakeAction(TEXT("Primary"), EInputActionValueType::Boolean), EKeys::LeftMouseButton);
 	Mapping->MapKey(MakeAction(TEXT("Build"), EInputActionValueType::Boolean), EKeys::B);
@@ -599,6 +600,13 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	Input->BindAction(Actions[TEXT("Interact")], ETriggerEvent::Completed, this, &AFWCharacter::InteractStop);
 	Input->BindAction(Actions[TEXT("Pickup")], ETriggerEvent::Started, this, &AFWCharacter::PickupStart);
 	Input->BindAction(Actions[TEXT("Pickup")], ETriggerEvent::Completed, this, &AFWCharacter::PickupStop);
+	Input->BindActionValueLambda(Actions[TEXT("Garage")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenGarage();
+		}
+	});
 	Input->BindAction(Actions[TEXT("Primary")], ETriggerEvent::Started, this, &AFWCharacter::Primary);
 	Input->BindAction(Actions[TEXT("Build")], ETriggerEvent::Started, this, &AFWCharacter::ToggleBuild);
 	Input->BindAction(Actions[TEXT("Rotate")], ETriggerEvent::Started, this, &AFWCharacter::Rotate);

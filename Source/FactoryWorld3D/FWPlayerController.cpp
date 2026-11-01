@@ -14,6 +14,7 @@
 #include "EngineUtils.h"
 #include "Game/FWCatalog.h"
 #include "Game/FWGameSettings.h"
+#include "UI/SFWGarageWindow.h"
 #include "Net/FWNetSubsystem.h"
 #include "UI/SFWHud.h"
 #include "AudioMixerBlueprintLibrary.h"
@@ -1067,6 +1068,73 @@ void AFWPlayerController::StorageTransferAll(bool bPut)
 	for (const FFWStack& Stack : TArray<FFWStack>(Storage.Items))
 	{
 		StorageTransfer(false, Stack.Id, Stack.Quantity);
+	}
+}
+
+void AFWPlayerController::OpenGarage()
+{
+	SAssignNew(GarageWindow, SFWGarageWindow).Controller(this);
+	ShowWidget(GarageWindow.ToSharedRef(), GarageWindow);
+}
+
+void AFWPlayerController::RefreshLook()
+{
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Net()->GetCharacter([WeakThis](const FFWNetReply& Reply)
+	{
+		if (AFWPlayerController* This = WeakThis.Get(); This && Reply.Type == TEXT("character"))
+		{
+			This->ApplyLook(Reply.Payload);
+		}
+	});
+}
+
+void AFWPlayerController::FWGarage(int32 Tab)
+{
+	if (!GarageWindow.IsValid() || ShownWidget != GarageWindow)
+	{
+		OpenGarage();
+	}
+	GarageWindow->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWGarageSort()
+{
+	if (GarageWindow.IsValid() && ShownWidget == GarageWindow)
+	{
+		GarageWindow->ToggleSorting();
+	}
+}
+
+void AFWPlayerController::FWGaragePlace(const FString& Kind)
+{
+	if (GarageWindow.IsValid() && ShownWidget == GarageWindow)
+	{
+		GarageWindow->PlaceFurniture(Kind);
+	}
+}
+
+void AFWPlayerController::FWGarageSorter(int32 Quantity)
+{
+	if (GarageWindow.IsValid() && ShownWidget == GarageWindow)
+	{
+		GarageWindow->LoadSorter(Quantity);
+	}
+}
+
+void AFWPlayerController::FWGarageOutfit(int32 Number, int32 Save)
+{
+	if (GarageWindow.IsValid() && ShownWidget == GarageWindow)
+	{
+		GarageWindow->WearOutfit(Number, Save != 0);
+	}
+}
+
+void AFWPlayerController::FWGarageHang(const FString& Item)
+{
+	if (GarageWindow.IsValid() && ShownWidget == GarageWindow)
+	{
+		GarageWindow->HangUp(Item);
 	}
 }
 

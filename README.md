@@ -70,6 +70,18 @@ Polecenia konsoli (klawisz `~`) do testów:
 "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "%CD%\FactoryWorld3D.uproject" -run=pythonscript -script="%CD%\Tools\make_test_level.py"
 ```
 
+## Garaż (U)
+
+U otwiera garaż, jak w grze 2D (tam to osobne pomieszczenie):
+
+- **Segregacja** — ręczne segregowanie śmieci z kosza, worek po worku (każdy daje losowy surowiec i 5 XP), z paskiem postępu i tym, co ostatnio wypadło; zamknięcie okna przerywa worek, a śmieci wracają do kosza,
+- **Sortownia** — automatyczna sortownia: wkładanie worków (1, 10, wszystko), postęp, posegregowane przedmioty z „Wyjmij”, szanse na surowce,
+- **Ulepszenia** — podłoga, ściany, oświetlenie, regały i ogrzewanie, poziom po poziomie za pieniądze i materiały, z premią na zawsze,
+- **Garderoba** — komplety ubrań (zapisz to, co masz na sobie; załóż jednym kliknięciem), ubrania w szafie i wieszanie z plecaka,
+- **Meble** — garaż z góry z meblami, stawianie mebli z plecaka w pierwszym wolnym miejscu i chowanie ich do plecaka.
+
+Do testów: `FWGarage 0..4`, `FWGarageSort`, `FWGaragePlace furniture_wardrobe`, `FWGarageSorter 5`, `FWGarageOutfit 1 1`, `FWGarageHang clothes_beanie`.
+
 ## Gra na działce (demo)
 
 Po zalogowaniu:
