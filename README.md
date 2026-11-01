@@ -172,6 +172,16 @@ Cień rzuca osobna, niewidoczna dla gracza pełna postać w tym samym wyglądzie
 
 Do testów: `FWSelect <0–4>`, `FWGesture place|rotate|pickup|swing|mine`, `FWDress <koszulka 0–2> <kolor hex>`, `FWWalk <s>`.
 
+## Czat, osiągnięcia i rywalizacja
+
+Jak w grze 2D:
+
+- **Czat** w lewym dolnym rogu: ostatnie linie same znikają po kilkunastu sekundach. **Enter** otwiera historię i pole do pisania: do graczy na działce albo do całego świata, z szybkimi zwrotami (Cześć!, Dzięki!...). Esc albo pusty Enter zamyka. Ogłoszenia serwera (meteoryt, pierwsi na świecie) są na złoto (`chat.get` co 2 s, `chat.send`).
+- **Osiągnięcia** (O): odznaki w grupach z postępem, rankingi najlepszych graczy z własnym miejscem, rywalizacja: wyzwanie tygodnia i zwycięzcy, meteoryt z kopaniem, cuda świata, pierwsi na świecie (`achievements.get`, `rankings.get`, `rivalry.get`, `meteor.get/dig`, `company.wonders`).
+- **Nowa odznaka**: karta wysuwa się z góry ekranu, gdy serwer zgłosi zdobycie (`achievements.watch` → `achievement.unlocked`); znaleziska do albumu jako komunikat (`album.found`).
+
+Do testów: `FWChatOpen`, `FWSay <plot/world> <tekst>`, `FWAchievements <0–2>`, `FWRanking <id>`, `FWBadgeTest <nazwa>`.
+
 ## Dźwięk
 
 Wszystkie dźwięki (49) są syntezowane przez nasz skrypt `Tools/make_audio.py` (Python z numpy, uruchamiany w Blenderze), bez nagrań i bez licencji do pilnowania. Tworzy je `Tools/setup_assets.ps1` i nie ma ich w gicie.
@@ -183,6 +193,16 @@ Wszystkie dźwięki (49) są syntezowane przez nasz skrypt `Tools/make_audio.py`
 - **Miks:** klasy dźwięku Master → Ambience / SFX / UI, wygaszanie z odległością i limity głosów. Głośność ogólną ustawia `MasterVolume` w `Config/DefaultGame.ini` (menu ustawień jeszcze nie ma).
 
 Do testów: `FWRecordStart <s>` i `FWRecordStop <nazwa>` nagrywają to, co gra gra, do `Saved/BouncedWavFiles`, a `FWWalk <s>` idzie prosto. Gra w tle jest wyciszona (domyślnie w Unrealu), więc do nagrań bez fokusu uruchom ją z `-ini:Engine:[Audio]:UnfocusedVolumeMultiplier=1.0`.
+
+## Badania, zlecenia i statystyki
+
+Jak w grze 2D:
+
+- **Stół badawczy** (E przy stole `furniture_research_table`): drzewko technologii osobno dla każdej gałęzi (zakładki u góry, z postępem). Karty stoją w kolumnach etapów, połączone krzywymi z tym, czego wymagają; wymagania z innych gałęzi to małe ikony na karcie. Po prawej opis, co odblokowuje, koszt (wymagane/masz), czas i XP, przyciski **Zbadaj** / **Przerwij badanie** i przyspieszanie danymi badawczymi (`research.get/start/cancel/boost`). Badania spółki: dokładanie przedmiotów i pieniędzy (`research.companyStart/contribute/companyCancel`).
+- **Zlecenia** (J): zlecenia firm i przyjęte zlecenia graczy z dostarczaniem z ekwipunku i rezygnacją, tablica zleceń innych graczy, własne zlecenia z formularzem i odwoływaniem (`contracts.get/deliver/abandon/accept/create/cancel`).
+- **Statystyki produkcji** (L): okres 10 min / 1 h / 24 h, wąskie gardła (maszyny stojące i czego im brak, kończące się zapasy), praca maszyn, wykres produkcji i zużycia wybranego przedmiotu oraz tabela na minutę (`stats.production`, co 5 s).
+
+Do testów: `FWResearch`, `FWResearchPick <id>`, `FWResearchStart`, `FWContracts <0–2>`, `FWContractFirst <deliver/accept/abandon/cancel> <npc/taken/board/issued> [ile]`, `FWContractCreate <przedmiot> <ile> <nagroda $> <godziny>`, `FWStats <minuty> [przedmiot]`.
 
 ## Automatyczne logowanie (tylko do testów)
 
@@ -197,6 +217,16 @@ Katalog `Saved/` nie trafia do gita, więc hasła nie ma w repozytorium. Plik je
 
 Konto bez działki i bez pieniędzy dostaje propozycję kupna działki i przycisk „Rozejrzyj się (bez działki)”, więc gra nie utyka.
 
+## Transport: stacja, kursy, trasy i eksport
+
+Jak w grze 2D:
+
+- **Stacja kolejowa** (T): **Trasy** między własnymi działkami (ze skrzyń ładujących do odbierających, nazwa działki), **Magazyn** stacji (ładowanie z ekwipunku i zdejmowanie), **Wyślij** jeden pociąg – albo statek z portu, ciężarówkę z bazy, sanie, wóz konny – na swoją działkę, do innego gracza (szukanie po nazwie) lub na podane X, Y, z wyliczeniem odległości, czasu i opłaty, opcjonalnie jako przemyt; **Rozkład** – kursy odjeżdżające same co kilka minut; **W drodze** – pociągi przyjeżdżające i odjechane z odliczaniem (`station.*`, `freight.*`).
+- **Skrzynia eksportowa** (E przy niej): ceny towarów, wkładanie i wyjmowanie, droga do najbliższego rynku skupu i pociągi w drodze (`export.get/load/unload/price`).
+- **Rynek skupu i port pociągowy** (E przy nich): prowizja rynku albo opłata portu, ustawiana przez właściciela, i zarobek (`export.post/setPost`).
+
+Do testów: `FWRail <0–4>`, `FWRailStock <1 załaduj / 0 zdejmij> <przedmiot> <ile>`, `FWExport [id rynku lub portu]`.
+
 ## Grafika: zasoby zewnętrzne
 
 Fotogrametryczne skały, drzewa, krzaki, tekstury gruntu (Poly Haven, CC0) i prawdziwe ukształtowanie terenu (Copernicus DEM) nie są w repozytorium, bo zajęłyby zbyt dużo miejsca w Git LFS. Tworzy je jedno polecenie:
@@ -209,6 +239,15 @@ Skrypt pobiera pliki i sprawdza ich sumy kontrolne, przygotowuje je w Blenderze 
 
 Obraz: fizyczne słońce (75 000 lx), ekspozycja z histogramu w zakresie EV 12,5–14,8, krzywa filmowa, delikatny bloom, winieta i ziarno, Lumen z HW RT (oświetlenie trafień z surface cache), wirtualne mapy cieni, Nanite, mgła wolumetryczna.
 
+## Spółka, banki i giełda
+
+Jak w grze 2D:
+
+- **Spółka** (K): bez spółki zakładanie i zaproszenia; w spółce zakładki **Spółka** (członkowie i role, zapraszanie, działki spółki z kierownikami, wnoszenie własnych działek, wspólny magazyn – wkładanie i wyjmowanie, dziennik), **Kasa** (wpłata za udziały, wypłata, sprzedaż z magazynu handlarzowi, zakup do magazynu, udziały, dywidenda, trofea), **Projekty** (wielkie budowy i cuda świata, dokładanie części z ekwipunku i magazynu), **Zlecenia** (zlecenia tygodnia, zadania z pensją), **Umowy** (stałe dostawy z innymi spółkami), **Giełda** (akcje, wejście na giełdę, przejęcie) i **Ranking** sezonu (`company.*`).
+- **Banki** (Z – w 3D B to budowanie): konta, wpłata, wypłata, przelewy do innych graczy, pieniądze „w drodze” z odliczaniem (`bank.*`, odświeżanie co 5 s).
+
+Do testów: `FWCompany <0–6>`, `FWCompanyDo <wiadomość> <pole> <wartość>` (np. `FWCompanyDo company.deposit cents 50000`), `FWBank`.
+
 ## Wersja do grania (paczka dla Windows)
 
 ```
@@ -220,6 +259,16 @@ Skrypt kompiluje grę, przygotowuje zasoby (cook) i pakuje wszystko do `D:\Facto
 
 - Adres serwera: `FactoryWorld3D.exe -ServerUrl=ws://adres:5080/ws` albo `ServerUrl` w `Saved\Config\Windows\Game.ini`.
 - Wersja Shipping pomija `Saved/DevLogin.ini`, więc zawsze pokazuje ekran logowania. Wersja Development loguje się automatycznie, jeśli ten plik istnieje.
+
+## Miasto, państwo i policja
+
+Jak w grze 2D:
+
+- **Miasto** (H – ratusz): potrzeby miasta z dostawą z ekwipunku lub ze stacji, tygodniowy przetarg (ukryte oferty z wadium, dostawa zwycięzcy), rozwój miasta i główny dostawca, wywóz śmieci, usługi biur graczy, ratusz (podatki i premia burmistrza, festyn, uchwały z głosowaniem, wotum nieufności), wybory burmistrza (głosowanie, kandydowanie z programem i kaucją, wsparcie spółek) i kasa miasta z budowami (`city.*`). Na działce w powiecie, poza samym miastem, tylko ratusz, wybory, kasa i przetarg.
+- **Państwo** (P): obywatelstwo, prezydent i ministrowie, prawo i skarbiec, rząd (podatki, opłaty, cła, dotacje, inwestycje, mianowanie ministrów), wybory prezydenta z wotum nieufności, dyplomacja (sojusze, embarga), ranking państw i partie (`country.*`, `party.*`).
+- **Policja** (przycisk w oknie państwa): prawo i licencje, sprawy i kary, zgłaszanie graczy, służba (kontrole pociągów, wyroki, śledztwa, nakazy, funkcjonariusze), sąd (odwołania, nakazy) i paser (`law.*`, `fence.*`).
+
+Do testów: `FWCity <0–7>`, `FWCountry <0–5> [kod kraju, np. SVK]`, `FWPolice <0–3>`.
 
 ## Las (Project Titan)
 
@@ -242,3 +291,9 @@ Nad lasem rośnie pas kosodrzewiny (Pinus mugo), jak w Tatrach. Zaczyna się na 
 Krzewy robimy sami w Blenderze (`Tools/blender/make_mugo_pine.py`, 5 odmian). Z jednej nasady wychodzi wiele wygiętych pędów, które łukiem rozchodzą się na boki. Gęste szczotki igieł to prawdziwa geometria (Nanite), a nie płaskie karty z przezroczystością. Kora ma teksturę z modelu `pine_tree_01` z Poly Haven (CC0), a igły kolor z materiału `M_FWFoliage`. Ten materiał porusza krzewami na wietrze, ale tylko w promieniu 15 m od gracza. Kępy do 400 m od działki są nie do przejścia, tak jak prawdziwa kosodrzewina: dostają niewidoczny walec kolizji.
 
 Krzewy powstają razem z innymi zasobami (`Tools/setup_assets.ps1`) i nie ma ich w gicie. Bez nich gra działa normalnie, tylko bez kosodrzewiny.
+
+## Modele stołów, pieców i maszyn
+
+`Tools/blender/make_factory.py` buduje osobne modele w prawdziwej skali dla zajmowanego obszaru (1 pole = 4 m): stół warsztatowy (imadło, tablica z narzędziami), kowadło na pniu, komputer z dwoma monitorami i krzesłem, stół badawczy (mikroskop, kolby), kamienny piec z kominem, ceglany piec z kolebkowym sklepieniem, wielki piec z nagrzewnicami i pochylnią, tartak z piłą tarczową pod wiatą, montownię z ramieniem robota i ogrodzeniem oraz młyn wodny. Podobne rodzaje dzielą model, przeskalowany do swojego obszaru (`FWArt::FurnitureModel`); reszta maszyn ma dalej ogólną obudowę. Nowe tekstury CC0 z Poly Haven: `red_brick_03`, `castle_wall_slates`, `wood_table_001` (`node Tools/fetch_polyhaven.mjs`). Ikony na pasku renderuje `Tools/blender/render_icons.py`.
+
+Do testów: `FWLookAt <rodzaj> <pola> <kąt> [pochylenie]` staje w danej odległości od najbliższego obiektu i patrzy na niego.
