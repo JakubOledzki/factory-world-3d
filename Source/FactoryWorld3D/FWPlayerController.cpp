@@ -30,6 +30,7 @@
 #include "Camera/CameraComponent.h"
 #include "UI/SFWLoginWidget.h"
 #include "World/FWCharacterStudio.h"
+#include "World/FWTrains.h"
 #include "Player/FWCharacter.h"
 #include "UI/SFWPromptWidget.h"
 #include "World/FWEnvironment.h"
@@ -1500,6 +1501,14 @@ void AFWPlayerController::FWStoreAt(int32 TileX, int32 TileY)
 	}
 }
 
+void AFWPlayerController::FWTrain(float Seconds, int32 Quantity)
+{
+	if (Trains)
+	{
+		Trains->Expect(Seconds, Quantity);
+	}
+}
+
 void AFWPlayerController::PlaceOnGround(const FVector& Feet)
 {
 	ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
@@ -1635,6 +1644,16 @@ void AFWPlayerController::Tick(float DeltaSeconds)
 	if (!StationId.IsEmpty() && Now >= NextStationPoll)
 	{
 		PollStation();
+	}
+	// The trains of the plot stood on
+	if (Plot && Plot->IsBuilt() && (!Trains || Trains->GetPlot() != Plot))
+	{
+		if (Trains)
+		{
+			Trains->Destroy();
+		}
+		Trains = GetWorld()->SpawnActor<AFWTrains>();
+		Trains->Init(this, Plot);
 	}
 	if (Now < WalkUntil)
 	{

@@ -53,6 +53,9 @@ if (-not (Test-Path RawAssets\processed\pine_tree_01.glb)) {
 if (-not (Test-Path RawAssets\processed\factory\belt_straight.glb)) {
     & $Blender --background --factory-startup --python Tools\blender\make_factory.py
 }
+if (-not (Test-Path RawAssets\processed\factory\train_locomotive.glb)) {
+    & $Blender --background --factory-startup --python Tools\blender\make_trains.py
+}
 if (-not (Test-Path RawAssets\processed\factory\tool_pickaxe.glb)) {
     & $Blender --background --factory-startup --python Tools\blender\make_tools.py
 }

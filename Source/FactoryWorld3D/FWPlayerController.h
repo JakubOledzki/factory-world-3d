@@ -13,6 +13,7 @@ class AFWPlot;
 class SFWCharacterCreator;
 class SFWHud;
 class SFWLoginWidget;
+class AFWTrains;
 class SFWPromptWidget;
 class SWidget;
 class UFWNetSubsystem;
@@ -139,6 +140,9 @@ public:
 	void FWPickupAt(int32 TileX, int32 TileY);
 	UFUNCTION(Exec)
 	void FWStoreAt(int32 TileX, int32 TileY);
+	// A train for tests: arrives at the platform in Seconds with Quantity goods (a wagon per 400)
+	UFUNCTION(Exec)
+	void FWTrain(float Seconds = 20.f, int32 Quantity = 1200);
 	UFUNCTION(Exec)
 	void FWShot(const FString& Name);
 	// Finds a free row near the player and builds chest → inserter → belts eastwards, then looks at it
@@ -244,6 +248,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UAudioComponent> WindSound;
+	// Trains coming to the plot's station and leaving it
+	UPROPERTY()
+	TObjectPtr<AFWTrains> Trains;
 	UPROPERTY()
 	TObjectPtr<UAudioComponent> ForestSound;
 	double NextGustAt = 0.0;
