@@ -24,6 +24,7 @@
 #include "UI/SFWCharacterCreator.h"
 #include "UI/SFWInventoryWindow.h"
 #include "UI/SFWSettingsWindow.h"
+#include "UI/SFWMarketWindow.h"
 #include "UI/SFWStationWindow.h"
 #include "Engine/Texture2D.h"
 #include "Camera/CameraComponent.h"
@@ -906,7 +907,11 @@ void AFWPlayerController::FWOpenNearest(const FString& Kind)
 		return;
 	}
 	FWGoto(Nearest->Tile.X - 2, Nearest->Tile.Y + 2, -45.f, -25.f);
-	if (FWCatalog::IsStorage(Kind))
+	if (Kind == TEXT("furniture_computer"))
+	{
+		OpenMarket();
+	}
+	else if (FWCatalog::IsStorage(Kind))
 	{
 		OpenInventory(Nearest->Id);
 	}
@@ -916,8 +921,58 @@ void AFWPlayerController::FWOpenNearest(const FString& Kind)
 	}
 }
 
+void AFWPlayerController::OpenMarket()
+{
+	SAssignNew(Market, SFWMarketWindow).Controller(this);
+	ShowWidget(Market.ToSharedRef(), Market);
+	RefreshWallet();
+}
+
+void AFWPlayerController::Send(const TCHAR* Type, TSharedPtr<FJsonObject> P, TFunction<void(const FFWNetReply&)> OnReply)
+{
+	Net()->Request(Type, P.IsValid() ? P : Payload(), MoveTemp(OnReply));
+}
+
+void AFWPlayerController::PlayUiSound(const TCHAR* Sound)
+{
+	FWAudio::Play2D(this, Sound, 0.5f);
+}
+
+void AFWPlayerController::FWMarketTab(int32 Tab)
+{
+	if (Market.IsValid())
+	{
+		Market->ShowTab(Tab);
+	}
+}
+
+void AFWPlayerController::FWMarketItem(const FString& Item)
+{
+	if (Market.IsValid())
+	{
+		Market->OpenItem(Item);
+	}
+}
+
+void AFWPlayerController::FWMarketOffer(int32 Sell, int32 Quantity, float PriceDollars)
+{
+	if (Market.IsValid())
+	{
+		Market->PutOffer(Sell != 0, Quantity, PriceDollars * 100.0);
+	}
+}
+
+void AFWPlayerController::FWTrade(int32 Buy, const FString& Item, int32 Quantity)
+{
+	if (Market.IsValid())
+	{
+		Market->Trade(Buy != 0, Item, Quantity);
+	}
+}
+
 void AFWPlayerController::CloseWindow()
 {
+	Market.Reset();
 	StationId.Reset();
 	StationState.Reset();
 	if (!Storage.Id.IsEmpty())
