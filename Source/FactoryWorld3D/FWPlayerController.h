@@ -196,6 +196,9 @@ public:
 	// Places an item on the nearest free spot around the player
 	UFUNCTION(Exec)
 	void FWPlaceNear(const FString& Kind);
+	// Stands Tiles away from the nearest object of a kind, on the side at Angle (0 east, 90 south), looking at it
+	UFUNCTION(Exec)
+	void FWLookAt(const FString& Kind, float Tiles, float Angle, float Pitch = -12.f);
 	UFUNCTION(Exec)
 	void FWStationDo(const FString& Type, const FString& Field, const FString& Value) { StationAction(*Type, Field.IsEmpty() ? nullptr : *Field, Value); }
 	UFUNCTION(Exec)

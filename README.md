@@ -246,3 +246,9 @@ Nad lasem rośnie pas kosodrzewiny (Pinus mugo), jak w Tatrach. Zaczyna się na 
 Krzewy robimy sami w Blenderze (`Tools/blender/make_mugo_pine.py`, 5 odmian). Z jednej nasady wychodzi wiele wygiętych pędów, które łukiem rozchodzą się na boki. Gęste szczotki igieł to prawdziwa geometria (Nanite), a nie płaskie karty z przezroczystością. Kora ma teksturę z modelu `pine_tree_01` z Poly Haven (CC0), a igły kolor z materiału `M_FWFoliage`. Ten materiał porusza krzewami na wietrze, ale tylko w promieniu 15 m od gracza. Kępy do 400 m od działki są nie do przejścia, tak jak prawdziwa kosodrzewina: dostają niewidoczny walec kolizji.
 
 Krzewy powstają razem z innymi zasobami (`Tools/setup_assets.ps1`) i nie ma ich w gicie. Bez nich gra działa normalnie, tylko bez kosodrzewiny.
+
+## Modele stołów, pieców i maszyn
+
+`Tools/blender/make_factory.py` buduje osobne modele w prawdziwej skali dla zajmowanego obszaru (1 pole = 4 m): stół warsztatowy (imadło, tablica z narzędziami), kowadło na pniu, komputer z dwoma monitorami i krzesłem, stół badawczy (mikroskop, kolby), kamienny piec z kominem, ceglany piec z kolebkowym sklepieniem, wielki piec z nagrzewnicami i pochylnią, tartak z piłą tarczową pod wiatą, montownię z ramieniem robota i ogrodzeniem oraz młyn wodny. Podobne rodzaje dzielą model, przeskalowany do swojego obszaru (`FWArt::FurnitureModel`); reszta maszyn ma dalej ogólną obudowę. Nowe tekstury CC0 z Poly Haven: `red_brick_03`, `castle_wall_slates`, `wood_table_001` (`node Tools/fetch_polyhaven.mjs`). Ikony na pasku renderuje `Tools/blender/render_icons.py`.
+
+Do testów: `FWLookAt <rodzaj> <pola> <kąt> [pochylenie]` staje w danej odległości od najbliższego obiektu i patrzy na niego.
