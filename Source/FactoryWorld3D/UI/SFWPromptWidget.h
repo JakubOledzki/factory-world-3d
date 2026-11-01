@@ -32,11 +32,14 @@ public:
 	TSharedPtr<SWidget> GetFocusTarget() const;
 	// Fills the text field (if any) and presses the button, for console testing
 	void AcceptWith(const FString& Text);
+	// Presses the second button, for console testing
+	void PressSecondary() { OnSecondary.ExecuteIfBound(); }
 
 private:
 	FReply Accept();
 
 	FOnFWPromptAccepted OnAccepted;
+	FSimpleDelegate OnSecondary;
 	TSharedPtr<SEditableTextBox> Input;
 	TSharedPtr<STextBlock> MessageText;
 	bool bBusy = false;

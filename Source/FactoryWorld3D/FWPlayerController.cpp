@@ -488,20 +488,25 @@ void AFWPlayerController::OfferStarterPlot(int32 Radius, int32 Index)
 			.Title(LOCTEXT("FirstPlot", "Pierwsza działka"))
 			.Message(Message)
 			.ButtonText(LOCTEXT("Buy", "Kup działkę"))
-			.SecondaryText(LOCTEXT("LookAround", "Rozejrzyj się (bez działki)"))
+			.SecondaryText(LOCTEXT("ToGarage", "Idź do garażu"))
 			.OnSecondary_Lambda([WeakThis]()
 			{
 				if (AFWPlayerController* Inner = WeakThis.Get())
 				{
 					Inner->HideWidget();
 					Inner->Prompt.Reset();
-					Inner->Toast(LOCTEXT("NoPlotYet", "Nie masz jeszcze działki. Zarób na nią w garażu w Factory World i zaloguj się ponownie."));
 					if (!Inner->Hud.IsValid())
 					{
 						SAssignNew(Inner->Hud, SFWHud).Controller(Inner);
 						Inner->GetWorld()->GetGameViewport()->AddViewportWidgetContent(Inner->Hud.ToSharedRef(), 10);
 					}
 					Inner->RefreshWallet();
+					// Without a plot the player starts in the garage and earns the first plot there
+					if (!Inner->bInGarage)
+					{
+						Inner->ToggleGarageRoom();
+					}
+					Inner->Toast(LOCTEXT("NoPlotYet", "Nie masz jeszcze działki. Zarób na nią w garażu: segreguj śmieci przy koszu i sprzedawaj surowce. Brama garażu pokaże wolną działkę."));
 				}
 			})
 			.OnAccepted_Lambda([WeakThis, At](const FString&)
@@ -577,6 +582,8 @@ void AFWPlayerController::EnterPlot(int32 X, int32 Y)
 		This->Plot = World->SpawnActor<AFWPlot>();
 		This->Plot->Build(Reply.Payload);
 		This->PlaceOnGround(This->Plot->SpawnLocation());
+		// Bought from the garage: the player is on the plot now
+		This->bInGarage = false;
 
 		This->HideWidget();
 		This->Prompt.Reset();
@@ -1692,11 +1699,17 @@ void AFWPlayerController::FWGarageHang(const FString& Item)
 void AFWPlayerController::ToggleGarageRoom()
 {
 	APawn* Walker = GetPawn();
-	if (!Walker || !Plot)
+	if (!Walker)
 	{
 		return;
 	}
 	CloseWindow();
+	if (bInGarage && !Plot)
+	{
+		// No plot to go back to yet: the door offers one to buy, and the player stays in the garage until then
+		ChoosePlot();
+		return;
+	}
 	if (bInGarage)
 	{
 		// Out of the door, back where the player stood on the plot
@@ -1708,7 +1721,7 @@ void AFWPlayerController::ToggleGarageRoom()
 	if (!GarageRoom)
 	{
 		// High above the plot, out of sight of it and of its mountains
-		GarageRoom = GetWorld()->SpawnActor<AFWGarageRoom>(Plot->GetActorLocation() + FVector(0.f, 0.f, 500000.f), FRotator::ZeroRotator);
+		GarageRoom = GetWorld()->SpawnActor<AFWGarageRoom>((Plot ? Plot->GetActorLocation() : FVector::ZeroVector) + FVector(0.f, 0.f, 500000.f), FRotator::ZeroRotator);
 	}
 	PlotSpot = FTransform(GetControlRotation(), Walker->GetActorLocation());
 	bInGarage = true;
@@ -2198,6 +2211,14 @@ void AFWPlayerController::FWPrompt(const FString& Text)
 	if (Prompt.IsValid())
 	{
 		Prompt->AcceptWith(Text);
+	}
+}
+
+void AFWPlayerController::FWPromptSecondary()
+{
+	if (Prompt.IsValid())
+	{
+		Prompt->PressSecondary();
 	}
 }
 
