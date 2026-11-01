@@ -466,3 +466,23 @@ if os.path.isdir(AUDIO):
         wave.set_editor_property("sound_class_object", classes[group])
         library.save_loaded_asset(wave)
     unreal.log_warning(f"FWIMPORT audio: {len(library.list_assets(destination, recursive=False, include_folder=False))} sounds")
+
+# The world map picture from Tools/build_world_map.mjs: an interface texture, no mipmaps
+WORLD_MAP = os.path.join(MODELS, "world_map.png")
+if os.path.isfile(WORLD_MAP):
+    destination = "/Game/External/WorldMap"
+    if library.list_assets(destination, recursive=True):
+        library.delete_directory(destination)
+    for path in run([WORLD_MAP], destination):
+        texture = unreal.load_asset(path)
+        if isinstance(texture, unreal.Texture2D):
+            texture.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
+            texture.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_UI)
+            texture.set_editor_property("never_stream", True)
+            texture.set_editor_property("filter", unreal.TextureFilter.TF_BILINEAR)
+            library.save_loaded_asset(texture)
+            # A copy sampled nearest, for close up, where each plot is a crisp square
+            sharp = library.duplicate_asset(path.split(".")[0], destination + "/world_map_sharp")
+            sharp.set_editor_property("filter", unreal.TextureFilter.TF_NEAREST)
+            library.save_loaded_asset(sharp)
+            unreal.log_warning(f"FWIMPORT world map {path}")
