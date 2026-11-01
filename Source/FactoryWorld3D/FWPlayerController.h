@@ -9,15 +9,28 @@ class AFWCharacterStudio;
 class SFWMarketWindow;
 class UTexture2D;
 class UAudioComponent;
+class SFWCityWindow;
+class SFWCountryWindow;
+class SFWPoliceWindow;
 class AFWPlot;
+class SFWRailWindow;
+class SFWExportWindow;
 class SFWCharacterCreator;
 class SFWHud;
+class SFWResearchWindow;
+class SFWContractsWindow;
+class SFWStatsWindow;
 class SFWLoginWidget;
 class AFWTrains;
 class SFWPromptWidget;
 class SWidget;
+class SFWChat;
+class SFWAchievementsWindow;
+class SFWBadgeToast;
 class UFWNetSubsystem;
 struct FFWNetReply;
+class SFWCompanyWindow;
+class SFWBankWindow;
 
 struct FFWStack
 {
@@ -80,6 +93,11 @@ public:
 	// Windows over the game: the inventory (with a chest beside it) and the settings menu
 	void OpenInventory(const FString& StorageId = FString());
 	void OpenSettings();
+	// The research table (E at it), contracts (J) and production statistics (L), as in the 2D game
+	void OpenResearch();
+	void OpenContracts();
+	void OpenStats();
+	void RefreshWallet();
 	void CloseWindow();
 	void ApplyUserSettings(const FFWUserSettings& Settings);
 	// Inventory moves, each answered by the server with the new state
@@ -107,8 +125,15 @@ public:
 	FString ItemName(const FString& Item) const;
 	const TArray<FFWToast>& GetToasts() const { return Toasts; }
 	bool IsInWorld() const { return Plot != nullptr; }
+	// The company (K) and the banks (Z, as B builds in 3D), as in the 2D game
+	void OpenCompany();
+	void OpenBank();
 
 	void SelectSlot(int32 Slot);
+	// The chat in the corner (Enter opens it to write) and achievements, rankings and rivalry (O), as in the 2D game
+	void OpenChat();
+	void CloseChat();
+	void OpenAchievements();
 	// The icon of an item for the HUD, rendered from its model (Tools/blender/render_icons.py)
 	UTexture2D* GetIcon(const FString& Item) const;
 	void Toast(const FText& Text, bool bError = false);
@@ -118,7 +143,14 @@ public:
 	void Mine(int32 MineId, TFunction<void(bool bOk)> Done);
 	void Place(const FString& Kind, FIntPoint Tile, int32 Rotation);
 	void Pickup(const FString& ObjectId);
+	// The plot's railway station (T), its export chest, and a buying market or a rail port by its object id, as in the 2D game
+	void OpenRail();
+	void OpenExport(const FString& PostId = FString());
 	void PutAllInStorage(const FString& ObjectId);
+	// The town of this plot (H), the country and politics (P) and the police, as in the 2D game
+	void OpenCity();
+	void OpenCountry();
+	void OpenPolice();
 
 	// Console commands for testing without mouse and keyboard; a file of "seconds command" lines passed
 	// with -FWAutoTest=<path> runs them one after another.
@@ -148,12 +180,26 @@ public:
 	// Finds a free row near the player and builds chest → inserter → belts eastwards, then looks at it
 	UFUNCTION(Exec)
 	void FWBuildLine(int32 BeltCount = 5);
+	// Politics for tests: the town, the country (on a tab, or a country by code) and the police on a tab
+	UFUNCTION(Exec)
+	void FWCity(int32 Tab = 0);
+	UFUNCTION(Exec)
+	void FWCountry(int32 Tab = 4, const FString& Code = TEXT(""));
+	UFUNCTION(Exec)
+	void FWPolice(int32 Tab = 0);
 	// Puts the mined resources in the chest of that line
 	UFUNCTION(Exec)
 	void FWStoreLine();
 	// Hovers above the belts of the plot, looking at them
 	UFUNCTION(Exec)
 	void FWViewBelts(float Height = 700.f);
+	// Transport for tests: the station on a tab, loading (1) or unloading (0) the station, the export chest or a post
+	UFUNCTION(Exec)
+	void FWRail(int32 Tab = 0);
+	UFUNCTION(Exec)
+	void FWRailStock(int32 Load, const FString& Item, int32 Quantity);
+	UFUNCTION(Exec)
+	void FWExport(const FString& PostId = TEXT(""));
 	// Character creator: pick an option (appearance key, index), type the name, randomize, zoom (0-1), create
 	UFUNCTION(Exec)
 	void FWCreatorPick(const FString& Key, int32 Index);
@@ -192,12 +238,31 @@ public:
 	// Places an item on the nearest free spot around the player
 	UFUNCTION(Exec)
 	void FWPlaceNear(const FString& Kind);
+	// Stands Tiles away from the nearest object of a kind, on the side at Angle (0 east, 90 south), looking at it
+	UFUNCTION(Exec)
+	void FWLookAt(const FString& Kind, float Tiles, float Angle, float Pitch = -12.f);
 	UFUNCTION(Exec)
 	void FWStationDo(const FString& Type, const FString& Field, const FString& Value) { StationAction(*Type, Field.IsEmpty() ? nullptr : *Field, Value); }
 	UFUNCTION(Exec)
 	void FWStationLoad(const FString& Type, const FString& Item, int32 Quantity) { StationLoad(*Type, Item, Quantity); }
 	UFUNCTION(Exec)
 	void FWMenu() { OpenSettings(); }
+	// Research, contracts and statistics for tests: open them; pick a technology and start it; a contracts tab, an
+	// action on the first order of a list (deliver/accept/abandon/cancel), a new order; a statistics period and item
+	UFUNCTION(Exec)
+	void FWResearch() { OpenResearch(); }
+	UFUNCTION(Exec)
+	void FWResearchPick(const FString& Technology);
+	UFUNCTION(Exec)
+	void FWResearchStart();
+	UFUNCTION(Exec)
+	void FWContracts(int32 Tab = 0);
+	UFUNCTION(Exec)
+	void FWContractFirst(const FString& Action, const FString& List, int32 Quantity = 1);
+	UFUNCTION(Exec)
+	void FWContractCreate(const FString& Item, int32 Quantity, float RewardDollars, int32 Hours);
+	UFUNCTION(Exec)
+	void FWStats(int32 Minutes = 10, const FString& Item = TEXT(""));
 	UFUNCTION(Exec)
 	void FWMoveTile(int32 From, int32 To) { MoveTile(From, To); }
 	UFUNCTION(Exec)
@@ -208,8 +273,27 @@ public:
 	// Walks straight ahead for a while (footsteps without a keyboard)
 	UFUNCTION(Exec)
 	void FWWalk(float Seconds);
+	// Company and banks for tests: open on a tab, a company message with one text field, the bank window on a bank
+	UFUNCTION(Exec)
+	void FWCompany(int32 Tab = 0);
+	UFUNCTION(Exec)
+	void FWCompanyDo(const FString& Type, const FString& Field, const FString& Value);
+	UFUNCTION(Exec)
+	void FWBank();
 	UFUNCTION(Exec)
 	void FWRecordStop(const FString& Name);
+	// Chat, achievements and badges for tests: open the chat, say something on a channel (plot/world), the window on a
+	// tab or a ranking, a made-up badge card
+	UFUNCTION(Exec)
+	void FWChatOpen() { OpenChat(); }
+	UFUNCTION(Exec)
+	void FWSay(const FString& Channel, const FString& Text);
+	UFUNCTION(Exec)
+	void FWAchievements(int32 Tab = 0);
+	UFUNCTION(Exec)
+	void FWRanking(const FString& Ranking);
+	UFUNCTION(Exec)
+	void FWBadgeTest(const FString& Name);
 
 protected:
 	virtual void BeginPlay() override;
@@ -229,7 +313,6 @@ private:
 	void ChoosePlot();
 	void OfferStarterPlot(int32 Radius, int32 Index);
 	void EnterPlot(int32 X, int32 Y);
-	void RefreshWallet();
 	void PollLogistics();
 	void ApplyHotbar(const TSharedPtr<FJsonObject>& Payload);
 	void ApplyInventory(const TSharedPtr<FJsonObject>& Payload);
@@ -245,6 +328,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<AFWCharacterStudio> Studio;
 	TSharedPtr<SFWCharacterCreator> Creator;
+	TSharedPtr<SFWChat> Chat;
+	TSharedPtr<SFWAchievementsWindow> Achievements;
+	TSharedPtr<SFWBadgeToast> BadgeToast;
 
 	UPROPERTY()
 	TObjectPtr<UAudioComponent> WindSound;
@@ -263,8 +349,13 @@ private:
 	TSharedPtr<SFWMarketWindow> Market;
 	TSharedPtr<SFWLoginWidget> LoginWidget;
 	TSharedPtr<SFWPromptWidget> Prompt;
+	TSharedPtr<SFWCompanyWindow> Company;
+	TSharedPtr<SFWBankWindow> Bank;
 	TSharedPtr<SWidget> ShownWidget;
 	TSharedPtr<SFWHud> Hud;
+	TSharedPtr<SFWResearchWindow> Research;
+	TSharedPtr<SFWContractsWindow> Contracts;
+	TSharedPtr<SFWStatsWindow> Stats;
 
 	TArray<FFWStack> Inventory;
 	int32 InventorySlots = 0;
@@ -276,10 +367,18 @@ private:
 	int32 StationVersion = 0;
 	double StationServerMs = 0.0;
 	double StationReceivedAt = 0.0;
+	TSharedPtr<SFWRailWindow> Rail;
+	TSharedPtr<SFWExportWindow> Export;
 	double NextStationPoll = 0.0;
+	TSharedPtr<SFWCityWindow> City;
+	TSharedPtr<SFWCountryWindow> Country;
+	TSharedPtr<SFWPoliceWindow> Police;
 	void ApplyStation(const FFWNetReply& Reply);
 	void PollStation();
 	TMap<FString, TSharedPtr<FSlateBrush>> IconBrushes;
+	// The textures of those brushes: Slate does not keep them from the garbage collector
+	UPROPERTY()
+	TArray<TObjectPtr<UTexture2D>> IconTextures;
 	TMap<FString, FString> Names;
 	TArray<FString> Hotbar;
 	int32 SelectedSlot = 0;
