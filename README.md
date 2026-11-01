@@ -103,6 +103,17 @@ Materiały bazowe (`Content/Materials`) tworzy skrypt `Tools/make_materials.py`.
 
 ![Tryb budowania](docs/screenshots/build_mode.png)
 
+## Filtry i rozdzielacze
+
+Jak w grze 2D:
+
+- **podajnik** (zwykły, szybki, ekspresowy, długi) **i pompa** — E otwiera filtr: podnosi tylko wybrany przedmiot; do tego warunek pracy („napełniaj skrzynię przed sobą do…”, „zostawiaj w skrzyni za sobą…”),
+- **rozdzielacz** — E: wybrane przedmioty (do 8) idą w lewo albo w prawo (z kierunkiem świata), reszta na drugą stronę; bez filtra na zmianę,
+- **skrzynia i magazyn** — przycisk „Filtr” w oknie skrzyni: przyjmuje tylko wybrany przedmiot,
+- **piec i maszyna** — przycisk „Filtr” pod oknem: z podajników przyjmuje tylko wybrany przedmiot.
+
+Wybór przedmiotu z wyszukiwarką (najpierw to, co masz w plecaku). Esc wraca do okna skrzyni albo maszyny. Do testów: `FWFilter logistics_inserter` otwiera filtr najbliższego podajnika, a drugie `FWFilter logistics_inserter coal` ustawia węgiel (`-` czyści; przy rozdzielaczu trzeci argument to strona 0/1).
+
 ## Kreator postaci
 
 Po założeniu konta, gdy serwer odpowie `character.none`, otwiera się kreator. Ma te same opcje co edytor w grze 2D, w tej samej kolejności: skóra, twarz, oczy, fryzura, kolor włosów, zarost, koszulka, kolor koszulki, spodnie i buty, a do tego imię. Listy kolorów i liczbę stylów podaje serwer (`character.options`), więc nowy kolor dodany na serwerze pojawi się bez aktualizacji gry. Imię sprawdzamy według reguły serwera (3–16 liter, cyfr lub _), a postać tworzy `character.create`.

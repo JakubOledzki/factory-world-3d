@@ -5,6 +5,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/StaticMeshActor.h"
+#include "UI/SFWFilterWindow.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Misc/CommandLine.h"
@@ -989,6 +990,54 @@ void AFWPlayerController::ApplyUserSettings(const FFWUserSettings& Settings)
 	if (AFWCharacter* Walker = Cast<AFWCharacter>(GetPawn()))
 	{
 		Walker->ApplyUserSettings(Settings.MouseSensitivity, Settings.FieldOfView);
+	}
+}
+
+bool AFWPlayerController::HasOwnFilter(const FString& Kind)
+{
+	return SFWFilterWindow::RoleOf(Kind) != SFWFilterWindow::ERole::None;
+}
+
+void AFWPlayerController::OpenFilter(const FString& ObjectId, bool bMachine)
+{
+	const FFWPlotObject* Found = Plot ? Plot->GetObjects().Find(ObjectId) : nullptr;
+	SFWFilterWindow::ERole FilterRole = Found ? SFWFilterWindow::RoleOf(Found->Kind) : SFWFilterWindow::ERole::None;
+	if (FilterRole == SFWFilterWindow::ERole::None)
+	{
+		FilterRole = bMachine ? SFWFilterWindow::ERole::Machine : SFWFilterWindow::ERole::Storage;
+	}
+	SAssignNew(FilterWindow, SFWFilterWindow).Controller(this).Object(ObjectId).Role(FilterRole);
+	ShowWidget(FilterWindow.ToSharedRef(), FilterWindow);
+}
+
+void AFWPlayerController::FWFilter(const FString& Kind, const FString& Item, int32 Side)
+{
+	if (!FilterWindow.IsValid() || ShownWidget != FilterWindow)
+	{
+		if (!Plot || !GetPawn())
+		{
+			return;
+		}
+		const FIntPoint At = Plot->TileAt(GetPawn()->GetActorLocation());
+		const FFWPlotObject* Nearest = nullptr;
+		for (const TPair<FString, FFWPlotObject>& Pair : Plot->GetObjects())
+		{
+			if (Pair.Value.Kind == Kind && (!Nearest || (Pair.Value.Tile - At).SizeSquared() < (Nearest->Tile - At).SizeSquared()))
+			{
+				Nearest = &Pair.Value;
+			}
+		}
+		if (!Nearest)
+		{
+			UE_LOG(LogFWGame, Warning, TEXT("No %s on the plot"), *Kind);
+			return;
+		}
+		FWGoto(Nearest->Tile.X - 2, Nearest->Tile.Y + 2, -45.f, -25.f);
+		OpenFilter(Nearest->Id, FWCatalog::StationOf(Kind) >= 0);
+	}
+	else if (!Item.IsEmpty() || Side >= 0)
+	{
+		FilterWindow->Choose(Item == TEXT("-") ? FString() : Item, Side);
 	}
 }
 
