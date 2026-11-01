@@ -2,12 +2,37 @@
 
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
+#include "Game/FWHeadComponent.h"
+#include "ReferenceSkeleton.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
 namespace FWGear
 {
 	namespace
 	{
+		// The skin tone the MetaHuman heads are baked in, and the gain from a palette colour to the iris tint
+		const FLinearColor BakedSkin(0.25f, 0.1f, 0.055f);
+		constexpr float IrisGain = 1.f;
+
+		// Our hair and facial hair are made around the mannequin's head: on a MetaHuman head they are moved (cm, in the
+		// body's bind pose) to its skull and chin, and the hair a little enlarged over its wider skull. Measured from the
+		// heads Tools/make_metahumans.py builds (their skull, chin and eyes against the mannequin's, from the head bone),
+		// then set by eye.
+		struct FHeadFit
+		{
+			FVector Hair;
+			FVector Beard;
+		};
+		const FHeadFit HeadFits[] = {
+			{ FVector(0, -0.5f, 0), FVector(0, -1.8f, -1.6f) },
+			{ FVector(0, 0.3f, 0), FVector(0, -1.6f, -1.0f) },
+			{ FVector(0, 0.4f, 0.5f), FVector(0, -1.2f, -1.2f) },
+			{ FVector(0, -1.f, -1.5f), FVector(0, -4.f, -1.8f) },
+		};
+		constexpr float HairScale = 1.06f;
+		// The head's centre in the mannequin's bind pose: the hair grows from there
+		const FVector HeadCentre(0, 2.f, 170.f);
+
 		FLinearColor PaletteColor(const TSharedPtr<FJsonObject>& Appearance, const TSharedPtr<FJsonObject>& Options, const TCHAR* Key, const TCHAR* Palette)
 		{
 			int32 Index = 0;
@@ -52,21 +77,21 @@ namespace FWGear
 	}
 
 	USkeletalMeshComponent* Wear(AActor* Owner, USceneComponent* Parent, USkinnedMeshComponent* Leader,
-		TMap<FString, TObjectPtr<USkeletalMeshComponent>>& Gear, const FString& Kind, const FString& Piece,
+		TMap<FString, TObjectPtr<USkinnedMeshComponent>>& Gear, const FString& Kind, const FString& Piece,
 		const FLinearColor& Color, bool bArmsOnly)
 	{
-		for (TPair<FString, TObjectPtr<USkeletalMeshComponent>>& Pair : Gear)
+		for (TPair<FString, TObjectPtr<USkinnedMeshComponent>>& Pair : Gear)
 		{
 			if (Pair.Key.StartsWith(Kind) && Pair.Value)
 			{
-				Pair.Value->SetVisibility(Pair.Key == Piece);
+				Pair.Value->SetVisibility(Pair.Key == Piece, true);
 			}
 		}
 		if (Piece.IsEmpty() || !Leader)
 		{
 			return nullptr;
 		}
-		TObjectPtr<USkeletalMeshComponent>* Found = Gear.Find(Piece);
+		TObjectPtr<USkinnedMeshComponent>* Found = Gear.Find(Piece);
 		if (!Found)
 		{
 			USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/External/Character/%s.%s"), *Piece, *Piece), nullptr, LOAD_NoWarn | LOAD_Quiet);
@@ -120,7 +145,7 @@ namespace FWGear
 			// Missing pieces (Tools/setup_assets.ps1 not run) are remembered as none: the painted body shows instead
 			Found = &Gear.Add(Piece, Part);
 		}
-		USkeletalMeshComponent* Part = *Found;
+		USkeletalMeshComponent* Part = Cast<USkeletalMeshComponent>(*Found);
 		if (Part)
 		{
 			Part->SetVisibility(true);
@@ -135,7 +160,79 @@ namespace FWGear
 		return Part;
 	}
 
-	void Dress(AActor* Owner, USkinnedMeshComponent* Body, TMap<FString, TObjectPtr<USkeletalMeshComponent>>& Gear,
+	UFWHeadComponent* WearHead(AActor* Owner, USkinnedMeshComponent* Body, TMap<FString, TObjectPtr<USkinnedMeshComponent>>& Gear,
+		const FFWLook& Look)
+	{
+		const FString Piece = FString::Printf(TEXT("face_%d"), Look.FaceStyle);
+		for (TPair<FString, TObjectPtr<USkinnedMeshComponent>>& Pair : Gear)
+		{
+			if (Pair.Key.StartsWith(TEXT("face_")) && Pair.Value)
+			{
+				Pair.Value->SetVisibility(Pair.Key == Piece);
+			}
+		}
+		TObjectPtr<USkinnedMeshComponent>* Found = Gear.Find(Piece);
+		if (!Found)
+		{
+			const FString Name = FString::Printf(TEXT("SKM_FW_Face%d_FaceMesh"), Look.FaceStyle);
+			USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/MetaHumans/Built/FW_Face%d/Face/%s.%s"), Look.FaceStyle, *Name, *Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
+			UFWHeadComponent* Head = nullptr;
+			if (Mesh && Mesh->GetRefSkeleton().FindBoneIndex(TEXT("head")) != INDEX_NONE)
+			{
+				// Posed from the body every frame (the face stands as built: no facial animation)
+				Head = NewObject<UFWHeadComponent>(Owner);
+				Head->SetupAttachment(Body);
+				Head->SetSkinnedAssetAndUpdate(Mesh);
+				Head->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				Head->FirstPersonPrimitiveType = Body->FirstPersonPrimitiveType;
+				Head->SetOwnerNoSee(Body->bOwnerNoSee);
+				Head->SetCastShadow(Body->CastShadow);
+				Head->bCastHiddenShadow = Body->bCastHiddenShadow;
+				if (Body->bOwnerNoSee)
+				{
+					// Only its shadow is seen by the player: the lightest level of detail is enough
+					Head->SetForcedLOD(Mesh->GetLODNum());
+				}
+				Head->RegisterComponent();
+				for (int32 Slot = 0; Slot < Head->GetNumMaterials(); ++Slot)
+				{
+					if (UMaterialInterface* Base = Head->GetMaterial(Slot))
+					{
+						Head->SetMaterial(Slot, UMaterialInstanceDynamic::Create(Base, Owner));
+					}
+				}
+			}
+			Found = &Gear.Add(Piece, Head);
+		}
+		UFWHeadComponent* Head = Cast<UFWHeadComponent>(*Found);
+		if (Head)
+		{
+			Head->SetVisibility(true, true);
+			const TArray<FName> Slots = Head->GetMaterialSlotNames();
+			for (int32 Slot = 0; Slot < Slots.Num(); ++Slot)
+			{
+				UMaterialInstanceDynamic* Material = Cast<UMaterialInstanceDynamic>(Head->GetMaterial(Slot));
+				const FString SlotName = Slots[Slot].ToString();
+				if (!Material)
+				{
+					continue;
+				}
+				if (SlotName.StartsWith(TEXT("head_")))
+				{
+					// The baked skin is the one tone all heads were built in (Tools/make_metahumans.py): scaled to the
+					// palette's
+					Material->SetVectorParameterValue(TEXT("Basecolor Global Multiply Post-Bake"), Look.Skin / BakedSkin);
+				}
+				else if (SlotName.StartsWith(TEXT("eyeLeft")) || SlotName.StartsWith(TEXT("eyeRight")))
+				{
+					Material->SetVectorParameterValue(TEXT("Iris Color Multiply"), Look.Eyes * IrisGain);
+				}
+			}
+		}
+		return Head;
+	}
+
+	void Dress(AActor* Owner, USkinnedMeshComponent* Body, TMap<FString, TObjectPtr<USkinnedMeshComponent>>& Gear,
 		const FFWLook& Look, bool bArmsOnly)
 	{
 		if (!Body)
@@ -166,12 +263,32 @@ namespace FWGear
 			Material->SetScalarParameterValue(TEXT("FacialHair"), Look.FacialHair);
 			Material->SetScalarParameterValue(TEXT("FaceStyle"), Look.FaceStyle);
 		}
+		// The MetaHuman head over the painted one, which is then cut away
+		const bool bHead = !bArmsOnly && WearHead(Owner, Body, Gear, Look) != nullptr;
+		if (UMaterialInstanceDynamic* Material = Cast<UMaterialInstanceDynamic>(Body->GetMaterial(0)))
+		{
+			Material->SetScalarParameterValue(TEXT("HideHead"), bHead ? 1.f : 0.f);
+			// Down to where the MetaHuman neck meets the shoulders (bind-pose height, cm)
+			Material->SetScalarParameterValue(TEXT("HeadCut"), 149.f);
+		}
 		USceneComponent* Parent = Body;
 		// First person: only the sleeves are seen; hair and the rest would only cost
 		if (!bArmsOnly)
 		{
-			Wear(Owner, Parent, Body, Gear, TEXT("hair"), Look.HairStyle > 0 ? FString::Printf(TEXT("hair_%d"), Look.HairStyle) : FString(), Look.Hair);
-			Wear(Owner, Parent, Body, Gear, TEXT("beard"), Look.FacialHair > 0 ? FString::Printf(TEXT("beard_%d"), Look.FacialHair) : FString(), Look.Hair);
+			USkeletalMeshComponent* Hair = Wear(Owner, Parent, Body, Gear, TEXT("hair"), Look.HairStyle > 0 ? FString::Printf(TEXT("hair_%d"), Look.HairStyle) : FString(), Look.Hair);
+			USkeletalMeshComponent* Beard = Wear(Owner, Parent, Body, Gear, TEXT("beard"), Look.FacialHair > 0 ? FString::Printf(TEXT("beard_%d"), Look.FacialHair) : FString(), Look.Hair);
+			const FHeadFit* Fit = bHead && Look.FaceStyle >= 0 && Look.FaceStyle < UE_ARRAY_COUNT(HeadFits) ? &HeadFits[Look.FaceStyle] : nullptr;
+			if (Hair)
+			{
+				// Enlarged about the head's centre
+				const float Scale = Fit ? HairScale : 1.f;
+				Hair->SetRelativeScale3D(FVector(Scale));
+				Hair->SetRelativeLocation((Fit ? Fit->Hair : FVector::ZeroVector) + HeadCentre * (1.f - Scale));
+			}
+			if (Beard)
+			{
+				Beard->SetRelativeLocation(Fit ? Fit->Beard : FVector::ZeroVector);
+			}
 			Wear(Owner, Parent, Body, Gear, TEXT("pants"), TEXT("pants"), Look.Pants);
 			Wear(Owner, Parent, Body, Gear, TEXT("shoes"), TEXT("shoes"), Look.Shoes);
 		}

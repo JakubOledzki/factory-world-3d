@@ -34,3 +34,6 @@ Plugins/EasyImpostor/
 
 # UE5 mannequin from the engine's templates, copied locally by Tools/copy_mannequins.ps1
 Content/Characters/
+
+# MetaHuman heads built locally by Tools/make_metahumans.py (MetaHuman license: Unreal Engine only, not redistributed)
+Content/MetaHumans/
