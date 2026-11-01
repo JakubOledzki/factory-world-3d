@@ -22,19 +22,32 @@
 #include "Engine/StaticMesh.h"
 #include "Game/FWArt.h"
 #include "Game/FWAudio.h"
+#include "UI/SFWCityWindow.h"
+#include "UI/SFWCountryWindow.h"
+#include "UI/SFWPoliceWindow.h"
 #include "UI/SFWCharacterCreator.h"
 #include "UI/SFWInventoryWindow.h"
+#include "UI/SFWContractsWindow.h"
+#include "UI/SFWResearchWindow.h"
+#include "UI/SFWStatsWindow.h"
 #include "UI/SFWSettingsWindow.h"
 #include "UI/SFWMarketWindow.h"
 #include "UI/SFWStationWindow.h"
 #include "Engine/Texture2D.h"
+#include "UI/SFWExportWindow.h"
+#include "UI/SFWRailWindow.h"
 #include "Camera/CameraComponent.h"
+#include "UI/SFWBankWindow.h"
+#include "UI/SFWCompanyWindow.h"
 #include "UI/SFWLoginWidget.h"
 #include "World/FWCharacterStudio.h"
 #include "Player/FWCharacter.h"
 #include "UI/SFWPromptWidget.h"
 #include "World/FWEnvironment.h"
 #include "World/FWPlot.h"
+#include "UI/SFWAchievementsWindow.h"
+#include "UI/SFWBadgeToast.h"
+#include "UI/SFWChat.h"
 
 #define LOCTEXT_NAMESPACE "FWGame"
 
@@ -562,6 +575,14 @@ void AFWPlayerController::EnterPlot(int32 X, int32 Y)
 			SAssignNew(This->Hud, SFWHud).Controller(This);
 			World->GetGameViewport()->AddViewportWidgetContent(This->Hud.ToSharedRef(), 10);
 		}
+		// The chat in the corner and the badge cards over everything, made once
+		if (!This->Chat.IsValid())
+		{
+			SAssignNew(This->Chat, SFWChat).Controller(This);
+			World->GetGameViewport()->AddViewportWidgetContent(This->Chat.ToSharedRef(), 20);
+			SAssignNew(This->BadgeToast, SFWBadgeToast).Controller(This);
+			World->GetGameViewport()->AddViewportWidgetContent(This->BadgeToast.ToSharedRef(), 200);
+		}
 		// The player's own settings from the last time
 		This->ApplyUserSettings(FFWUserSettings::Load());
 		This->Toast(FText::Format(LOCTEXT("Welcome", "Działka {0}:{1}"),
@@ -571,6 +592,55 @@ void AFWPlayerController::EnterPlot(int32 X, int32 Y)
 		This->RefreshWallet();
 		This->NextPollAt = 0.0;
 	});
+}
+
+void AFWPlayerController::OpenCity()
+{
+	SAssignNew(City, SFWCityWindow).Controller(this);
+	ShowWidget(City.ToSharedRef(), City);
+}
+
+void AFWPlayerController::OpenCountry()
+{
+	SAssignNew(Country, SFWCountryWindow).Controller(this);
+	ShowWidget(Country.ToSharedRef(), Country);
+}
+
+void AFWPlayerController::OpenPolice()
+{
+	SAssignNew(Police, SFWPoliceWindow).Controller(this);
+	ShowWidget(Police.ToSharedRef(), Police);
+}
+
+void AFWPlayerController::FWCity(int32 Tab)
+{
+	if (!City.IsValid())
+	{
+		OpenCity();
+	}
+	City->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWCountry(int32 Tab, const FString& Code)
+{
+	if (!Country.IsValid())
+	{
+		OpenCountry();
+	}
+	if (!Code.IsEmpty())
+	{
+		Country->ShowCountry(Code);
+	}
+	Country->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWPolice(int32 Tab)
+{
+	if (!Police.IsValid())
+	{
+		OpenPolice();
+	}
+	Police->ShowTab(Tab);
 }
 
 void AFWPlayerController::RefreshInventory()
@@ -592,6 +662,41 @@ void AFWPlayerController::RefreshInventory()
 			}
 		});
 	});
+}
+
+void AFWPlayerController::OpenRail()
+{
+	SAssignNew(Rail, SFWRailWindow).Controller(this);
+	ShowWidget(Rail.ToSharedRef(), Rail);
+}
+
+void AFWPlayerController::OpenExport(const FString& PostId)
+{
+	SAssignNew(Export, SFWExportWindow).Controller(this).Post(PostId);
+	ShowWidget(Export.ToSharedRef(), Export);
+}
+
+void AFWPlayerController::FWRail(int32 Tab)
+{
+	if (!Rail.IsValid())
+	{
+		OpenRail();
+	}
+	Rail->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWRailStock(int32 Load, const FString& Item, int32 Quantity)
+{
+	if (!Rail.IsValid())
+	{
+		OpenRail();
+	}
+	Rail->StockAction(Load != 0, Item, Quantity);
+}
+
+void AFWPlayerController::FWExport(const FString& PostId)
+{
+	OpenExport(PostId);
 }
 
 void AFWPlayerController::ApplyInventory(const TSharedPtr<FJsonObject>& InventoryPayload)
@@ -673,6 +778,7 @@ const FSlateBrush* AFWPlayerController::GetIconBrush(const FString& Item)
 		Brush = MakeShared<FSlateBrush>();
 		Brush->SetResourceObject(Texture);
 		Brush->ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
+		IconTextures.Add(Texture);
 	}
 	IconBrushes.Add(Item, Brush);
 	return Brush.Get();
@@ -922,6 +1028,38 @@ void AFWPlayerController::FWPlaceNear(const FString& Kind)
 	}
 }
 
+void AFWPlayerController::FWLookAt(const FString& Kind, float Tiles, float Angle, float Pitch)
+{
+	if (!Plot || !GetPawn())
+	{
+		return;
+	}
+	const FIntPoint At = Plot->TileAt(GetPawn()->GetActorLocation());
+	const FFWPlotObject* Nearest = nullptr;
+	for (const TPair<FString, FFWPlotObject>& Pair : Plot->GetObjects())
+	{
+		if (Pair.Value.Kind == Kind && (!Nearest || (Pair.Value.Tile - At).SizeSquared() < (Nearest->Tile - At).SizeSquared()))
+		{
+			Nearest = &Pair.Value;
+		}
+	}
+	if (!Nearest)
+	{
+		UE_LOG(LogFWGame, Warning, TEXT("No %s on the plot"), *Kind);
+		return;
+	}
+	// The footprint's middle (plot space) to world, then a point that far out on that side, put on the ground
+	const float Radians = FMath::DegreesToRadians(Angle);
+	const FVector Middle = Plot->GetActorTransform().TransformPosition(Plot->FootprintCenter(Kind, Nearest->Tile));
+	const FVector Out = Middle + FVector(FMath::Cos(Radians), FMath::Sin(Radians), 0.f) * Tiles * Plot->GetTileSize();
+	FHitResult Hit;
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Out + FVector(0, 0, 100000.f), Out - FVector(0, 0, 100000.f), ECC_Visibility))
+	{
+		PlaceOnGround(Hit.ImpactPoint);
+	}
+	SetControlRotation(FRotator(Pitch, Angle + 180.f, 0.f));
+}
+
 void AFWPlayerController::FWOpenNearest(const FString& Kind)
 {
 	if (!Plot || !GetPawn())
@@ -947,6 +1085,10 @@ void AFWPlayerController::FWOpenNearest(const FString& Kind)
 	{
 		OpenMarket();
 	}
+	else if (Kind == TEXT("furniture_research_table"))
+	{
+		OpenResearch();
+	}
 	else if (FWCatalog::IsStorage(Kind))
 	{
 		OpenInventory(Nearest->Id);
@@ -954,6 +1096,88 @@ void AFWPlayerController::FWOpenNearest(const FString& Kind)
 	else
 	{
 		OpenStation(Nearest->Id, Kind);
+	}
+}
+
+void AFWPlayerController::OpenResearch()
+{
+	SAssignNew(Research, SFWResearchWindow).Controller(this);
+	ShowWidget(Research.ToSharedRef(), Research);
+}
+
+void AFWPlayerController::OpenContracts()
+{
+	SAssignNew(Contracts, SFWContractsWindow).Controller(this);
+	ShowWidget(Contracts.ToSharedRef(), Contracts);
+	RefreshWallet();
+}
+
+void AFWPlayerController::OpenStats()
+{
+	SAssignNew(Stats, SFWStatsWindow).Controller(this);
+	ShowWidget(Stats.ToSharedRef(), Stats);
+}
+
+void AFWPlayerController::FWResearchPick(const FString& Technology)
+{
+	if (Research.IsValid())
+	{
+		Research->Choose(Technology);
+	}
+}
+
+void AFWPlayerController::FWResearchStart()
+{
+	if (Research.IsValid())
+	{
+		Research->Start();
+	}
+}
+
+void AFWPlayerController::FWContracts(int32 Tab)
+{
+	if (!Contracts.IsValid())
+	{
+		OpenContracts();
+	}
+	Contracts->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWContractFirst(const FString& Action, const FString& List, int32 Quantity)
+{
+	const int64 Id = Contracts.IsValid() ? Contracts->FirstId(*List) : 0;
+	if (Id == 0)
+	{
+		UE_LOG(LogFWGame, Warning, TEXT("No contract on %s"), *List);
+		return;
+	}
+	TSharedPtr<FJsonObject> P = Payload();
+	P->SetNumberField(TEXT("id"), double(Id));
+	if (Action == TEXT("deliver"))
+	{
+		P->SetNumberField(TEXT("quantity"), Quantity);
+	}
+	Contracts->Act(*(TEXT("contracts.") + Action), P);
+}
+
+void AFWPlayerController::FWContractCreate(const FString& Item, int32 Quantity, float RewardDollars, int32 Hours)
+{
+	if (Contracts.IsValid())
+	{
+		Contracts->Create(Item, Quantity, RewardDollars * 100.0, Hours);
+	}
+}
+
+void AFWPlayerController::FWStats(int32 Minutes, const FString& Item)
+{
+	if (!Stats.IsValid())
+	{
+		OpenStats();
+	}
+	Stats->SetPeriod(Minutes);
+	if (!Item.IsEmpty())
+	{
+		Stats->SelectItem(Item);
 	}
 }
 
@@ -1016,7 +1240,83 @@ void AFWPlayerController::CloseWindow()
 		FWAudio::Play2D(this, TEXT("chest_close"), 0.6f);
 		Storage = FFWStorageView();
 	}
+	if (Chat.IsValid() && Chat->IsOpen())
+	{
+		Chat->SetOpen(false);
+	}
 	HideWidget();
+}
+
+void AFWPlayerController::OpenChat()
+{
+	if (!Chat.IsValid())
+	{
+		return;
+	}
+	if (ShownWidget.IsValid())
+	{
+		CloseWindow();
+	}
+	Chat->SetOpen(true);
+	FInputModeUIOnly InputMode;
+	InputMode.SetWidgetToFocus(Chat->GetInput());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+	SetShowMouseCursor(true);
+}
+
+void AFWPlayerController::CloseChat()
+{
+	if (Chat.IsValid())
+	{
+		Chat->SetOpen(false);
+	}
+	SetInputMode(FInputModeGameOnly());
+	SetShowMouseCursor(false);
+}
+
+void AFWPlayerController::OpenAchievements()
+{
+	SAssignNew(Achievements, SFWAchievementsWindow).Controller(this);
+	ShowWidget(Achievements.ToSharedRef(), Achievements);
+}
+
+void AFWPlayerController::FWSay(const FString& InChannel, const FString& Text)
+{
+	if (Chat.IsValid())
+	{
+		Chat->SetChannel(InChannel);
+		Chat->Say(Text);
+	}
+}
+
+void AFWPlayerController::FWAchievements(int32 Tab)
+{
+	if (!Achievements.IsValid())
+	{
+		OpenAchievements();
+	}
+	Achievements->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWRanking(const FString& Ranking)
+{
+	if (!Achievements.IsValid())
+	{
+		OpenAchievements();
+	}
+	Achievements->ShowRanking(Ranking);
+}
+
+void AFWPlayerController::FWBadgeTest(const FString& Name)
+{
+	if (BadgeToast.IsValid())
+	{
+		TSharedPtr<FJsonObject> Badge = MakeShared<FJsonObject>();
+		Badge->SetStringField(TEXT("name"), Name);
+		Badge->SetStringField(TEXT("description"), TEXT("Przykładowa odznaka do sprawdzenia karty"));
+		BadgeToast->Show(Badge);
+	}
 }
 
 void AFWPlayerController::ApplyUserSettings(const FFWUserSettings& Settings)
@@ -1173,6 +1473,54 @@ void AFWPlayerController::ApplyHotbar(const TSharedPtr<FJsonObject>& HotbarPaylo
 			}
 		}
 	}
+}
+
+void AFWPlayerController::OpenCompany()
+{
+	SAssignNew(Company, SFWCompanyWindow).Controller(this);
+	ShowWidget(Company.ToSharedRef(), Company);
+}
+
+void AFWPlayerController::OpenBank()
+{
+	SAssignNew(Bank, SFWBankWindow).Controller(this);
+	ShowWidget(Bank.ToSharedRef(), Bank);
+}
+
+void AFWPlayerController::FWCompany(int32 Tab)
+{
+	if (!Company.IsValid())
+	{
+		OpenCompany();
+	}
+	Company->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWCompanyDo(const FString& Type, const FString& Field, const FString& Value)
+{
+	if (!Company.IsValid())
+	{
+		OpenCompany();
+	}
+	TSharedPtr<FJsonObject> P = Payload();
+	if (!Field.IsEmpty())
+	{
+		// Numbers go as numbers, the rest as text
+		if (Value.IsNumeric())
+		{
+			P->SetNumberField(Field, FCString::Atod(*Value));
+		}
+		else
+		{
+			P->SetStringField(Field, Value);
+		}
+	}
+	Company->Act(*Type, P);
+}
+
+void AFWPlayerController::FWBank()
+{
+	OpenBank();
 }
 
 void AFWPlayerController::RefreshWallet()
