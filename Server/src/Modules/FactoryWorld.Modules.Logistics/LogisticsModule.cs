@@ -66,7 +66,7 @@ public sealed record LogisticsState(
     DateTimeOffset SimulatedAt, DateTimeOffset ServerTime, IReadOnlyList<PlotObject> Objects, IReadOnlyDictionary<Guid, Contents> Contents, IPowerGrid Power);
 
 public sealed class LogisticsService(
-    GameDb db, IPlotObjects plots, IEnumerable<IMachinePorts> machines, IPlotPower power, IInventory inventory, ITechnologies technologies, TimeProvider time,
+    GameDb db, IPlotObjects plots, IEnumerable<IMachinePorts> machines, IPlotPower power, IInventory inventory, ITechnologies technologies, IPlotClock clock,
     ILogger<LogisticsService> logger)
     : IPlotAutomation
 {
@@ -284,7 +284,8 @@ public sealed class LogisticsService(
         }
 
         var locked = Stopwatch.GetTimestamp();
-        var now = time.GetUtcNow();
+        // Belts and inserters work in the plot's time: not while it stands still
+        var now = await clock.NowAsync(x, y, cancellationToken);
         var objects = await plots.ObjectsAsync(x, y, cancellationToken);
         var from = await SimulatedAtAsync(x, y, cancellationToken) ?? now;
         var contents = await ReadAsync(x, y, cancellationToken);

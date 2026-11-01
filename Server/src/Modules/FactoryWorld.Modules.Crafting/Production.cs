@@ -81,7 +81,7 @@ internal static class MachineProduction
 }
 
 /// <summary>What each of the player's furnaces and processing machines is doing now.</summary>
-public sealed class CraftingMachineStatuses(GameDb db, IPlotPower power, IPlotObjects plots, IPlotRegistry registry, TimeProvider time) : IMachineStatuses
+public sealed class CraftingMachineStatuses(GameDb db, IPlotPower power, IPlotObjects plots, IPlotRegistry registry, IPlotClock plotClock) : IMachineStatuses
 {
     public Task<IReadOnlyList<MachineStatus>> StatusesAsync(Guid owner, CancellationToken cancellationToken) =>
         ReadAsync("owner_id = @owner", "owner", owner, cancellationToken);
@@ -94,8 +94,9 @@ public sealed class CraftingMachineStatuses(GameDb db, IPlotPower power, IPlotOb
     /// <summary>The furnaces and machines <paramref name="where"/> picks, with <paramref name="value"/> as its one parameter.</summary>
     private async Task<IReadOnlyList<MachineStatus>> ReadAsync(string where, string parameter, object value, CancellationToken cancellationToken)
     {
-        var now = time.GetUtcNow();
+        // Each works in the time of the plot it stands on
         var statuses = new List<MachineStatus>();
+        var fired = new List<(Guid Id, FurnaceState State, FurnaceLevel Level)>();
         await using (var furnaces = await db.CommandAsync(
             $"""
             SELECT object_id, input_item, input_quantity, fuel, heat, output_item, output_quantity, started_at, kind
@@ -108,12 +109,17 @@ public sealed class CraftingMachineStatuses(GameDb db, IPlotPower power, IPlotOb
             {
                 var kind = reader.GetString(8);
                 var level = Smelting.Level(kind) ?? Smelting.Stone;
-                var state = Smelting.Advance(new FurnaceState(
+                fired.Add((reader.GetGuid(0), new FurnaceState(
                     reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetInt32(4),
                     reader.IsDBNull(5) ? null : reader.GetString(5), reader.GetInt32(6),
-                    reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7)), level, now);
-                statuses.Add(Furnace(reader.GetGuid(0), state, level.Kind) with { Fired = true });
+                    reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7)), level));
             }
+        }
+
+        foreach (var (id, raw, level) in fired)
+        {
+            var state = Smelting.Advance(raw, level, await plotClock.NowOfAsync(id, cancellationToken));
+            statuses.Add(Furnace(id, state, level.Kind) with { Fired = true });
         }
 
         var stored = new List<(Guid Id, ProcessingMachine Machine, MachineState State)>();
@@ -143,6 +149,7 @@ public sealed class CraftingMachineStatuses(GameDb db, IPlotPower power, IPlotOb
         // Machines on power work in their own time; one at work with no power at all stalls for it.
         foreach (var (id, plain, state) in stored)
         {
+            var now = await plotClock.NowOfAsync(id, cancellationToken);
             var machine = (await Processing.OnPlotAsync(plain.Kind, db, plots, registry, id, now, cancellationToken))!;
             var clock = await Processing.ClockAsync(machine, power, id, cancellationToken);
             var status = Machine(id, machine, Processing.Advance(machine, state, clock.At(now))) with { Fired = machine.Fired };

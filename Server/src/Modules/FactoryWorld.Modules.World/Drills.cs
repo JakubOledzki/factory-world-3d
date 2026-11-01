@@ -205,7 +205,7 @@ public sealed record DrillOnPlot(PlotObject Object, MineSite Mine, DrillPatch Pa
 
 public sealed class DrillService(
     GameDb db, WorldMap map, PlotService plots, IPlotObjects objects, IInventory inventory, ICharacterProgress progress, IProductionStats stats,
-    IPlotPower power, TimeProvider time, ITechnologies technologies) : IPlacedHook, IPlotAutomation, IMachineContents, IMachinePorts, IMachineStatuses
+    IPlotPower power, IPlotClock plotClock, ITechnologies technologies) : IPlacedHook, IPlotAutomation, IMachineContents, IMachinePorts, IMachineStatuses
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -224,7 +224,7 @@ public sealed class DrillService(
         {
             await plots.RequireOwnerAsync(player, x, y, cancellationToken, PlotRight.Take);
             var drill = await WorkedAsync(x, y, id, automation, cancellationToken);
-            var now = time.GetUtcNow();
+            var now = await plotClock.NowAsync(x, y, cancellationToken);
             var machineNow = drill.Clock.At(now);
             var taken = new List<(string, int)>();
             foreach (var (item, quantity) in drill.Patch.Ores.ToList())
@@ -279,7 +279,7 @@ public sealed class DrillService(
     public Task CatchUpAsync(int x, int y, CancellationToken cancellationToken) =>
         db.InTransactionAsync(async () =>
         {
-            var now = time.GetUtcNow();
+            var now = await plotClock.NowAsync(x, y, cancellationToken);
             foreach (var drill in await OpenAsync(x, y, cancellationToken))
             {
                 drill.Patch.Advance(now, drill.Clock.At(now));
@@ -343,7 +343,7 @@ public sealed class DrillService(
     private async Task<IReadOnlyList<MachineStatus>> OnPlotAsync(int x, int y, Guid? owner, CancellationToken cancellationToken)
     {
         var statuses = new List<MachineStatus>();
-        var now = time.GetUtcNow();
+        var now = await plotClock.NowAsync(x, y, cancellationToken);
         foreach (var drill in (await OpenAsync(x, y, cancellationToken)).Where(d => owner is null || d.Object.Owner == owner))
         {
             drill.Patch.Advance(now, drill.Clock.At(now));
@@ -369,7 +369,7 @@ public sealed class DrillService(
             }
         }
 
-        var now = time.GetUtcNow();
+        var now = await plotClock.NowAsync(x, y, cancellationToken);
         var drill = (await OpenAsync(x, y, cancellationToken)).FirstOrDefault(d => d.Object.Id == id)
             ?? throw new GameException("no_object", "There is no such drill on this plot.");
         drill.Patch.Advance(now, drill.Clock.At(now));
@@ -496,7 +496,7 @@ public abstract class DrillHandler(IServiceScopeFactory scopes, TimeProvider tim
         var (drill, taken, xp) = await RunAsync(
             scope.ServiceProvider.GetRequiredService<DrillService>(), scope.ServiceProvider.GetServices<IPlotAutomation>(),
             client.RequireAccount(), request, cancellationToken);
-        var now = time.GetUtcNow();
+        var now = await scope.ServiceProvider.GetRequiredService<IPlotClock>().NowAsync(request.X, request.Y, cancellationToken);
         var patch = drill.Patch;
         var next = Drills.Levels.FirstOrDefault(l => l.Level == patch.DrillLevel.Level + 1);
         return new Reply("drill", new

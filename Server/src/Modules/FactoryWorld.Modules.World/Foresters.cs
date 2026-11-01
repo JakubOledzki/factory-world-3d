@@ -312,7 +312,7 @@ public sealed record PlotForests(int X, int Y, IReadOnlyList<ForesterOnPlot> For
 
 public sealed class ForesterService(
     GameDb db, WorldMap map, PlotService plots, IPlotObjects objects, IInventory inventory, ICharacterProgress progress, IProductionStats stats,
-    TimeProvider time) : IPlacedHook, IPlotAutomation, IMachineContents, IMachinePorts, IMachineStatuses
+    TimeProvider time, IPlotClock plotClock) : IPlacedHook, IPlotAutomation, IMachineContents, IMachinePorts, IMachineStatuses
 {
     /// <summary>The plot's foresters worked up to now, with every planted tree and the wild trees they cut.</summary>
     public Task<PlotForests> StateAsync(Guid player, int x, int y, IEnumerable<IPlotAutomation> automation, CancellationToken cancellationToken) =>
@@ -339,7 +339,7 @@ public sealed class ForesterService(
                 await machinery.CatchUpAsync(x, y, cancellationToken);
             }
 
-            var now = time.GetUtcNow();
+            var now = await plotClock.NowAsync(x, y, cancellationToken);
             var forests = await OpenAsync(x, y, now, cancellationToken);
             var forester = forests.FirstOrDefault(f => f.Object.Id == id)
                 ?? throw new GameException("no_object", "There is no such forester's building on this plot.");
@@ -385,7 +385,7 @@ public sealed class ForesterService(
                 await machinery.CatchUpAsync(x, y, cancellationToken);
             }
 
-            var now = time.GetUtcNow();
+            var now = await plotClock.NowAsync(x, y, cancellationToken);
             var forests = await OpenAsync(x, y, now, cancellationToken);
             var forester = forests.FirstOrDefault(f => f.Object.Id == id)
                 ?? throw new GameException("no_object", "There is no such forester's building on this plot.");
@@ -412,7 +412,7 @@ public sealed class ForesterService(
             insert.Parameters.AddWithValue("x", x);
             insert.Parameters.AddWithValue("y", y);
             insert.Parameters.AddWithValue("owner", owner);
-            insert.Parameters.AddWithValue("now", time.GetUtcNow());
+            insert.Parameters.AddWithValue("now", await plotClock.NowAsync(x, y, cancellationToken));
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -423,7 +423,7 @@ public sealed class ForesterService(
     /// <summary>Works every forester of the plot up to now; called before anything is put on the plot or taken off.</summary>
     public async Task CatchUpAsync(int x, int y, CancellationToken cancellationToken)
     {
-        var now = time.GetUtcNow();
+        var now = await plotClock.NowAsync(x, y, cancellationToken);
         var forests = await OpenAsync(x, y, now, cancellationToken);
         foreach (var forester in forests)
         {
@@ -514,7 +514,7 @@ public sealed class ForesterService(
     /// <summary>The plot's foresters, only <paramref name="owner"/>'s when given.</summary>
     private async Task<IReadOnlyList<MachineStatus>> OnPlotAsync(int x, int y, Guid? owner, CancellationToken cancellationToken)
     {
-        var now = time.GetUtcNow();
+        var now = await plotClock.NowAsync(x, y, cancellationToken);
         var forests = await OpenAsync(x, y, now, cancellationToken);
         foreach (var forester in forests)
         {
@@ -576,7 +576,7 @@ public sealed class ForesterService(
 
         taken.Add(PlotLayout.Spawn);
         var areas = Foresters.Areas(foresters);
-        var start = now ?? time.GetUtcNow();
+        var start = now ?? await plotClock.NowAsync(x, y, cancellationToken);
         var result = new List<ForesterOnPlot>();
         foreach (var o in foresters)
         {
@@ -696,7 +696,7 @@ public sealed class ForesterService(
     /// <summary>The foresters as they stand now, every planted tree of the plot and the wild trees cut in their squares.</summary>
     private async Task<PlotForests> ReportAsync(int x, int y, CancellationToken cancellationToken)
     {
-        var now = time.GetUtcNow();
+        var now = await plotClock.NowAsync(x, y, cancellationToken);
         var forests = await OpenAsync(x, y, now, cancellationToken);
         foreach (var forester in forests)
         {
@@ -783,16 +783,17 @@ public abstract class ForestryHandler(IServiceScopeFactory scopes, TimeProvider 
             scope.ServiceProvider.GetRequiredService<ForesterService>(), scope.ServiceProvider.GetServices<IPlotAutomation>(),
             client.RequireAccount(), payload, cancellationToken);
         var biome = scope.ServiceProvider.GetRequiredService<WorldMap>().BiomeAt(state.X, state.Y);
+        var now = await scope.ServiceProvider.GetRequiredService<IPlotClock>().NowAsync(state.X, state.Y, cancellationToken);
         return new Reply("forestry", new
         {
             x = state.X,
             y = state.Y,
-            foresters = state.Foresters.Select(f => ForesterJson(f, biome, time.GetUtcNow())),
+            foresters = state.Foresters.Select(f => ForesterJson(f, biome, now)),
             trees = state.Trees.Select(PlantTreeHandler.TreeJson),
             cleared = state.Cleared.Select(t => new { tileX = t.X, tileY = t.Y }),
             taken = taken.Select(t => new { id = t.Item, name = Items.Names[t.Item], quantity = t.Quantity }),
             xp = xp is { } gain ? new { xp = gain.Xp, level = gain.Level, leveledUp = gain.LeveledUp } : null,
-            serverTime = time.GetUtcNow().ToUnixTimeMilliseconds(),
+            serverTime = now.ToUnixTimeMilliseconds(),
         });
     }
 

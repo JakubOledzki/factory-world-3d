@@ -74,4 +74,7 @@ public sealed class OnlinePlayers
     public Guid[] BotAccounts => _botAccounts.Keys.ToArray();
 
     public bool IsOnline(Guid accountId) => _connections.ContainsKey(accountId) || _bots.ContainsKey(accountId);
+
+    /// <summary>Every account in the game right now: players on a connection and bots in a play session.</summary>
+    public Guid[] Online => _connections.Keys.Concat(_bots.Keys).Distinct().ToArray();
 }

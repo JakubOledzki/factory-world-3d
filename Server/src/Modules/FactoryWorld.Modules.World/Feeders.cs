@@ -282,7 +282,7 @@ public sealed class Yard(Biome biome, IReadOnlyList<Trough> troughs, IEnumerable
 }
 
 public sealed class FeederService(
-    GameDb db, WorldMap map, PlotService plots, IPlotObjects objects, IInventory inventory, IProductionStats stats, TimeProvider time)
+    GameDb db, WorldMap map, PlotService plots, IPlotObjects objects, IInventory inventory, IProductionStats stats, TimeProvider time, IPlotClock plotClock)
     : IPlacedHook, IPlotAutomation, IMachineContents, IMachinePorts
 {
     /// <summary>The feeder as it is now, its hungry animals in reach fed.</summary>
@@ -294,7 +294,7 @@ public sealed class FeederService(
             await CatchUpAllAsync(x, y, automation, cancellationToken);
             var yard = await OpenAsync(x, y, cancellationToken);
             var feeder = Find(yard, id);
-            yard.Feed(time.GetUtcNow());
+            yard.Feed(await plotClock.NowAsync(x, y, cancellationToken));
             await SaveAsync(x, y, yard, cancellationToken);
             return (feeder, await AnimalsAsync(x, y, cancellationToken));
         }, cancellationToken);
@@ -324,7 +324,7 @@ public sealed class FeederService(
             }
 
             await inventory.RemoveAsync(player, item, added, cancellationToken);
-            yard.Feed(time.GetUtcNow());
+            yard.Feed(await plotClock.NowAsync(x, y, cancellationToken));
             await SaveAsync(x, y, yard, cancellationToken);
             return (feeder, await AnimalsAsync(x, y, cancellationToken));
         }, cancellationToken);
@@ -338,7 +338,7 @@ public sealed class FeederService(
             await plots.RequireOwnerAsync(player, x, y, cancellationToken, PlotRight.Take);
             var yard = await OpenAsync(x, y, cancellationToken);
             var feeder = Find(yard, id);
-            yard.Feed(time.GetUtcNow());
+            yard.Feed(await plotClock.NowAsync(x, y, cancellationToken));
             var inside = feeder.Contents();
             var taken = new List<(string Item, int Quantity)>();
             foreach (var (item, quantity) in inside)
@@ -401,7 +401,7 @@ public sealed class FeederService(
     public async Task<IReadOnlyDictionary<(int X, int Y), DateTimeOffset>> FeedAsync(int x, int y, CancellationToken cancellationToken)
     {
         var yard = await OpenAsync(x, y, cancellationToken);
-        yard.Feed(time.GetUtcNow());
+        yard.Feed(await plotClock.NowAsync(x, y, cancellationToken));
         var fed = yard.Fed.ToDictionary();
         await SaveAsync(x, y, yard, cancellationToken);
         return fed;
@@ -663,7 +663,7 @@ public abstract class FeederHandler(IServiceScopeFactory scopes, TimeProvider ti
             },
             animals = animals.Select(AnimalHandler.AnimalJson),
             taken = taken.Select(t => new { id = t.Item, name = Items.Names[t.Item], quantity = t.Quantity }),
-            serverTime = time.GetUtcNow().ToUnixTimeMilliseconds(),
+            serverTime = (await scope.ServiceProvider.GetRequiredService<IPlotClock>().NowAsync(request.X, request.Y, cancellationToken)).ToUnixTimeMilliseconds(),
         });
     }
 
@@ -722,7 +722,7 @@ public sealed class GetAnimalsHandler(IServiceScopeFactory scopes, TimeProvider 
             x = request.X,
             y = request.Y,
             animals = animals.Select(AnimalHandler.AnimalJson),
-            serverTime = time.GetUtcNow().ToUnixTimeMilliseconds(),
+            serverTime = (await scope.ServiceProvider.GetRequiredService<IPlotClock>().NowAsync(request.X, request.Y, cancellationToken)).ToUnixTimeMilliseconds(),
         });
     }
 }

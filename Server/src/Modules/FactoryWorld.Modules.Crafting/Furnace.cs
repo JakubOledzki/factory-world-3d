@@ -236,13 +236,14 @@ internal static class FurnaceRows
 }
 
 public sealed class FurnaceService(
-    GameDb db, IEnumerable<IPlacedObjects> places, IInventory inventory, ICharacterProgress progress, IProductionStats stats, IPlotObjects plots, TimeProvider time)
+    GameDb db, IEnumerable<IPlacedObjects> places, IInventory inventory, ICharacterProgress progress, IProductionStats stats, IPlotObjects plots, IPlotClock clock)
 {
     public Task<FurnaceReply> StateAsync(Guid owner, Guid id, CancellationToken cancellationToken) =>
         db.InTransactionAsync(async () =>
         {
-            var (state, level) = await OpenAsync(owner, id, cancellationToken);
-            return new FurnaceReply(id, level, state, time.GetUtcNow(), [], null);
+            var now = await clock.NowOfAsync(id, cancellationToken);
+            var (state, level) = await OpenAsync(owner, id, now, cancellationToken);
+            return new FurnaceReply(id, level, state, now, [], null);
         }, cancellationToken);
 
     /// <summary>Puts items from the inventory into the furnace: coal on the fire, ore to smelt.
@@ -255,7 +256,8 @@ public sealed class FurnaceService(
                 throw new GameException("bad_quantity", "Put in at least one.");
             }
 
-            var (state, level) = await OpenAsync(owner, id, cancellationToken);
+            var now = await clock.NowOfAsync(id, cancellationToken);
+            var (state, level) = await OpenAsync(owner, id, now, cancellationToken);
             var taken = new List<(string, int)>();
             XpGain? xp = null;
             if (Items.IsCoal(item))
@@ -301,9 +303,9 @@ public sealed class FurnaceService(
             }
 
             await inventory.RemoveAsync(owner, item, quantity, cancellationToken);
-            state = Smelting.Start(state, time.GetUtcNow());
+            state = Smelting.Start(state, now);
             await FurnaceRows.WriteAsync(db, owner, id, level, state, cancellationToken);
-            return new FurnaceReply(id, level, state, time.GetUtcNow(), taken, xp);
+            return new FurnaceReply(id, level, state, now, taken, xp);
         }, cancellationToken);
 
     /// <summary>Takes the ingots (<c>output</c>), the ore not smelted yet (<c>input</c>) or the coal (<c>fuel</c>) out, as much as
@@ -311,7 +313,8 @@ public sealed class FurnaceService(
     public Task<FurnaceReply> TakeAsync(Guid owner, Guid id, string what, CancellationToken cancellationToken) =>
         db.InTransactionAsync(async () =>
         {
-            var (state, level) = await OpenAsync(owner, id, cancellationToken);
+            var now = await clock.NowOfAsync(id, cancellationToken);
+            var (state, level) = await OpenAsync(owner, id, now, cancellationToken);
             var taken = new List<(string, int)>();
             XpGain? xp = null;
             switch (what)
@@ -344,7 +347,7 @@ public sealed class FurnaceService(
             }
 
             await FurnaceRows.WriteAsync(db, owner, id, level, state, cancellationToken);
-            return new FurnaceReply(id, level, state, time.GetUtcNow(), taken, xp);
+            return new FurnaceReply(id, level, state, now, taken, xp);
         }, cancellationToken);
 
     /// <summary>Hands the ingots to the player: as many as fit (<paramref name="partial"/>), the rest staying in, or all of them,
@@ -373,13 +376,13 @@ public sealed class FurnaceService(
         return (quantity < state.OutputQuantity ? state with { OutputQuantity = state.OutputQuantity - quantity } : state with { Output = null, OutputQuantity = 0 }, xp);
     }
 
-    /// <summary>The player's furnace, locked until the transaction ends and smelted up to now.</summary>
-    private async Task<(FurnaceState, FurnaceLevel)> OpenAsync(Guid owner, Guid id, CancellationToken cancellationToken)
+    /// <summary>The player's furnace, locked until the transaction ends and smelted up to <paramref name="now"/> (its plot's time).</summary>
+    private async Task<(FurnaceState, FurnaceLevel)> OpenAsync(Guid owner, Guid id, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var kind = await Workshop.RequireAsync(places, owner, id, Items.IsFurnace, Items.Furnace, cancellationToken);
         var level = await Smelting.OnPlotAsync(Smelting.Level(kind)!, plots, id, cancellationToken);
         var stored = (await FurnaceRows.ReadAsync(db, id, cancellationToken))?.State ?? FurnaceState.Empty;
-        var state = Smelting.Advance(stored, level, time.GetUtcNow());
+        var state = Smelting.Advance(stored, level, now);
         var made = MachineProduction.Smelted(level, stored, state);
         if (made.Count > 0)
         {
@@ -393,17 +396,18 @@ public sealed class FurnaceService(
 
 /// <summary>Empties a furnace that is being picked up: what it smelted, its ore and its coal go to the inventory.
 /// Processing machines (mill, bakery, ...) are emptied the same way.</summary>
-public sealed class FurnaceContents(GameDb db, IInventory inventory, IWallet wallet, IProductionStats stats, IPlotPower power, TimeProvider time) : IMachineContents
+public sealed class FurnaceContents(GameDb db, IInventory inventory, IWallet wallet, IProductionStats stats, IPlotPower power, IPlotClock clock) : IMachineContents
 {
     public async Task ReleaseAsync(Guid owner, Guid id, CancellationToken cancellationToken)
     {
-        await MachineRows.ReleaseAsync(db, inventory, wallet, stats, power, owner, id, time.GetUtcNow(), cancellationToken);
+        var now = await clock.NowOfAsync(id, cancellationToken);
+        await MachineRows.ReleaseAsync(db, inventory, wallet, stats, power, owner, id, now, cancellationToken);
         if (await FurnaceRows.ReadAsync(db, id, cancellationToken) is not { } row)
         {
             return;
         }
 
-        var state = Smelting.Advance(row.State, row.Level, time.GetUtcNow());
+        var state = Smelting.Advance(row.State, row.Level, now);
         await stats.RecordAsync(owner, MachineProduction.Smelted(row.Level, row.State, state), cancellationToken);
         if (state.Output is { } output && state.OutputQuantity > 0)
         {

@@ -68,7 +68,7 @@ public sealed record Field(int TileX, int TileY, string? Crop, DateTimeOffset? R
 public sealed record FieldChange(Field Field, IReadOnlyList<(string Item, int Quantity)> Items, XpGain? Xp);
 
 public sealed class FarmService(
-    GameDb db, PlotService plots, IInventory inventory, IEquipment equipment, ICharacterProgress progress, IProductionStats stats, TimeProvider time,
+    GameDb db, PlotService plots, IInventory inventory, IEquipment equipment, ICharacterProgress progress, IProductionStats stats, TimeProvider time, IPlotClock plotClock,
     OilService oil, IPlotObjects objects, ITechnologies technologies, SmogService smog)
 {
     public async Task<IReadOnlyList<Field>> FieldsAsync(int x, int y, CancellationToken cancellationToken)
@@ -142,7 +142,7 @@ public sealed class FarmService(
             await plots.RequireOwnerAsync(player, x, y, cancellationToken, PlotRight.Work);
             await technologies.RequireUnlockedAsync(player, crop, cancellationToken);
             await oil.RequireCleanAsync(x, y, tileX, tileY, cancellationToken);
-            var now = time.GetUtcNow();
+            var now = await plotClock.NowAsync(x, y, cancellationToken);
             if (fertilize)
             {
                 await inventory.RemoveAsync(player, Items.Fertilizer, 1, cancellationToken);
@@ -204,7 +204,7 @@ public sealed class FarmService(
             }
 
             var info = Farming.ById[crop];
-            if (planted + info.Grow > time.GetUtcNow())
+            if (planted + info.Grow > await plotClock.NowAsync(x, y, cancellationToken))
             {
                 throw new GameException("not_ripe", "It is not ripe yet.");
             }
@@ -253,7 +253,7 @@ public sealed class FarmService(
                 planted = reader.IsDBNull(2) ? null : reader.GetFieldValue<DateTimeOffset>(2);
             }
 
-            if (Read(tileX, tileY, crop, planted).ReadyAt is { } ready && ready <= time.GetUtcNow())
+            if (Read(tileX, tileY, crop, planted).ReadyAt is { } ready && ready <= await plotClock.NowAsync(x, y, cancellationToken))
             {
                 throw new GameException("reap_first", "Reap the ripe crop first.");
             }
@@ -295,7 +295,7 @@ public abstract class FieldHandler(IServiceScopeFactory scopes, TimeProvider tim
             field = FieldJson(change.Field),
             items = change.Items.Select(i => new { id = i.Item, name = Items.Names[i.Item], quantity = i.Quantity }),
             xp = change.Xp is { } xp ? new { xp = xp.Xp, level = xp.Level, leveledUp = xp.LeveledUp } : null,
-            serverTime = time.GetUtcNow().ToUnixTimeMilliseconds(),
+            serverTime = (await scope.ServiceProvider.GetRequiredService<IPlotClock>().NowAsync(request.X, request.Y, cancellationToken)).ToUnixTimeMilliseconds(),
         });
     }
 
@@ -349,6 +349,6 @@ public sealed class UntillHandler(IServiceScopeFactory scopes, TimeProvider time
         var r = Payload.Read<FieldRequest>(payload);
         await using var scope = scopes.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<FarmService>().UntillAsync(client.RequireAccount(), r.X, r.Y, r.TileX, r.TileY, cancellationToken);
-        return new Reply("plot.untilled", new { tileX = r.TileX, tileY = r.TileY, serverTime = time.GetUtcNow().ToUnixTimeMilliseconds() });
+        return new Reply("plot.untilled", new { tileX = r.TileX, tileY = r.TileY, serverTime = (await scope.ServiceProvider.GetRequiredService<IPlotClock>().NowAsync(r.X, r.Y, cancellationToken)).ToUnixTimeMilliseconds() });
     }
 }

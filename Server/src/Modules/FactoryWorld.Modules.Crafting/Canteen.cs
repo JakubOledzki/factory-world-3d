@@ -85,13 +85,13 @@ public static class Canteens
 
 public sealed record CanteenReply(Guid Id, DateTimeOffset? FedUntil, int Crews, DateTimeOffset ServerTime, int Served);
 
-public sealed class CanteenService(GameDb db, IEnumerable<IPlacedObjects> places, IInventory inventory, IPlotObjects plots, TimeProvider time)
+public sealed class CanteenService(GameDb db, IEnumerable<IPlacedObjects> places, IInventory inventory, IPlotObjects plots, IPlotClock clock)
 {
     public Task<CanteenReply> StateAsync(Guid owner, Guid id, CancellationToken cancellationToken) =>
         db.InTransactionAsync(async () =>
         {
             await Workshop.RequireAsync(places, owner, id, Items.Canteen, cancellationToken);
-            return new CanteenReply(id, await Canteens.FedUntilAsync(db, id, cancellationToken), await CrewsAsync(id, cancellationToken), time.GetUtcNow(), 0);
+            return new CanteenReply(id, await Canteens.FedUntilAsync(db, id, cancellationToken), await CrewsAsync(id, cancellationToken), await clock.NowOfAsync(id, cancellationToken), 0);
         }, cancellationToken);
 
     /// <summary>Serves dishes from the inventory: the food lasts as long as their portions feed the plot's machines.</summary>
@@ -109,7 +109,8 @@ public sealed class CanteenService(GameDb db, IEnumerable<IPlacedObjects> places
             }
 
             await Workshop.RequireAsync(places, owner, id, Items.Canteen, cancellationToken);
-            var now = time.GetUtcNow();
+            // The food lasts in the plot's time: it is not eaten while the plot stands still
+            var now = await clock.NowOfAsync(id, cancellationToken);
             var crews = await CrewsAsync(id, cancellationToken);
             var from = await Canteens.FedUntilAsync(db, id, cancellationToken, locked: true) is { } until && until > now ? until : now;
             var fedUntil = from + Canteens.Lasts(portions * quantity, crews);

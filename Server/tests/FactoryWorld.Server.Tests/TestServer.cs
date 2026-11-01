@@ -57,6 +57,9 @@ public class ServerFactory : WebApplicationFactory<Program>
         builder.UseSetting("Bots:Count", BotTests.TestBots.ToString(System.Globalization.CultureInfo.InvariantCulture));
         // A bot's line goes up right; the tests that need it put up wrong set the chance themselves.
         builder.UseSetting("Bots:MistakeChance", "0");
+        // Plots stand still while their players are away; the tests of that check who is in the game themselves, so the
+        // others' plots run as the clock moves however long a test takes.
+        builder.UseSetting("PlotClock:Auto", "false");
         builder.UseSetting("ConnectionStrings:Game",
             new NpgsqlConnectionStringBuilder(_admin) { Database = _database }.ConnectionString);
         builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(Time));
