@@ -747,6 +747,12 @@ void AFWCharacter::InteractStart()
 	bInteractHeld = true;
 	AFWPlot* Plot = GetPlot();
 	AFWPlayerController* PC = GetFWController();
+	// A shop or a works canteen opens its own window
+	if (const FFWPlotObject* Shop = Plot && PC && bHasTarget && Hold == EHold::None ? Plot->FindObjectAt(TargetTile) : nullptr; Shop && AFWPlayerController::IsShop(Shop->Kind))
+	{
+		PC->OpenShop(Shop->Id, Shop->Kind);
+		return;
+	}
 	if (!Plot || !PC || !bHasTarget || Hold != EHold::None)
 	{
 		return;
