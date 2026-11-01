@@ -1038,6 +1038,13 @@ bool AFWPlot::DrawArtObject(FFWPlotObject& Object)
 		TurbineRotors.Add(Spinning);
 		return true;
 	}
+	// Workshop furniture with a model of its own, at the size of its footprint
+	int32 ModelTiles = 1;
+	if (UStaticMesh* Model = FWArt::FurnitureModel(Kind, ModelTiles))
+	{
+		Place(Model, FVector::ZeroVector, FRotator::ZeroRotator, float(FWCatalog::FootprintSize(Kind)) / ModelTiles, true);
+		return true;
+	}
 	// Anything else that stands on the plot: the generic machine at the size of its footprint
 	if (UStaticMesh* Machine = FWArt::Factory(TEXT("machine")))
 	{
