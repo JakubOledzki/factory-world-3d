@@ -135,6 +135,18 @@ Do testów: `FWInventory`, `FWChestNearest`, `FWMoveTile <z> <do>`, `FWStorage <
 
 Do testów: `FWPlaceNear <rodzaj>`, `FWOpenNearest <rodzaj>`, `FWStationDo <typ> <pole> <wartość>`, `FWStationLoad <typ> <przedmiot> <ile>`.
 
+## Generatory, wiertła, szyby i przyłącza
+
+E przy urządzeniu, które pracuje samo, otwiera jego okno, jak w grze 2D:
+
+- **generator parowy i elektrownie na opał** (węglowa, gazowa, biomasa, jądrowa…): co się pali, ile mocy daje, kiedy skończy się opał, jak stoi sieć (ile maszyn pobiera, czy prądu starcza); dokładanie opału z plecaka (+1, +10, wszystko) i wyjmowanie go,
+- **źródła bez opału** (koło wodne, panel słoneczny, turbina wiatrowa, geotermia) i **akumulatory**: moc teraz, pora dnia, siła wiatru, naładowanie,
+- **wiertło górnicze** przy kopalni: tempo, urobek w środku (rudy, węgiel, kamień) i „Wyjmij urobek”,
+- **szyb** (żuraw pompowy, szyb gazowy, platforma): złoże, ile wypompował, uszczelki i ich zużycie,
+- **przyłącze sieciowe**: cena prądu dla innych, kable do innych działek (kupowanie prądu na godziny, zwijanie), szukanie przyłączy i kładzenie nowego kabla.
+
+Każde okno ma też „Schowaj do ekwipunku”. Do testów: `FWDevice power_generator` (albo `furniture_drill`, `furniture_pumpjack`, `power_grid_tie`, `power_solar_panel`…) podchodzi do najbliższego takiego urządzenia i otwiera jego okno.
+
 ## Rynek
 
 Jak w grze 2D, rynek otwiera się klawiszem **E przy komputerze** na działce:

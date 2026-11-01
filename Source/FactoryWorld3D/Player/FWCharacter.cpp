@@ -682,6 +682,10 @@ void AFWCharacter::InteractStart()
 	{
 		PC->OpenStation(Station->Id, Station->Kind);
 	}
+	else if (const FFWPlotObject* Device = Plot->FindObjectAt(TargetTile); Device && AFWPlayerController::IsDevice(Device->Kind))
+	{
+		PC->OpenDevice(Device->Id, Device->Kind);
+	}
 }
 
 void AFWCharacter::InteractStop()
