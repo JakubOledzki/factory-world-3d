@@ -716,6 +716,21 @@ namespace FactoryWorld.Modules.World.Migrations
                     b.ToTable("plot_animals", "world");
                 });
 
+            modelBuilder.Entity("FactoryWorld.Modules.World.PlotClockCheckRow", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("checked_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("plot_clock", "world");
+                });
+
             modelBuilder.Entity("FactoryWorld.Modules.World.PlotDrillRow", b =>
                 {
                     b.Property<Guid>("ObjectId")
@@ -1104,6 +1119,29 @@ namespace FactoryWorld.Modules.World.Migrations
                         .IsUnique();
 
                     b.ToTable("plot_objects", "world");
+                });
+
+            modelBuilder.Entity("FactoryWorld.Modules.World.PlotPauseRow", b =>
+                {
+                    b.Property<int>("X")
+                        .HasColumnType("integer")
+                        .HasColumnName("x");
+
+                    b.Property<int>("Y")
+                        .HasColumnType("integer")
+                        .HasColumnName("y");
+
+                    b.Property<TimeSpan>("Paused")
+                        .HasColumnType("interval")
+                        .HasColumnName("paused");
+
+                    b.Property<DateTimeOffset?>("PausedSince")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paused_since");
+
+                    b.HasKey("X", "Y");
+
+                    b.ToTable("plot_pauses", "world");
                 });
 
             modelBuilder.Entity("FactoryWorld.Modules.World.PlotSprayRow", b =>

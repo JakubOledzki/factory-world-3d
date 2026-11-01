@@ -114,7 +114,7 @@ public sealed record GeneratorReply(Guid Id, PowerGrid Grid, DateTimeOffset Serv
 /// to everyone who asks, so belts and inserters, the machines they feed and the generators they
 /// fuel all work with the same one.
 /// </summary>
-public sealed class PowerService(GameDb db, IPlotObjects plots, IPlotRegistry registry, IInventory inventory, TimeProvider time, IServiceProvider services)
+public sealed class PowerService(GameDb db, IPlotObjects plots, IPlotRegistry registry, IInventory inventory, TimeProvider time, IPlotClock clock, IServiceProvider services)
     : IPlotPower, IPlotAutomation
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -247,7 +247,7 @@ public sealed class PowerService(GameDb db, IPlotObjects plots, IPlotRegistry re
         {
             create.Parameters.AddWithValue("x", x);
             create.Parameters.AddWithValue("y", y);
-            create.Parameters.AddWithValue("now", time.GetUtcNow());
+            create.Parameters.AddWithValue("now", await clock.NowAsync(x, y, cancellationToken));
             await create.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -291,7 +291,7 @@ public sealed class PowerService(GameDb db, IPlotObjects plots, IPlotRegistry re
         await db.InTransactionAsync(async () =>
         {
             var grid = await OpenAsync(x, y, cancellationToken);
-            grid.Settle(time.GetUtcNow());
+            grid.Settle(await clock.NowAsync(x, y, cancellationToken));
             await grid.SaveAsync(cancellationToken);
         }, cancellationToken);
 
@@ -299,7 +299,7 @@ public sealed class PowerService(GameDb db, IPlotObjects plots, IPlotRegistry re
         db.InTransactionAsync(async () =>
         {
             var grid = await GeneratorGridAsync(player, x, y, id, cancellationToken);
-            return new GeneratorReply(id, grid, time.GetUtcNow(), []);
+            return new GeneratorReply(id, grid, await clock.NowAsync(x, y, cancellationToken), []);
         }, cancellationToken);
 
     /// <summary>Puts wood or coal from the inventory by the generator's fire.</summary>
@@ -317,10 +317,11 @@ public sealed class PowerService(GameDb db, IPlotObjects plots, IPlotRegistry re
                 throw new GameException("no_fuel_needed", "Water, the sun, the wind or stored power drives it; it burns nothing.");
             }
 
-            grid.Fuel(id, item, quantity, time.GetUtcNow());
+            var now = await clock.NowAsync(x, y, cancellationToken);
+            grid.Fuel(id, item, quantity, now);
             await inventory.RemoveAsync(player, item, quantity, cancellationToken);
             await grid.SaveAsync(cancellationToken);
-            return new GeneratorReply(id, grid, time.GetUtcNow(), []);
+            return new GeneratorReply(id, grid, now, []);
         }, cancellationToken);
 
     /// <summary>Takes the fuel not burning yet back into the inventory, as much as fits; the rest stays by the fire.</summary>
@@ -329,7 +330,7 @@ public sealed class PowerService(GameDb db, IPlotObjects plots, IPlotRegistry re
         {
             var grid = await GeneratorGridAsync(player, x, y, id, cancellationToken, PlotRight.Take);
             var taken = new List<(string, int)>();
-            var now = time.GetUtcNow();
+            var now = await clock.NowAsync(x, y, cancellationToken);
             if (grid.Generator(id, now) is { FuelItem: { } item, Fuel: > 0 } state
                 && grid.Unfuel(id, now, (int)await inventory.FitAsync(player, item, state.Fuel, cancellationToken)) is { } fuel)
             {
@@ -377,7 +378,7 @@ public sealed class PowerService(GameDb db, IPlotObjects plots, IPlotRegistry re
             return;
         }
 
-        var now = time.GetUtcNow();
+        var now = await clock.NowOfAsync(id, cancellationToken);
         if (grid.Unfuel(id, now) is { } fuel)
         {
             await inventory.AddAsync(owner, fuel.Item, fuel.Quantity, cancellationToken);

@@ -1056,20 +1056,20 @@ internal static class MachineRows
 
 public sealed class MachineService(
     GameDb db, IEnumerable<IPlacedObjects> places, IInventory inventory, ICharacterProgress progress, IProductionStats stats, ITechnologies technologies,
-    IPlotPower power, IPlotObjects plots, IPlotRegistry registry, IWallet wallet, IMarketPrices prices, TimeProvider time)
+    IPlotPower power, IPlotObjects plots, IPlotRegistry registry, IWallet wallet, IMarketPrices prices, IPlotClock plotClock)
 {
     public Task<MachineReply> StateAsync(Guid owner, Guid id, CancellationToken cancellationToken) =>
         db.InTransactionAsync(async () =>
         {
-            var (machine, state, clock) = await OpenAsync(owner, id, cancellationToken);
-            return Reply(id, machine, state, clock, [], null);
+            var (machine, state, clock, now) = await OpenAsync(owner, id, cancellationToken);
+            return Reply(id, machine, state, clock, now, [], null);
         }, cancellationToken);
 
     /// <summary>Sets what the machine makes. Ingredients and products of the old recipe go back to the inventory; the fire keeps burning.</summary>
     public Task<MachineReply> SetRecipeAsync(Guid owner, Guid id, string recipeId, CancellationToken cancellationToken) =>
         db.InTransactionAsync(async () =>
         {
-            var (machine, state, clock) = await OpenAsync(owner, id, cancellationToken);
+            var (machine, state, clock, now) = await OpenAsync(owner, id, cancellationToken);
             var recipe = machine.Recipe(recipeId) ?? throw new GameException("no_recipe", "This machine has no such recipe.");
             await technologies.RequireUnlockedAsync(owner, recipe.Id, cancellationToken);
             var taken = new List<(string, int)>();
@@ -1079,11 +1079,11 @@ public sealed class MachineService(
                 // The products must all fit; the ingredients come back whether or not they do.
                 (state, xp) = await TakeOutputAsync(owner, machine, state, taken, partial: false, cancellationToken);
                 state = await TakeInputsAsync(owner, machine, state, taken, partial: false, cancellationToken);
-                state = Processing.Start(machine, state with { Recipe = recipe.Id, Inputs = new int[recipe.Ingredients.Count] }, clock.At(time.GetUtcNow()));
+                state = Processing.Start(machine, state with { Recipe = recipe.Id, Inputs = new int[recipe.Ingredients.Count] }, clock.At(now));
                 await MachineRows.WriteAsync(db, owner, id, machine.Kind, state, cancellationToken);
             }
 
-            return Reply(id, machine, state, clock, taken, xp);
+            return Reply(id, machine, state, clock, now, taken, xp);
         }, cancellationToken);
 
     /// <summary>
@@ -1098,7 +1098,7 @@ public sealed class MachineService(
                 throw new GameException("bad_quantity", "Put in at least one.");
             }
 
-            var (machine, state, clock) = await OpenAsync(owner, id, cancellationToken);
+            var (machine, state, clock, now) = await OpenAsync(owner, id, cancellationToken);
             var recipe = machine.Recipe(state.Recipe);
             var slot = recipe is null || fuel ? -1 : recipe.Ingredients.ToList().FindIndex(i => Items.Fills(i.Item, item));
             if (slot >= 0)
@@ -1136,9 +1136,9 @@ public sealed class MachineService(
             }
 
             await inventory.RemoveAsync(owner, item, quantity, cancellationToken);
-            state = Processing.Start(machine, state, clock.At(time.GetUtcNow()));
+            state = Processing.Start(machine, state, clock.At(now));
             await MachineRows.WriteAsync(db, owner, id, machine.Kind, state, cancellationToken);
-            return Reply(id, machine, state, clock, [], null);
+            return Reply(id, machine, state, clock, now, [], null);
         }, cancellationToken);
 
     /// <summary>Takes the products (<c>output</c>), the ingredients not used yet (<c>input</c>) or the fuel (<c>fuel</c>) out, as
@@ -1146,7 +1146,7 @@ public sealed class MachineService(
     public Task<MachineReply> TakeAsync(Guid owner, Guid id, string what, CancellationToken cancellationToken) =>
         db.InTransactionAsync(async () =>
         {
-            var (machine, state, clock) = await OpenAsync(owner, id, cancellationToken);
+            var (machine, state, clock, now) = await OpenAsync(owner, id, cancellationToken);
             var taken = new List<(string, int)>();
             XpGain? xp = null;
             switch (what)
@@ -1154,7 +1154,7 @@ public sealed class MachineService(
                 case "output":
                     (state, xp) = await TakeOutputAsync(owner, machine, state, taken, partial: true, cancellationToken);
                     // Room again for what was waiting on a full machine.
-                    state = Processing.Start(machine, state, clock.At(time.GetUtcNow()));
+                    state = Processing.Start(machine, state, clock.At(now));
                     break;
                 case "input":
                     state = await TakeInputsAsync(owner, machine, state, taken, partial: true, cancellationToken);
@@ -1188,7 +1188,7 @@ public sealed class MachineService(
             }
 
             await MachineRows.WriteAsync(db, owner, id, machine.Kind, state, cancellationToken);
-            return Reply(id, machine, state, clock, taken, xp);
+            return Reply(id, machine, state, clock, now, taken, xp);
         }, cancellationToken);
 
     /// <summary>Gives the player <paramref name="quantity"/> pieces; returns how many. With <paramref name="partial"/> only as many
@@ -1311,30 +1311,30 @@ public sealed class MachineService(
     public Task<MachineReply> ServiceAsync(Guid owner, Guid id, CancellationToken cancellationToken) =>
         db.InTransactionAsync(async () =>
         {
-            var (machine, state, clock) = await OpenAsync(owner, id, cancellationToken);
+            var (machine, state, clock, now) = await OpenAsync(owner, id, cancellationToken);
             var cents = MachineServicing.Cents(machine.Kind, prices);
             var balance = await wallet.DebitAsync(owner, cents, $"service {machine.Kind} {id}", cancellationToken);
-            state = state with { ServiceDue = clock.At(time.GetUtcNow()) + MachineServicing.Every };
+            state = state with { ServiceDue = clock.At(now) + MachineServicing.Every };
             await MachineRows.WriteAsync(db, owner, id, machine.Kind, state, cancellationToken);
-            return Reply(id, machine, state, clock, [], null) with { BalanceCents = balance };
+            return Reply(id, machine, state, clock, now, [], null) with { BalanceCents = balance };
         }, cancellationToken);
 
-    private MachineReply Reply(Guid id, ProcessingMachine machine, MachineState state, IPowerClock clock, IReadOnlyList<(string, int)> taken, XpGain? xp)
+    private MachineReply Reply(Guid id, ProcessingMachine machine, MachineState state, IPowerClock clock, DateTimeOffset now, IReadOnlyList<(string, int)> taken, XpGain? xp)
     {
-        var now = time.GetUtcNow();
         return new MachineReply(id, machine, state, now, taken, xp, clock.At(now), clock.Speed(now), MachineServicing.Cents(machine.Kind, prices));
     }
 
-    /// <summary>The player's machine, locked until the transaction ends and worked up to now, with the
-    /// clock it works by: its own time on the power grid if it runs on power.</summary>
-    private async Task<(ProcessingMachine, MachineState, IPowerClock)> OpenAsync(Guid owner, Guid id, CancellationToken cancellationToken)
+    /// <summary>The player's machine, locked until the transaction ends and worked up to now (its plot's time, which comes
+    /// with it), with the clock it works by: its own time on the power grid if it runs on power.</summary>
+    private async Task<(ProcessingMachine, MachineState, IPowerClock, DateTimeOffset)> OpenAsync(Guid owner, Guid id, CancellationToken cancellationToken)
     {
+        var now = await plotClock.NowOfAsync(id, cancellationToken);
         ProcessingMachine? machine = null;
         foreach (var place in places)
         {
             if (await place.KindAsync(owner, id, cancellationToken) is { } kind)
             {
-                machine = await Processing.OnPlotAsync(kind, db, plots, registry, id, time.GetUtcNow(), cancellationToken);
+                machine = await Processing.OnPlotAsync(kind, db, plots, registry, id, now, cancellationToken);
                 break;
             }
         }
@@ -1347,7 +1347,6 @@ public sealed class MachineService(
         // The grid is locked before the machine, as when inserters work it.
         var clock = await Processing.ClockAsync(machine, power, id, cancellationToken);
         var stored = await MachineRows.ReadOrNewAsync(db, owner, id, machine.Kind, cancellationToken);
-        var now = time.GetUtcNow();
         var state = Processing.Advance(machine, stored, clock.At(now));
         var made = MachineProduction.Processed(machine, stored, state, clock, now);
         if (made.Count > 0)
@@ -1356,16 +1355,16 @@ public sealed class MachineService(
             await MachineRows.WriteAsync(db, owner, id, machine.Kind, state, cancellationToken);
         }
 
-        return (machine, state, clock);
+        return (machine, state, clock, now);
     }
 }
 
 /// <summary>Processing machines as inserters see them: ingredients of the chosen recipe and fuel go in, products come out.</summary>
-public sealed class ProcessingPorts(GameDb db, IProductionStats stats, IPlotPower power, IPlotObjects plots, IPlotRegistry registry, TimeProvider time) : IMachinePorts
+public sealed class ProcessingPorts(GameDb db, IProductionStats stats, IPlotPower power, IPlotObjects plots, IPlotRegistry registry, IPlotClock plotClock) : IMachinePorts
 {
     public async Task<IMachinePort?> OpenAsync(Guid owner, Guid id, string kind, CancellationToken cancellationToken)
     {
-        if (!Processing.ByKind.ContainsKey(kind) || (await Processing.OnPlotAsync(kind, db, plots, registry, id, time.GetUtcNow(), cancellationToken)) is not { } machine)
+        if (!Processing.ByKind.ContainsKey(kind) || (await Processing.OnPlotAsync(kind, db, plots, registry, id, await plotClock.NowOfAsync(id, cancellationToken), cancellationToken)) is not { } machine)
         {
             return null;
         }

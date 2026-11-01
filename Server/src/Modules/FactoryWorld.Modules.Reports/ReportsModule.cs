@@ -172,6 +172,22 @@ public sealed class GetAwayReportHandler(IServiceScopeFactory scopes) : IMessage
             .OrderByDescending(g => g.Cents)
             .ToList();
         var made = await scope.ServiceProvider.GetRequiredService<IProductionHistory>().MadeAsync(owner, start, end, cancellationToken);
+        // A plot stands still while its players are away (PlotClockRules); one in a company works while any member plays.
+        long plots = 0, companyPlots = 0;
+        await using (var command = await db.CommandAsync(
+            """
+            SELECT count(*), count(*) FILTER (WHERE EXISTS (SELECT 1 FROM companies.plots c WHERE c.x = p.x AND c.y = p.y))
+            FROM world.plots p WHERE p.owner_id = @owner
+            """, cancellationToken))
+        {
+            command.Parameters.AddWithValue("owner", owner);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                (plots, companyPlots) = (reader.GetInt64(0), reader.GetInt64(1));
+            }
+        }
+
         return new Reply("report.away", new
         {
             away = true,
@@ -181,6 +197,9 @@ public sealed class GetAwayReportHandler(IServiceScopeFactory scopes) : IMessage
             income = groups.Where(g => g.Cents > 0).Select(g => new { name = g.Group, cents = g.Cents }),
             expenses = groups.Where(g => g.Cents < 0).Select(g => new { name = g.Group, cents = g.Cents }),
             netCents = groups.Sum(g => g.Cents),
+            // The player's plots, and how many of them are in a company and so could work while they were away.
+            plots,
+            companyPlots,
             made = made
                 .OrderByDescending(m => m.Value)
                 .Take(AwayRules.MadeShown)

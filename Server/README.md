@@ -40,3 +40,9 @@ To hasło (`factory`) służy tylko do lokalnych testów. Na serwerze publicznym
 ```
 dotnet test Server/FactoryWorld.slnx
 ```
+
+## Produkcja tylko przy graczach
+
+Działka produkuje tylko wtedy, gdy jej właściciel jest w grze. Działka dodana do spółki produkuje, gdy w grze jest dowolny członek spółki. Krótkie rozłączenie nic nie zmienia: działka pracuje jeszcze 90 s po wyjściu ostatniego gracza (`PlotClockRules.Grace`).
+
+Każda działka ma swój zegar (`IPlotClock`): czas rzeczywisty minus wszystkie przerwy. Co 10 s `PlotClockKeeper` sprawdza, kto jest w grze, i zaczyna albo kończy przerwę działki (tabele `world.plot_pauses` i `world.plot_clock`). Po restarcie serwera działki stoją od ostatniego sprawdzenia przed wyłączeniem, aż wrócą ich gracze. Na zegarze działki chodzą taśmy, chwytaki, piece, maszyny, stołówki, prąd z elektrowni na działce, wiertła, szyby naftowe, pola, lasy, zwierzęta, karmniki i ule. Czasu rzeczywistego trzymają się pogoda, pociągi, handel, podatki, kontrakty, odrastanie zebranych zasobów oraz warsztat i maszyny w garażu (garaż nie jest działką).

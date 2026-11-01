@@ -276,7 +276,7 @@ public sealed record FarmsteadOnPlot(PlotObject Object, FarmPatch Patch);
 
 public sealed class FarmsteadService(
     GameDb db, WorldMap map, PlotService plots, IPlotObjects objects, IInventory inventory, ICharacterProgress progress, IProductionStats stats,
-    TimeProvider time, ITechnologies technologies, SmogService smog) : IPlacedHook, IPlotAutomation, IMachineContents, IMachinePorts, IMachineStatuses
+    TimeProvider time, IPlotClock plotClock, ITechnologies technologies, SmogService smog) : IPlacedHook, IPlotAutomation, IMachineContents, IMachinePorts, IMachineStatuses
 {
     /// <summary>The plot's farmsteads worked up to now.</summary>
     public Task<IReadOnlyList<FarmsteadOnPlot>> StateAsync(Guid player, int x, int y, IEnumerable<IPlotAutomation> automation, CancellationToken cancellationToken) =>
@@ -302,7 +302,7 @@ public sealed class FarmsteadService(
                 await machinery.CatchUpAsync(x, y, cancellationToken);
             }
 
-            var now = time.GetUtcNow();
+            var now = await plotClock.NowAsync(x, y, cancellationToken);
             var farms = await OpenAsync(x, y, now, cancellationToken);
             var farm = Find(farms, id);
             var taken = new List<(string Item, int Quantity)>();
@@ -351,7 +351,7 @@ public sealed class FarmsteadService(
                 await machinery.CatchUpAsync(x, y, cancellationToken);
             }
 
-            var now = time.GetUtcNow();
+            var now = await plotClock.NowAsync(x, y, cancellationToken);
             var farms = await OpenAsync(x, y, now, cancellationToken);
             var farm = Find(farms, id);
             farm.Patch.Advance(now);
@@ -396,7 +396,7 @@ public sealed class FarmsteadService(
             insert.Parameters.AddWithValue("y", y);
             insert.Parameters.AddWithValue("owner", owner);
             insert.Parameters.AddWithValue("crop", Farming.Crops[0].Item);
-            insert.Parameters.AddWithValue("now", time.GetUtcNow());
+            insert.Parameters.AddWithValue("now", await plotClock.NowAsync(x, y, cancellationToken));
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -406,7 +406,7 @@ public sealed class FarmsteadService(
 
     public async Task CatchUpAsync(int x, int y, CancellationToken cancellationToken)
     {
-        var now = time.GetUtcNow();
+        var now = await plotClock.NowAsync(x, y, cancellationToken);
         var farms = await OpenAsync(x, y, now, cancellationToken);
         foreach (var farm in farms)
         {
@@ -494,7 +494,7 @@ public sealed class FarmsteadService(
     /// <summary>The plot's farmsteads, only <paramref name="owner"/>'s when given.</summary>
     private async Task<IReadOnlyList<MachineStatus>> OnPlotAsync(int x, int y, Guid? owner, CancellationToken cancellationToken)
     {
-        var now = time.GetUtcNow();
+        var now = await plotClock.NowAsync(x, y, cancellationToken);
         var farms = await OpenAsync(x, y, now, cancellationToken);
         foreach (var farm in farms)
         {
@@ -572,7 +572,7 @@ public sealed class FarmsteadService(
 
         taken.Add(PlotLayout.Spawn);
         var areas = Farmsteads.Areas(farmsteads);
-        var start = now ?? time.GetUtcNow();
+        var start = now ?? await plotClock.NowAsync(x, y, cancellationToken);
         var cropSpeed = farmsteads.Count > 0 ? (await smog.LevelAsync(x, y, cancellationToken)).CropSpeed : 1;
         var result = new List<FarmsteadOnPlot>();
         foreach (var o in farmsteads)
@@ -674,7 +674,7 @@ public sealed class FarmsteadService(
 
     private async Task<IReadOnlyList<FarmsteadOnPlot>> ReportAsync(int x, int y, CancellationToken cancellationToken)
     {
-        var now = time.GetUtcNow();
+        var now = await plotClock.NowAsync(x, y, cancellationToken);
         var farms = await OpenAsync(x, y, now, cancellationToken);
         foreach (var farm in farms)
         {
@@ -737,7 +737,7 @@ public abstract class FarmsteadHandler(IServiceScopeFactory scopes, TimeProvider
         var (state, taken, xp) = await RunAsync(
             scope.ServiceProvider.GetRequiredService<FarmsteadService>(), scope.ServiceProvider.GetServices<IPlotAutomation>(),
             client.RequireAccount(), payload, cancellationToken);
-        var now = time.GetUtcNow();
+        var now = (await scope.ServiceProvider.GetRequiredService<IPlotClock>().NowAsync(request.X, request.Y, cancellationToken));
         return new Reply("farmsteads", new
         {
             x = request.X,

@@ -319,7 +319,7 @@ public sealed record Harvest(TileObject Object, IReadOnlyList<(string Item, int 
 public sealed class PlotService(
     GameDb db, WorldMap map, IInventory inventory, IEquipment equipment, ICharacterProgress progress, IProductionStats stats,
     IEnumerable<ICompanyPlots> companies, BeachService beach, PestService pests, ForestLedger ledger, IOutfit outfit, PlotTaxService taxes,
-    TimeProvider time, IServiceProvider services, PlotPermits permits)
+    TimeProvider time, IServiceProvider services, PlotPermits permits, IPlotClock plotClock)
 {
     /// <summary>The tiles of a plot as they are now; only its owner and members of its company may enter, or anyone when it is public.</summary>
     public async Task<byte[]> TilesAsync(Guid player, int x, int y, CancellationToken cancellationToken)
@@ -596,7 +596,7 @@ public sealed class PlotService(
         Guid player, int x, int y, int tileX, int tileY, (DateTimeOffset ReadyAt, TreeKind Kind, bool ByHand) tree, Action<TimeSpan> pace,
         CancellationToken cancellationToken)
     {
-        if (tree.ReadyAt > time.GetUtcNow())
+        if (tree.ReadyAt > await plotClock.NowAsync(x, y, cancellationToken))
         {
             throw new GameException("not_grown", "The tree has not grown yet.");
         }
@@ -662,7 +662,7 @@ public sealed class PlotService(
 
             if (await PlantedAtAsync(x, y, tx, ty, cancellationToken) is { } planted)
             {
-                if (planted.ReadyAt <= time.GetUtcNow())
+                if (planted.ReadyAt <= await plotClock.NowAsync(x, y, cancellationToken))
                 {
                     felled.Add(((tx, ty), await CutDownAsync(x, y, tx, ty, planted, saw, cancellationToken)));
                 }
@@ -708,7 +708,7 @@ public sealed class PlotService(
 
         var speed = Industries.Speed(await outfit.BonusAsync(player, industry, cancellationToken));
         if (industry is Industries.Forestry or Industries.Mining && at is { } plot
-            && await Husbandry.HorseAtWorkAsync(db, plot.X, plot.Y, plot.TileX is { } tx && plot.TileY is { } ty ? (tx, ty) : null, time.GetUtcNow(), cancellationToken))
+            && await Husbandry.HorseAtWorkAsync(db, plot.X, plot.Y, plot.TileX is { } tx && plot.TileY is { } ty ? (tx, ty) : null, await plotClock.NowAsync(plot.X, plot.Y, cancellationToken), cancellationToken))
         {
             speed *= Husbandry.HorseBonus;
         }

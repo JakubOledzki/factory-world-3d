@@ -64,7 +64,7 @@ public sealed record Hive(Guid Id, int X, int Y, Guid Owner, int Honey, int Wax,
 }
 
 public sealed class BeeService(
-    GameDb db, PlotService plots, WorldMap map, IInventory inventory, ICharacterProgress progress, IProductionStats stats, TimeProvider time)
+    GameDb db, PlotService plots, WorldMap map, IInventory inventory, ICharacterProgress progress, IProductionStats stats, TimeProvider time, IPlotClock plotClock)
     : IPlacedHook, IMachineContents
 {
     public async Task PlacedAsync(Guid owner, int x, int y, PlacedOnPlot placed, CancellationToken cancellationToken)
@@ -83,7 +83,7 @@ public sealed class BeeService(
         insert.Parameters.AddWithValue("x", x);
         insert.Parameters.AddWithValue("y", y);
         insert.Parameters.AddWithValue("owner", owner);
-        insert.Parameters.AddWithValue("now", time.GetUtcNow());
+        insert.Parameters.AddWithValue("now", await plotClock.NowAsync(x, y, cancellationToken));
         await insert.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -183,7 +183,7 @@ public sealed class BeeService(
 
         var tile = await TileAsync(id, cancellationToken);
         var lindens = await LindensAsync(hive.X, hive.Y, tile.X, tile.Y, cancellationToken);
-        return (hive.Advance(time.GetUtcNow(), Bees.Speed(lindens)), lindens);
+        return (hive.Advance(await plotClock.NowAsync(hive.X, hive.Y, cancellationToken), Bees.Speed(lindens)), lindens);
     }
 
     private async Task<(int X, int Y)> TileAsync(Guid id, CancellationToken cancellationToken)
@@ -210,7 +210,7 @@ public sealed class BeeService(
             }
         }
 
-        var now = time.GetUtcNow();
+        var now = await plotClock.NowAsync(x, y, cancellationToken);
         lindens += (await ForestService.ReadAsync(db, x, y, cancellationToken))
             .Count(t => t.Species == Trees.Linden && t.ReadyAt <= now && Math.Abs(t.TileX - tileX) <= Bees.Reach && Math.Abs(t.TileY - tileY) <= Bees.Reach);
         return lindens;
@@ -259,7 +259,7 @@ public abstract class HiveHandler(IServiceScopeFactory scopes, TimeProvider time
         var (hive, lindens, taken, xp) = await RunAsync(scope.ServiceProvider.GetRequiredService<BeeService>(), client.RequireAccount(), request.Id, cancellationToken);
         return new Reply("hive", new
         {
-            hive = BeeService.Json(hive, lindens, time.GetUtcNow()),
+            hive = BeeService.Json(hive, lindens, (await scope.ServiceProvider.GetRequiredService<IPlotClock>().NowOfAsync(request.Id, cancellationToken))),
             taken = taken.Select(t => new { id = t.Item, name = Items.Names[t.Item], quantity = t.Quantity }),
             xp = xp is { } gain ? new { xp = gain.Xp, level = gain.Level, leveledUp = gain.LeveledUp } : null,
         });

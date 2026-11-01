@@ -775,6 +775,18 @@ void SFWAwayWindow::Construct(const FArguments& InArgs)
 	const FString Away = Minutes >= 48 * 60 ? FString::Printf(TEXT("%d dni"), Minutes / (24 * 60))
 		: Minutes >= 60 ? FString::Printf(TEXT("%d h %02d min"), Minutes / 60, Minutes % 60) : FString::Printf(TEXT("%d min"), Minutes);
 	Add(FWUi::Note(FText::FromString(FString::Printf(TEXT("Nie było cię %s. Oto, co się w tym czasie działo."), *Away)), FWStyle::Text), 0.f);
+	// Plots stand still while their players are away; those in a company work while anyone in it plays
+	const int32 Plots = int32(FWUi::Num(Report, TEXT("plots")));
+	const int32 CompanyPlots = int32(FWUi::Num(Report, TEXT("companyPlots")));
+	if (Plots > 0)
+	{
+		const FString Paused = CompanyPlots == 0
+			? FString(TEXT("Twoje działki stały – produkcja idzie tylko wtedy, gdy jesteś w grze (krótkie rozłączenie, do półtorej minuty, jej nie zatrzymuje)."))
+			: CompanyPlots >= Plots
+			? FString(TEXT("Twoje działki są w spółce: pracowały wtedy, gdy w grze był ktoś ze spółki."))
+			: FString::Printf(TEXT("Działki poza spółką stały. Działki w spółce (%d) pracowały wtedy, gdy w grze był ktoś ze spółki."), CompanyPlots);
+		Add(FWUi::Note(FText::FromString(Paused), FWStyle::Muted), 6.f);
+	}
 	const double Net = FWUi::Num(Report, TEXT("netCents"));
 	Add(SNew(STextBlock).Font(FWStyle::Font(22, TEXT("Bold"))).ColorAndOpacity(Net >= 0.0 ? FWStyle::Good : FWStyle::Error)
 		.Text(FText::FromString(FString::Printf(TEXT("Razem: %s%s"), Net > 0.0 ? TEXT("+") : TEXT(""), *FWUi::Money(Net).ToString()))), 10.f);
@@ -818,7 +830,7 @@ void SFWAwayWindow::Construct(const FArguments& InArgs)
 	}
 	if (Income.Num() == 0 && Expenses.Num() == 0 && Made.Num() == 0)
 	{
-		Add(FWUi::Note(LOCTEXT("Quiet", "Tym razem nic się nie zmieniło. Pociągi eksportowe, banki i sklepy pracują, także gdy cię nie ma."), FWStyle::Muted), 12.f);
+		Add(FWUi::Note(LOCTEXT("Quiet", "Tym razem nic się nie zmieniło. Maszyny stoją, gdy cię nie ma, ale pociągi eksportowe, banki i sklepy pracują dalej."), FWStyle::Muted), 12.f);
 	}
 	TWeakPtr<SFWAwayWindow> WeakThis = SharedThis(this);
 	Add(SNew(SBox).HAlign(HAlign_Left)
