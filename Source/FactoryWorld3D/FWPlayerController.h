@@ -86,6 +86,9 @@ public:
 	void SetHotbarSlot(int32 Slot, const FString& Item);
 	void StorageTransfer(bool bPut, const FString& Item, int32 Quantity);
 	void StorageTransferAll(bool bPut);
+	// A building that farms the land around it (farmstead, forester, beehive, feeder) and its window, as in the 2D game
+	static bool IsFarm(const FString& Kind);
+	void OpenFarm(const FString& ObjectId, const FString& Kind);
 	// The market, at the plot's computer
 	void OpenMarket();
 	// A request to the server for the windows; replies go to the callback
@@ -169,6 +172,9 @@ public:
 	// Opens the storage nearest the player, and goes to stand by it
 	UFUNCTION(Exec)
 	void FWChestNearest();
+	// Walks to the nearest farming building of a kind (furniture_farmstead, furniture_beehive, ...) and opens its window, for tests
+	UFUNCTION(Exec)
+	void FWFarm(const FString& Kind);
 	UFUNCTION(Exec)
 	void FWClose() { CloseWindow(); }
 	// Opens the nearest object of a kind (e.g. furniture_workbench) and stands by it
@@ -247,6 +253,7 @@ private:
 	UPROPERTY()
 	TObjectPtr<UAudioComponent> ForestSound;
 	double NextGustAt = 0.0;
+	TSharedPtr<class SFWFarmWindow> Farm;
 	double NextBirdAt = 0.0;
 	float GustBoost = 0.f;
 	float WindLevel = 0.f;

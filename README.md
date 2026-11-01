@@ -125,6 +125,17 @@ Fryzury, zarost i ubrania to prawdziwe modele 3D (`Tools/blender/make_character_
 
 Do testów: `FWInventory`, `FWChestNearest`, `FWMoveTile <z> <do>`, `FWStorage <1 włóż / 0 weź> <przedmiot> <ile>`, `FWMenu`, `FWClose`.
 
+## Zagroda, leśniczówka, ul i karmnik
+
+E przy budynku, który sam uprawia ziemię wokół siebie, otwiera jego okno, jak w grze 2D:
+
+- **zagroda rolnika / folwark / gospodarstwo zmechanizowane**: pole wokół, ile grządek dojrzało, wybór uprawy (pszenica, marchew, kapusta, kukurydza, ziemniaki, słonecznik, burak, len, konopie), obornik z plecaka, plony w środku i „Wyjmij plony”, następny poziom,
+- **chata leśnika / leśniczówka / stacja leśna**: las wokół, wybór gatunku (sosna, świerk, brzoza, dąb, lipa), drewno w środku i „Wyjmij drewno”,
+- **ul**: miód i wosk, lipy w zasięgu (przyspieszają pszczoły), „Wybierz miód i wosk”,
+- **karmnik / obora automatyczna**: pasza w środku, zwierzęta w zasięgu, wsypywanie paszy z plecaka, zbiory obory.
+
+Do testów: `FWFarm furniture_farmstead` (albo `furniture_forester_hut`, `furniture_beehive`, `furniture_feeder`) podchodzi do najbliższego takiego budynku i otwiera jego okno.
+
 ## Stół warsztatowy, piece i maszyny
 
 **E** na stanowisku pracy otwiera jego okno. Jest odświeżane z serwera co 1,5 s i po każdej akcji.

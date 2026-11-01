@@ -670,6 +670,10 @@ void AFWCharacter::InteractStart()
 		HoldNeeded = FMath::Max(0.2f, Mine->Seconds);
 		HoldTime = 0.f;
 	}
+	else if (const FFWPlotObject* Farm = Plot->FindObjectAt(TargetTile); Farm && AFWPlayerController::IsFarm(Farm->Kind))
+	{
+		PC->OpenFarm(Farm->Id, Farm->Kind);
+	}
 	else if (const FFWPlotObject* Object = Plot->FindObjectAt(TargetTile); Object && FWCatalog::IsStorage(Object->Kind))
 	{
 		PC->OpenInventory(Object->Id);

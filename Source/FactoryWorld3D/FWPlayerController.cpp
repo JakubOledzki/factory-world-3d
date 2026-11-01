@@ -3,6 +3,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/GameInstance.h"
+#include "UI/SFWFarmWindow.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/StaticMeshActor.h"
 #include "GameFramework/Character.h"
@@ -1055,6 +1056,41 @@ void AFWPlayerController::StorageTransfer(bool bPut, const FString& Item, int32 
 			}
 		}
 	});
+}
+
+bool AFWPlayerController::IsFarm(const FString& Kind)
+{
+	return SFWFarmWindow::ModeOf(Kind) != SFWFarmWindow::EMode::None;
+}
+
+void AFWPlayerController::OpenFarm(const FString& ObjectId, const FString& Kind)
+{
+	SAssignNew(Farm, SFWFarmWindow).Controller(this).Object(ObjectId).Kind(Kind);
+	ShowWidget(Farm.ToSharedRef(), Farm);
+}
+
+void AFWPlayerController::FWFarm(const FString& Kind)
+{
+	if (!Plot || !GetPawn())
+	{
+		return;
+	}
+	const FIntPoint At = Plot->TileAt(GetPawn()->GetActorLocation());
+	const FFWPlotObject* Nearest = nullptr;
+	for (const TPair<FString, FFWPlotObject>& Pair : Plot->GetObjects())
+	{
+		if (Pair.Value.Kind == Kind && (!Nearest || (Pair.Value.Tile - At).SizeSquared() < (Nearest->Tile - At).SizeSquared()))
+		{
+			Nearest = &Pair.Value;
+		}
+	}
+	if (!Nearest)
+	{
+		UE_LOG(LogFWGame, Warning, TEXT("No %s on the plot"), *Kind);
+		return;
+	}
+	FWGoto(Nearest->Tile.X - 3, Nearest->Tile.Y + 3, -45.f, -25.f);
+	OpenFarm(Nearest->Id, Nearest->Kind);
 }
 
 void AFWPlayerController::StorageTransferAll(bool bPut)
