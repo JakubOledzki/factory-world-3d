@@ -21,6 +21,9 @@
 #include "Engine/StaticMesh.h"
 #include "Game/FWArt.h"
 #include "Game/FWAudio.h"
+#include "UI/SFWCityWindow.h"
+#include "UI/SFWCountryWindow.h"
+#include "UI/SFWPoliceWindow.h"
 #include "UI/SFWCharacterCreator.h"
 #include "UI/SFWInventoryWindow.h"
 #include "UI/SFWContractsWindow.h"
@@ -586,6 +589,55 @@ void AFWPlayerController::EnterPlot(int32 X, int32 Y)
 		This->RefreshWallet();
 		This->NextPollAt = 0.0;
 	});
+}
+
+void AFWPlayerController::OpenCity()
+{
+	SAssignNew(City, SFWCityWindow).Controller(this);
+	ShowWidget(City.ToSharedRef(), City);
+}
+
+void AFWPlayerController::OpenCountry()
+{
+	SAssignNew(Country, SFWCountryWindow).Controller(this);
+	ShowWidget(Country.ToSharedRef(), Country);
+}
+
+void AFWPlayerController::OpenPolice()
+{
+	SAssignNew(Police, SFWPoliceWindow).Controller(this);
+	ShowWidget(Police.ToSharedRef(), Police);
+}
+
+void AFWPlayerController::FWCity(int32 Tab)
+{
+	if (!City.IsValid())
+	{
+		OpenCity();
+	}
+	City->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWCountry(int32 Tab, const FString& Code)
+{
+	if (!Country.IsValid())
+	{
+		OpenCountry();
+	}
+	if (!Code.IsEmpty())
+	{
+		Country->ShowCountry(Code);
+	}
+	Country->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWPolice(int32 Tab)
+{
+	if (!Police.IsValid())
+	{
+		OpenPolice();
+	}
+	Police->ShowTab(Tab);
 }
 
 void AFWPlayerController::RefreshInventory()

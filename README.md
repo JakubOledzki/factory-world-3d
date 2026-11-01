@@ -244,6 +244,16 @@ Skrypt kompiluje grę, przygotowuje zasoby (cook) i pakuje wszystko do `D:\Facto
 - Adres serwera: `FactoryWorld3D.exe -ServerUrl=ws://adres:5080/ws` albo `ServerUrl` w `Saved\Config\Windows\Game.ini`.
 - Wersja Shipping pomija `Saved/DevLogin.ini`, więc zawsze pokazuje ekran logowania. Wersja Development loguje się automatycznie, jeśli ten plik istnieje.
 
+## Miasto, państwo i policja
+
+Jak w grze 2D:
+
+- **Miasto** (H – ratusz): potrzeby miasta z dostawą z ekwipunku lub ze stacji, tygodniowy przetarg (ukryte oferty z wadium, dostawa zwycięzcy), rozwój miasta i główny dostawca, wywóz śmieci, usługi biur graczy, ratusz (podatki i premia burmistrza, festyn, uchwały z głosowaniem, wotum nieufności), wybory burmistrza (głosowanie, kandydowanie z programem i kaucją, wsparcie spółek) i kasa miasta z budowami (`city.*`). Na działce w powiecie, poza samym miastem, tylko ratusz, wybory, kasa i przetarg.
+- **Państwo** (P): obywatelstwo, prezydent i ministrowie, prawo i skarbiec, rząd (podatki, opłaty, cła, dotacje, inwestycje, mianowanie ministrów), wybory prezydenta z wotum nieufności, dyplomacja (sojusze, embarga), ranking państw i partie (`country.*`, `party.*`).
+- **Policja** (przycisk w oknie państwa): prawo i licencje, sprawy i kary, zgłaszanie graczy, służba (kontrole pociągów, wyroki, śledztwa, nakazy, funkcjonariusze), sąd (odwołania, nakazy) i paser (`law.*`, `fence.*`).
+
+Do testów: `FWCity <0–7>`, `FWCountry <0–5> [kod kraju, np. SVK]`, `FWPolice <0–3>`.
+
 ## Las (Project Titan)
 
 Las świerkowo-sosnowy na zboczach wokół działki to drzewa Nanite z darmowego przykładu Epic **Project Titan** (Fab). Nie są w repozytorium (licencja pozwala używać ich w grze, ale nie rozpowszechniać osobno). Żeby je dodać, pobierz Titana w Epic Launcherze („Create Project”, UE 5.8) i uruchom:
