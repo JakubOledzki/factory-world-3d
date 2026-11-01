@@ -74,7 +74,7 @@ public:
 	FOnFWNetPush OnPush;
 
 	UPROPERTY(Config)
-	FString ServerUrl = TEXT("ws://localhost:5080/ws");
+	FString ServerUrl = TEXT("ws://localhost:5081/ws");
 
 	// Seconds before an unanswered request fails with code "timeout".
 	UPROPERTY(Config)

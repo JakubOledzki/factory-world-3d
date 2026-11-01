@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\FactoryWorld.Modules.Abstractions\FactoryWorld.Modules.Abstractions.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Session\FactoryWorld.Modules.Session.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Accounts\FactoryWorld.Modules.Accounts.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Characters\FactoryWorld.Modules.Characters.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Inventory\FactoryWorld.Modules.Inventory.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Wallet\FactoryWorld.Modules.Wallet.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Politics\FactoryWorld.Modules.Politics.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Chat\FactoryWorld.Modules.Chat.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Market\FactoryWorld.Modules.Market.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Recycling\FactoryWorld.Modules.Recycling.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.World\FactoryWorld.Modules.World.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Crafting\FactoryWorld.Modules.Crafting.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Logistics\FactoryWorld.Modules.Logistics.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Power\FactoryWorld.Modules.Power.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Tutorial\FactoryWorld.Modules.Tutorial.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Statistics\FactoryWorld.Modules.Statistics.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Contracts\FactoryWorld.Modules.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Companies\FactoryWorld.Modules.Companies.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Research\FactoryWorld.Modules.Research.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Achievements\FactoryWorld.Modules.Achievements.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Rivalry\FactoryWorld.Modules.Rivalry.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Bots\FactoryWorld.Modules.Bots.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Law\FactoryWorld.Modules.Law.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Reports\FactoryWorld.Modules.Reports.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Collections\FactoryWorld.Modules.Collections.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Expeditions\FactoryWorld.Modules.Expeditions.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Seasons\FactoryWorld.Modules.Seasons.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Mentoring\FactoryWorld.Modules.Mentoring.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Puzzles\FactoryWorld.Modules.Puzzles.csproj" />
+    <ProjectReference Include="..\Modules\FactoryWorld.Modules.Timelapse\FactoryWorld.Modules.Timelapse.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

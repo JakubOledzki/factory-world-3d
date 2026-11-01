@@ -45,4 +45,4 @@ if ($Exit -ne 0) { throw "Packaging failed ($Exit), log: $Log" }
 
 $Exe = Get-ChildItem $Target -Recurse -Filter "FactoryWorld3D*.exe" | Select-Object -First 1
 Write-Host "Game: $($Exe.FullName)"
-Write-Host "Server address: add -ServerUrl=ws://host:5080/ws to the command line, or ServerUrl in Saved\Config\Windows\Game.ini"
+Write-Host "Server address: add -ServerUrl=ws://host:5081/ws to the command line, or ServerUrl in Saved\Config\Windows\Game.ini"

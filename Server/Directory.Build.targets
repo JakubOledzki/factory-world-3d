@@ -1,0 +1,6 @@
+<Project>
+  <!-- "biomes.bin.gz" would make MSBuild take "bin" for a culture and move the file into a satellite assembly. -->
+  <ItemGroup>
+    <EmbeddedResource Update="@(EmbeddedResource)" WithCulture="false" />
+  </ItemGroup>
+</Project>
