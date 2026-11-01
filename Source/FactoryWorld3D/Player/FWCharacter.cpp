@@ -551,13 +551,22 @@ void AFWCharacter::CreateInput()
 		Back.Modifiers.Add(NewObject<UInputModifierNegate>(this));
 	}
 	Mapping->MapKey(MakeAction(TEXT("Look"), EInputActionValueType::Axis2D), EKeys::Mouse2D);
+	Mapping->MapKey(MakeAction(TEXT("Rail"), EInputActionValueType::Boolean), EKeys::T);
 	Mapping->MapKey(MakeAction(TEXT("Jump"), EInputActionValueType::Boolean), EKeys::SpaceBar);
+	Mapping->MapKey(MakeAction(TEXT("Chat"), EInputActionValueType::Boolean), EKeys::Enter);
+	Mapping->MapKey(MakeAction(TEXT("Achievements"), EInputActionValueType::Boolean), EKeys::O);
 	Mapping->MapKey(MakeAction(TEXT("Sprint"), EInputActionValueType::Boolean), EKeys::LeftShift);
+	Mapping->MapKey(MakeAction(TEXT("Company"), EInputActionValueType::Boolean), EKeys::K);
+	Mapping->MapKey(MakeAction(TEXT("Bank"), EInputActionValueType::Boolean), EKeys::Z);
 	Mapping->MapKey(MakeAction(TEXT("Interact"), EInputActionValueType::Boolean), EKeys::E);
 	Mapping->MapKey(MakeAction(TEXT("Pickup"), EInputActionValueType::Boolean), EKeys::RightMouseButton);
 	Mapping->MapKey(MakeAction(TEXT("Primary"), EInputActionValueType::Boolean), EKeys::LeftMouseButton);
+	Mapping->MapKey(MakeAction(TEXT("City"), EInputActionValueType::Boolean), EKeys::H);
+	Mapping->MapKey(MakeAction(TEXT("Country"), EInputActionValueType::Boolean), EKeys::P);
 	Mapping->MapKey(MakeAction(TEXT("Build"), EInputActionValueType::Boolean), EKeys::B);
 	Mapping->MapKey(MakeAction(TEXT("Rotate"), EInputActionValueType::Boolean), EKeys::R);
+	Mapping->MapKey(MakeAction(TEXT("Contracts"), EInputActionValueType::Boolean), EKeys::J);
+	Mapping->MapKey(MakeAction(TEXT("Stats"), EInputActionValueType::Boolean), EKeys::L);
 	Mapping->MapKey(MakeAction(TEXT("Inventory"), EInputActionValueType::Boolean), EKeys::Tab);
 	Mapping->MapKey(Actions[TEXT("Inventory")], EKeys::I);
 	Mapping->MapKey(MakeAction(TEXT("Menu"), EInputActionValueType::Boolean), EKeys::Escape);
@@ -591,18 +600,81 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(PlayerInputComponent);
 	Input->BindAction(Actions[TEXT("Move")], ETriggerEvent::Triggered, this, &AFWCharacter::Move);
 	Input->BindAction(Actions[TEXT("Look")], ETriggerEvent::Triggered, this, &AFWCharacter::Look);
+	Input->BindActionValueLambda(Actions[TEXT("Rail")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenRail();
+		}
+	});
 	Input->BindAction(Actions[TEXT("Jump")], ETriggerEvent::Started, this, &ACharacter::Jump);
 	Input->BindAction(Actions[TEXT("Jump")], ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+	Input->BindActionValueLambda(Actions[TEXT("City")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenCity();
+		}
+	});
+	Input->BindActionValueLambda(Actions[TEXT("Country")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenCountry();
+		}
+	});
 	Input->BindAction(Actions[TEXT("Sprint")], ETriggerEvent::Started, this, &AFWCharacter::SprintStart);
 	Input->BindAction(Actions[TEXT("Sprint")], ETriggerEvent::Completed, this, &AFWCharacter::SprintStop);
 	Input->BindAction(Actions[TEXT("Interact")], ETriggerEvent::Started, this, &AFWCharacter::InteractStart);
 	Input->BindAction(Actions[TEXT("Interact")], ETriggerEvent::Completed, this, &AFWCharacter::InteractStop);
+	Input->BindActionValueLambda(Actions[TEXT("Chat")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenChat();
+		}
+	});
+	Input->BindActionValueLambda(Actions[TEXT("Achievements")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenAchievements();
+		}
+	});
 	Input->BindAction(Actions[TEXT("Pickup")], ETriggerEvent::Started, this, &AFWCharacter::PickupStart);
 	Input->BindAction(Actions[TEXT("Pickup")], ETriggerEvent::Completed, this, &AFWCharacter::PickupStop);
 	Input->BindAction(Actions[TEXT("Primary")], ETriggerEvent::Started, this, &AFWCharacter::Primary);
+	Input->BindActionValueLambda(Actions[TEXT("Company")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenCompany();
+		}
+	});
+	Input->BindActionValueLambda(Actions[TEXT("Bank")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenBank();
+		}
+	});
 	Input->BindAction(Actions[TEXT("Build")], ETriggerEvent::Started, this, &AFWCharacter::ToggleBuild);
 	Input->BindAction(Actions[TEXT("Rotate")], ETriggerEvent::Started, this, &AFWCharacter::Rotate);
 	Input->BindAction(Actions[TEXT("Scroll")], ETriggerEvent::Started, this, &AFWCharacter::Scroll);
+	Input->BindActionValueLambda(Actions[TEXT("Contracts")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenContracts();
+		}
+	});
+	Input->BindActionValueLambda(Actions[TEXT("Stats")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenStats();
+		}
+	});
 	Input->BindActionValueLambda(Actions[TEXT("Inventory")], ETriggerEvent::Started, [this](const FInputActionValue&)
 	{
 		if (AFWPlayerController* PC = GetFWController())
@@ -678,9 +750,21 @@ void AFWCharacter::InteractStart()
 	{
 		PC->OpenInventory(Object->Id);
 	}
+	else if (const FFWPlotObject* Chest = Plot->FindObjectAt(TargetTile); Chest && Chest->Kind == TEXT("furniture_export_chest"))
+	{
+		PC->OpenExport();
+	}
+	else if (const FFWPlotObject* Post = Plot->FindObjectAt(TargetTile); Post && (Post->Kind == TEXT("furniture_buy_market") || Post->Kind == TEXT("furniture_rail_port")))
+	{
+		PC->OpenExport(Post->Id);
+	}
 	else if (const FFWPlotObject* Computer = Plot->FindObjectAt(TargetTile); Computer && Computer->Kind == TEXT("furniture_computer"))
 	{
 		PC->OpenMarket();
+	}
+	else if (const FFWPlotObject* Table = Plot->FindObjectAt(TargetTile); Table && Table->Kind == TEXT("furniture_research_table"))
+	{
+		PC->OpenResearch();
 	}
 	else if (const FFWPlotObject* Station = Plot->FindObjectAt(TargetTile); Station && FWCatalog::StationOf(Station->Kind) >= 0)
 	{
