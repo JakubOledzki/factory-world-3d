@@ -223,6 +223,15 @@ Skrypt pobiera pliki i sprawdza ich sumy kontrolne, przygotowuje je w Blenderze 
 
 Obraz: fizyczne słońce (75 000 lx), ekspozycja z histogramu w zakresie EV 12,5–14,8, krzywa filmowa, delikatny bloom, winieta i ziarno, Lumen z HW RT (oświetlenie trafień z surface cache), wirtualne mapy cieni, Nanite, mgła wolumetryczna.
 
+## Spółka, banki i giełda
+
+Jak w grze 2D:
+
+- **Spółka** (K): bez spółki zakładanie i zaproszenia; w spółce zakładki **Spółka** (członkowie i role, zapraszanie, działki spółki z kierownikami, wnoszenie własnych działek, wspólny magazyn – wkładanie i wyjmowanie, dziennik), **Kasa** (wpłata za udziały, wypłata, sprzedaż z magazynu handlarzowi, zakup do magazynu, udziały, dywidenda, trofea), **Projekty** (wielkie budowy i cuda świata, dokładanie części z ekwipunku i magazynu), **Zlecenia** (zlecenia tygodnia, zadania z pensją), **Umowy** (stałe dostawy z innymi spółkami), **Giełda** (akcje, wejście na giełdę, przejęcie) i **Ranking** sezonu (`company.*`).
+- **Banki** (Z – w 3D B to budowanie): konta, wpłata, wypłata, przelewy do innych graczy, pieniądze „w drodze” z odliczaniem (`bank.*`, odświeżanie co 5 s).
+
+Do testów: `FWCompany <0–6>`, `FWCompanyDo <wiadomość> <pole> <wartość>` (np. `FWCompanyDo company.deposit cents 50000`), `FWBank`.
+
 ## Wersja do grania (paczka dla Windows)
 
 ```
