@@ -85,6 +85,16 @@ public:
 	void SetHotbarSlot(int32 Slot, const FString& Item);
 	void StorageTransfer(bool bPut, const FString& Item, int32 Quantity);
 	void StorageTransferAll(bool bPut);
+	// A work place's window (workbench, furnace, machine): its state as the server last sent it
+	void OpenStation(const FString& ObjectId, const FString& Kind);
+	TSharedPtr<FJsonObject> GetStationState() const { return StationState; }
+	int32 GetStationVersion() const { return StationVersion; }
+	FString GetStationName() const { return StationName; }
+	// Sends "<station>.<action>" for the open work place with one more field (string, or a number when >= 0)
+	void StationAction(const TCHAR* Type, const TCHAR* Field, const FString& Value, int64 Number = -1);
+	void StationLoad(const TCHAR* Type, const FString& Item, int32 Quantity, bool bFuel = false);
+	// The server's clock now (ms), from the last station reply
+	double ServerNowMs() const;
 	FString ItemName(const FString& Item) const;
 	const TArray<FFWToast>& GetToasts() const { return Toasts; }
 	bool IsInWorld() const { return Plot != nullptr; }
@@ -153,6 +163,16 @@ public:
 	void FWChestNearest();
 	UFUNCTION(Exec)
 	void FWClose() { CloseWindow(); }
+	// Opens the nearest object of a kind (e.g. furniture_workbench) and stands by it
+	UFUNCTION(Exec)
+	void FWOpenNearest(const FString& Kind);
+	// Places an item on the nearest free spot around the player
+	UFUNCTION(Exec)
+	void FWPlaceNear(const FString& Kind);
+	UFUNCTION(Exec)
+	void FWStationDo(const FString& Type, const FString& Field, const FString& Value) { StationAction(*Type, Field.IsEmpty() ? nullptr : *Field, Value); }
+	UFUNCTION(Exec)
+	void FWStationLoad(const FString& Type, const FString& Item, int32 Quantity) { StationLoad(*Type, Item, Quantity); }
 	UFUNCTION(Exec)
 	void FWMenu() { OpenSettings(); }
 	UFUNCTION(Exec)
@@ -223,6 +243,16 @@ private:
 	TArray<FFWStack> Inventory;
 	int32 InventorySlots = 0;
 	FFWStorageView Storage;
+	FString StationId;
+	FString StationName;
+	int32 StationKind = -1;
+	TSharedPtr<FJsonObject> StationState;
+	int32 StationVersion = 0;
+	double StationServerMs = 0.0;
+	double StationReceivedAt = 0.0;
+	double NextStationPoll = 0.0;
+	void ApplyStation(const FFWNetReply& Reply);
+	void PollStation();
 	TMap<FString, TSharedPtr<FSlateBrush>> IconBrushes;
 	TMap<FString, FString> Names;
 	TArray<FString> Hotbar;

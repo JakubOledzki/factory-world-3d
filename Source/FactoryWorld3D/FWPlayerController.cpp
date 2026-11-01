@@ -24,6 +24,7 @@
 #include "UI/SFWCharacterCreator.h"
 #include "UI/SFWInventoryWindow.h"
 #include "UI/SFWSettingsWindow.h"
+#include "UI/SFWStationWindow.h"
 #include "Engine/Texture2D.h"
 #include "Camera/CameraComponent.h"
 #include "UI/SFWLoginWidget.h"
@@ -712,8 +713,213 @@ void AFWPlayerController::OpenSettings()
 	ShowWidget(Window, Window);
 }
 
+namespace
+{
+	const TCHAR* StationPrefix(int32 Kind)
+	{
+		return Kind == 0 ? TEXT("crafting") : Kind == 1 ? TEXT("furnace") : TEXT("machine");
+	}
+
+	const TCHAR* StationField(int32 Kind)
+	{
+		return Kind == 0 ? TEXT("workbench") : Kind == 1 ? TEXT("furnace") : TEXT("machine");
+	}
+}
+
+void AFWPlayerController::OpenStation(const FString& ObjectId, const FString& Kind)
+{
+	StationKind = FWCatalog::StationOf(Kind);
+	if (StationKind < 0 || !Plot)
+	{
+		return;
+	}
+	StationId = ObjectId;
+	StationName = ItemName(Kind);
+	StationState.Reset();
+	++StationVersion;
+	TSharedRef<SFWStationWindow> Window = SNew(SFWStationWindow).Controller(this)
+		.Station(StationKind == 0 ? EFWStation::Crafting : StationKind == 1 ? EFWStation::Furnace : EFWStation::Machine);
+	ShowWidget(Window, Window);
+	RefreshInventory();
+	PollStation();
+}
+
+void AFWPlayerController::PollStation()
+{
+	if (StationId.IsEmpty())
+	{
+		return;
+	}
+	NextStationPoll = FPlatformTime::Seconds() + 1.5;
+	StationAction(*FString::Printf(TEXT("%s.get"), StationPrefix(StationKind)), nullptr, FString());
+}
+
+void AFWPlayerController::StationAction(const TCHAR* Type, const TCHAR* Field, const FString& Value, int64 Number)
+{
+	if (StationId.IsEmpty())
+	{
+		return;
+	}
+	TSharedPtr<FJsonObject> P = Payload();
+	P->SetStringField(StationField(StationKind), StationId);
+	if (Field)
+	{
+		if (Number >= 0)
+		{
+			P->SetNumberField(Field, double(Number));
+		}
+		else
+		{
+			P->SetStringField(Field, Value);
+		}
+	}
+	const bool bGet = FString(Type).EndsWith(TEXT(".get"));
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Net()->Request(Type, P, [WeakThis, bGet](const FFWNetReply& Reply)
+	{
+		if (AFWPlayerController* This = WeakThis.Get())
+		{
+			This->ApplyStation(Reply);
+			if (!bGet && !Reply.IsError())
+			{
+				This->RefreshInventory();
+			}
+		}
+	});
+}
+
+void AFWPlayerController::StationLoad(const TCHAR* Type, const FString& Item, int32 Quantity, bool bFuel)
+{
+	if (StationId.IsEmpty() || Quantity <= 0)
+	{
+		return;
+	}
+	TSharedPtr<FJsonObject> P = Payload();
+	P->SetStringField(StationField(StationKind), StationId);
+	P->SetStringField(TEXT("item"), Item);
+	P->SetNumberField(TEXT("quantity"), Quantity);
+	P->SetBoolField(TEXT("fuel"), bFuel);
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Net()->Request(Type, P, [WeakThis](const FFWNetReply& Reply)
+	{
+		if (AFWPlayerController* This = WeakThis.Get())
+		{
+			This->ApplyStation(Reply);
+			This->RefreshInventory();
+		}
+	});
+}
+
+void AFWPlayerController::ApplyStation(const FFWNetReply& Reply)
+{
+	if (Reply.IsError())
+	{
+		ToastError(Reply);
+		return;
+	}
+	if (StationId.IsEmpty() || !Reply.Payload.IsValid())
+	{
+		return;
+	}
+	StationState = Reply.Payload;
+	// The workbench reply names its recipes, the work place among them
+	const TArray<TSharedPtr<FJsonValue>>* Recipes = nullptr;
+	if (Reply.Payload->TryGetArrayField(TEXT("recipes"), Recipes))
+	{
+		for (const TSharedPtr<FJsonValue>& Value : *Recipes)
+		{
+			FString Id, Name;
+			if (Value->AsObject()->TryGetStringField(TEXT("id"), Id) && Value->AsObject()->TryGetStringField(TEXT("name"), Name))
+			{
+				Names.Add(Id, Name);
+			}
+		}
+	}
+	if (const FFWPlotObject* Object = Plot ? Plot->GetObjects().Find(StationId) : nullptr)
+	{
+		StationName = ItemName(Object->Kind);
+	}
+	StationReceivedAt = FPlatformTime::Seconds();
+	Reply.Payload->TryGetNumberField(TEXT("serverTime"), StationServerMs);
+	++StationVersion;
+	// Finished orders and taken goods land in the inventory
+	const TArray<TSharedPtr<FJsonValue>>* Done = nullptr;
+	if ((Reply.Payload->TryGetArrayField(TEXT("done"), Done) || Reply.Payload->TryGetArrayField(TEXT("taken"), Done)) && Done->Num() > 0)
+	{
+		for (const TSharedPtr<FJsonValue>& Value : *Done)
+		{
+			const TSharedPtr<FJsonObject> Item = Value->AsObject();
+			Toast(FText::Format(LOCTEXT("Got", "+{0} {1}"), int32(Item->GetNumberField(TEXT("quantity"))), FText::FromString(Item->GetStringField(TEXT("name")))));
+		}
+		FWAudio::Play2D(this, TEXT("build_pickup"), 0.5f);
+		RefreshInventory();
+	}
+}
+
+double AFWPlayerController::ServerNowMs() const
+{
+	return StationServerMs + (FPlatformTime::Seconds() - StationReceivedAt) * 1000.0;
+}
+
+void AFWPlayerController::FWPlaceNear(const FString& Kind)
+{
+	if (!Plot || !GetPawn())
+	{
+		return;
+	}
+	const FIntPoint At = Plot->TileAt(GetPawn()->GetActorLocation());
+	for (int32 R = 2; R < 40; ++R)
+	{
+		for (int32 D = -R; D <= R; ++D)
+		{
+			for (const FIntPoint& Tile : { At + FIntPoint(D, R), At + FIntPoint(D, -R), At + FIntPoint(R, D), At + FIntPoint(-R, D) })
+			{
+				if (Plot->CanPlace(Kind, Tile))
+				{
+					UE_LOG(LogFWGame, Log, TEXT("Placing %s at %d,%d"), *Kind, Tile.X, Tile.Y);
+					Place(Kind, Tile, 0);
+					return;
+				}
+			}
+		}
+	}
+}
+
+void AFWPlayerController::FWOpenNearest(const FString& Kind)
+{
+	if (!Plot || !GetPawn())
+	{
+		return;
+	}
+	const FIntPoint At = Plot->TileAt(GetPawn()->GetActorLocation());
+	const FFWPlotObject* Nearest = nullptr;
+	for (const TPair<FString, FFWPlotObject>& Pair : Plot->GetObjects())
+	{
+		if (Pair.Value.Kind == Kind && (!Nearest || (Pair.Value.Tile - At).SizeSquared() < (Nearest->Tile - At).SizeSquared()))
+		{
+			Nearest = &Pair.Value;
+		}
+	}
+	if (!Nearest)
+	{
+		UE_LOG(LogFWGame, Warning, TEXT("No %s on the plot"), *Kind);
+		return;
+	}
+	FWGoto(Nearest->Tile.X - 2, Nearest->Tile.Y + 2, -45.f, -25.f);
+	if (FWCatalog::IsStorage(Kind))
+	{
+		OpenInventory(Nearest->Id);
+	}
+	else
+	{
+		OpenStation(Nearest->Id, Kind);
+	}
+}
+
 void AFWPlayerController::CloseWindow()
 {
+	StationId.Reset();
+	StationState.Reset();
 	if (!Storage.Id.IsEmpty())
 	{
 		FWAudio::Play2D(this, TEXT("chest_close"), 0.6f);
@@ -1371,6 +1577,10 @@ void AFWPlayerController::Tick(float DeltaSeconds)
 		PollLogistics();
 	}
 	UpdateAmbience(DeltaSeconds);
+	if (!StationId.IsEmpty() && Now >= NextStationPoll)
+	{
+		PollStation();
+	}
 	if (Now < WalkUntil)
 	{
 		if (APawn* Walker = GetPawn())

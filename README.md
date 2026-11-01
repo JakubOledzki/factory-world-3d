@@ -125,6 +125,16 @@ Fryzury, zarost i ubrania to prawdziwe modele 3D (`Tools/blender/make_character_
 
 Do testów: `FWInventory`, `FWChestNearest`, `FWMoveTile <z> <do>`, `FWStorage <1 włóż / 0 weź> <przedmiot> <ile>`, `FWMenu`, `FWClose`.
 
+## Stół warsztatowy, piece i maszyny
+
+**E** na stanowisku pracy otwiera jego okno. Jest odświeżane z serwera co 1,5 s i po każdej akcji.
+
+- **Stół warsztatowy** (też kowadło, stocznia, krawiec): wszystkie przepisy z tym, czego potrzebują (zielone: masz, czerwone: brakuje), czasem i informacją, czy trzeba coś zbadać. Do tego przycisk „Wytwórz” i kolejka z postępem i anulowaniem (`crafting.get/craft/cancel`). Gotowe rzeczy trafiają do plecaka.
+- **Piece** (kamienny, ceglany, hutniczy): ruda, węgiel i sztabki z paskiem wytopu, przyciski „Włóż rudę”, „Dołóż węgla”, „Weź sztabki” i lista tego, co piec wytapia (`furnace.get/load/take`).
+- **Maszyny przetwórcze** (71 rodzajów jak w grze 2D: tartaki, młyny, kamieniołomy, montownie…): wybór przepisu, wsad na partię z przyciskiem „Włóż”, opał dla maszyn z paleniskiem, postęp, prędkość przy braku prądu, gotowy produkt i serwis zużytej maszyny (`machine.get/recipe/load/take/service`).
+
+Do testów: `FWPlaceNear <rodzaj>`, `FWOpenNearest <rodzaj>`, `FWStationDo <typ> <pole> <wartość>`, `FWStationLoad <typ> <przedmiot> <ile>`.
+
 ## Ręce i cień gracza
 
 W widoku z pierwszej osoby widać ręce postaci w jej ubraniu (rękawy koszulki, bluzy albo gołe ramiona przy bezrękawniku) i w jej kolorze skóry. Ręce trzyma przed kamerą dwukośćowe IK na manekinie, bez gotowych animacji:
