@@ -7,6 +7,7 @@
 
 class AFWCharacterStudio;
 class SFWMarketWindow;
+class SFWWorldMap;
 class UTexture2D;
 class UAudioComponent;
 class SFWCityWindow;
@@ -106,6 +107,9 @@ public:
 	void StorageTransferAll(bool bPut);
 	// The market, at the plot's computer
 	void OpenMarket();
+	// The world map (N), and going to another plot from it
+	void OpenWorldMap();
+	void GoToPlot(FIntPoint Where) { EnterPlot(Where.X, Where.Y); }
 	// A request to the server for the windows; replies go to the callback
 	void Send(const TCHAR* Type, TSharedPtr<FJsonObject> Payload, TFunction<void(const FFWNetReply&)> OnReply);
 	void SetBalanceCents(int64 Cents) { BalanceCents = Cents; }
@@ -226,6 +230,15 @@ public:
 	// Market for tests: open it, pick a tab (0-2), an item's board, trade with the NPC trader (1 buy / 0 sell)
 	UFUNCTION(Exec)
 	void FWMarket() { OpenMarket(); }
+	// World map for tests: open it, centre on a plot at a zoom (pixels per plot), pick a plot, go to a plot
+	UFUNCTION(Exec)
+	void FWMap() { OpenWorldMap(); }
+	UFUNCTION(Exec)
+	void FWMapCenter(float X, float Y, float Zoom);
+	UFUNCTION(Exec)
+	void FWMapSelect(int32 X, int32 Y);
+	UFUNCTION(Exec)
+	void FWGoPlot(int32 X, int32 Y) { EnterPlot(X, Y); }
 	UFUNCTION(Exec)
 	void FWMarketTab(int32 Tab);
 	UFUNCTION(Exec)
@@ -347,6 +360,7 @@ private:
 	double WalkUntil = 0.0;
 
 	TSharedPtr<SFWMarketWindow> Market;
+	TSharedPtr<SFWWorldMap> WorldMap;
 	TSharedPtr<SFWLoginWidget> LoginWidget;
 	TSharedPtr<SFWPromptWidget> Prompt;
 	TSharedPtr<SFWCompanyWindow> Company;

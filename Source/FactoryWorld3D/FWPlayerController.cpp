@@ -33,6 +33,7 @@
 #include "UI/SFWSettingsWindow.h"
 #include "UI/SFWMarketWindow.h"
 #include "UI/SFWStationWindow.h"
+#include "UI/SFWWorldMap.h"
 #include "Engine/Texture2D.h"
 #include "UI/SFWExportWindow.h"
 #include "UI/SFWRailWindow.h"
@@ -1186,6 +1187,28 @@ void AFWPlayerController::OpenMarket()
 	SAssignNew(Market, SFWMarketWindow).Controller(this);
 	ShowWidget(Market.ToSharedRef(), Market);
 	RefreshWallet();
+}
+
+void AFWPlayerController::OpenWorldMap()
+{
+	SAssignNew(WorldMap, SFWWorldMap).Controller(this);
+	ShowWidget(WorldMap.ToSharedRef(), WorldMap);
+}
+
+void AFWPlayerController::FWMapCenter(float X, float Y, float Zoom)
+{
+	if (WorldMap.IsValid())
+	{
+		WorldMap->CenterOn(FVector2D(X, Y), Zoom);
+	}
+}
+
+void AFWPlayerController::FWMapSelect(int32 X, int32 Y)
+{
+	if (WorldMap.IsValid())
+	{
+		WorldMap->Select(FIntPoint(X, Y));
+	}
 }
 
 void AFWPlayerController::Send(const TCHAR* Type, TSharedPtr<FJsonObject> P, TFunction<void(const FFWNetReply&)> OnReply)
