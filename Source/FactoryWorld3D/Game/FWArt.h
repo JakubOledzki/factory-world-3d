@@ -27,6 +27,9 @@ namespace FWArt
 	TArray<UStaticMesh*> Grass();
 	// A factory model made by Tools/blender/make_factory.py (belt_straight, inserter_arm, ...), real size for a 4 m tile
 	UStaticMesh* Factory(const TCHAR* Name);
+	// The workshop model of a piece of furniture (workbench, furnace, sawmill...), null when it has none of its own;
+	// Tiles is the footprint it was built for (it is scaled to the object's own)
+	UStaticMesh* FurnitureModel(const FString& Kind, int32& Tiles);
 	// The model that shows an item (hotbar icon, held in the hand): what it builds, the tool, or the goods
 	UStaticMesh* ItemMesh(const FString& Item);
 	// Real elevation around this plot (Tools/dem_extract.mjs) when made, otherwise a made-up land for the biome

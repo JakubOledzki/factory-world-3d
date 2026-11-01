@@ -13,13 +13,19 @@ from mathutils import Vector
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "RawAssets")
 MODELS = os.path.join(ROOT, "processed", "factory")
 TEXTURES = os.path.join(ROOT, "polyhaven", "textures")
-OUT = os.path.join(ROOT, "processed", "icons")
+# FW_ICON_OUT / FW_ICON_SIZE / FW_ICON_ONLY (comma list) render larger previews elsewhere, e.g. to check new models
+OUT = os.environ.get("FW_ICON_OUT") or os.path.join(ROOT, "processed", "icons")
+SIZE = int(os.environ.get("FW_ICON_SIZE", "256"))
 ICONS = ["belt_straight", "inserter_base", "chest", "pole", "solar_panel", "turbine_tower", "machine", "chunk_ore",
-         "chunk_stone", "ingot", "crate", "tool_pickaxe"]
+         "chunk_stone", "ingot", "crate", "tool_pickaxe", "workbench", "anvil", "computer", "research_table", "furnace",
+         "brick_furnace", "blast_furnace", "sawmill", "assembler", "mill"]
+if os.environ.get("FW_ICON_ONLY"):
+    ICONS = os.environ["FW_ICON_ONLY"].split(",")
 # The same as the import: painted parts a flat colour, the rest a photographed set
 PAINTED = {"FW_PaintedSteel": (0.12, 0.15, 0.12), "FW_Worn": (0.42, 0.3, 0.04), "FW_Steel": (0.2, 0.2, 0.21)}
 SETS = {"FW_Rubber": "rubberized_track", "FW_Wood": "weathered_planks", "FW_Concrete": "concrete_floor_worn_001",
-        "FW_Grate": "metal_grate_rusty", "FW_ToolSteel": "metal_plate", "FW_Grip": "rubberized_track"}
+        "FW_Grate": "metal_grate_rusty", "FW_ToolSteel": "metal_plate", "FW_Grip": "rubberized_track",
+        "FW_Brick": "red_brick_03", "FW_Stone": "castle_wall_slates", "FW_TableWood": "wood_table_001"}
 
 
 def texture_node(tree, set_id, kind, non_color):
@@ -77,7 +83,7 @@ def stage():
     scene.cycles.samples = 48
     scene.cycles.use_denoising = True
     scene.render.film_transparent = True
-    scene.render.resolution_x = scene.render.resolution_y = 256
+    scene.render.resolution_x = scene.render.resolution_y = SIZE
     scene.view_settings.view_transform = "AgX"
     world = bpy.data.worlds.new("Studio")
     scene.world = world
