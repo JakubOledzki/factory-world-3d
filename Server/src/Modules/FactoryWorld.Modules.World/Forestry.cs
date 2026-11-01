@@ -342,7 +342,7 @@ public sealed class GreenestRanking(GameDb db) : IPlayerRanking
 
 public sealed class ForestService(
     GameDb db, PlotService plots, IInventory inventory, ICharacterProgress progress, IProductionStats stats, TimeProvider time, OilService oil,
-    ForestLedger ledger, PestService pests)
+    ForestLedger ledger, PestService pests, IPlotClock plotClock)
 {
     public Task<IReadOnlyList<PlantedTree>> TreesAsync(int x, int y, CancellationToken cancellationToken) => ReadAsync(db, x, y, cancellationToken);
 
@@ -379,7 +379,7 @@ public sealed class ForestService(
             await oil.RequireCleanAsync(x, y, tileX, tileY, cancellationToken);
             await inventory.RemoveAsync(player, kind.Sapling, 1, cancellationToken);
             await stats.RecordAsync(player, [ProductionEntry.Used(kind.Sapling, 1, time.GetUtcNow())], cancellationToken);
-            var tree = new PlantedTree(tileX, tileY, time.GetUtcNow() + grow, kind.Id);
+            var tree = new PlantedTree(tileX, tileY, await plotClock.NowAsync(x, y, cancellationToken) + grow, kind.Id);
             await using (var insert = await db.CommandAsync(
                 """
                 INSERT INTO world.plot_trees (x, y, tile_x, tile_y, ready_at, species) VALUES (@x, @y, @tx, @ty, @ready, @species)
@@ -442,7 +442,7 @@ public sealed class PlantTreeHandler(IServiceScopeFactory scopes, TimeProvider t
         {
             tree = TreeJson(tree),
             xp = new { xp = xp.Xp, level = xp.Level, leveledUp = xp.LeveledUp },
-            serverTime = time.GetUtcNow().ToUnixTimeMilliseconds(),
+            serverTime = (await scope.ServiceProvider.GetRequiredService<IPlotClock>().NowAsync(request.X, request.Y, cancellationToken)).ToUnixTimeMilliseconds(),
         });
     }
 

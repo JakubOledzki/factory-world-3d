@@ -976,6 +976,22 @@ public sealed class WorldDbContext(DbContextOptions<WorldDbContext> options, Gam
             e.Property(s => s.Day).HasColumnName("day");
             e.Property(s => s.Count).HasColumnName("count");
         });
+        model.Entity<PlotPauseRow>(e =>
+        {
+            e.ToTable("plot_pauses");
+            e.HasKey(p => new { p.X, p.Y });
+            e.Property(p => p.X).HasColumnName("x");
+            e.Property(p => p.Y).HasColumnName("y");
+            e.Property(p => p.Paused).HasColumnName("paused");
+            e.Property(p => p.PausedSince).HasColumnName("paused_since");
+        });
+        model.Entity<PlotClockCheckRow>(e =>
+        {
+            e.ToTable("plot_clock");
+            e.HasKey(c => c.Id);
+            e.Property(c => c.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(c => c.CheckedAt).HasColumnName("checked_at");
+        });
         model.Entity<PlotTaxRow>(e =>
         {
             e.ToTable("plot_taxes");
@@ -1844,6 +1860,9 @@ public sealed class WorldModule : IGameModule
         services.AddSingleton<IMessageHandler, GetMeteorHandler>();
         services.AddSingleton<IMessageHandler, DigMeteorHandler>();
         services.AddHostedService<MeteorClock>();
+        services.AddScoped<IPlotClock, PlotClock>();
+        services.AddSingleton<PlotClockKeeper>();
+        services.AddHostedService(sp => sp.GetRequiredService<PlotClockKeeper>());
         services.AddSingleton<IMessageHandler, GetShopHandler>();
         services.AddSingleton<IMessageHandler, StockShopHandler>();
         services.AddSingleton<IMessageHandler, TakeFromShopHandler>();

@@ -136,7 +136,7 @@ public sealed record AnimalChange(PlotAnimal? Animal, IReadOnlyList<(string Item
 
 public sealed class HusbandryService(
     GameDb db, PlotService plots, FeederService feeders, IInventory inventory, ICharacterProgress progress, IProductionStats stats,
-    TimeProvider time)
+    TimeProvider time, IPlotClock plotClock)
 {
     public async Task<IReadOnlyList<PlotAnimal>> AnimalsAsync(int x, int y, CancellationToken cancellationToken)
     {
@@ -224,11 +224,11 @@ public sealed class HusbandryService(
 
             if (readyAt is not null)
             {
-                throw new GameException("already_fed", readyAt <= time.GetUtcNow() ? "Collect what it gives first." : "It has eaten already.");
+                throw new GameException("already_fed", readyAt <= await plotClock.NowAsync(x, y, cancellationToken) ? "Collect what it gives first." : "It has eaten already.");
             }
 
             var animal = Husbandry.ById[kind];
-            var ready = time.GetUtcNow() + (Husbandry.Time(animal, biome) ?? animal.Time);
+            var ready = await plotClock.NowAsync(x, y, cancellationToken) + (Husbandry.Time(animal, biome) ?? animal.Time);
             await inventory.RemoveAsync(player, feed, Husbandry.FeedPerMeal, cancellationToken);
             await stats.RecordAsync(player, [ProductionEntry.Used(feed, Husbandry.FeedPerMeal, time.GetUtcNow())], cancellationToken);
             await using (var update = await db.CommandAsync(
@@ -254,7 +254,7 @@ public sealed class HusbandryService(
                 throw new GameException("hungry", "Feed it first.");
             }
 
-            if (readyAt > time.GetUtcNow())
+            if (readyAt > await plotClock.NowAsync(x, y, cancellationToken))
             {
                 throw new GameException("not_ready", "It has nothing to give yet.");
             }
@@ -376,7 +376,7 @@ public abstract class AnimalHandler(IServiceScopeFactory scopes, TimeProvider ti
             animal = change.Animal is { } animal ? AnimalJson(animal) : null,
             items = change.Items.Select(i => new { id = i.Item, name = Items.Names[i.Item], quantity = i.Quantity }),
             xp = change.Xp is { } xp ? new { xp = xp.Xp, level = xp.Level, leveledUp = xp.LeveledUp } : null,
-            serverTime = time.GetUtcNow().ToUnixTimeMilliseconds(),
+            serverTime = (await scope.ServiceProvider.GetRequiredService<IPlotClock>().NowAsync(request.X, request.Y, cancellationToken)).ToUnixTimeMilliseconds(),
         });
     }
 

@@ -252,7 +252,7 @@ internal sealed class SteadyClock : IPowerClock
 
 public sealed class OilService(
     GameDb db, PlotService plots, SurveyService surveys, IPlotObjects objects, IInventory inventory, ICharacterProgress progress,
-    IProductionStats stats, IPlotPower power, TimeProvider time) : IPlacedHook, IPlotAutomation, IMachineContents, IMachinePorts, IMachineStatuses
+    IProductionStats stats, IPlotPower power, IPlotClock plotClock) : IPlacedHook, IPlotAutomation, IMachineContents, IMachinePorts, IMachineStatuses
 {
     /// <summary>Fails unless a well of <paramref name="kind"/> may go on the plot: it was surveyed, the deposit is
     /// there and it does not have all the wells it takes yet.</summary>
@@ -327,7 +327,7 @@ public sealed class OilService(
         {
             await plots.RequireOwnerAsync(player, x, y, cancellationToken, PlotRight.Take);
             var well = await WorkedAsync(x, y, id, automation, cancellationToken);
-            var machineNow = well.Clock.At(time.GetUtcNow());
+            var machineNow = well.Clock.At(await plotClock.NowAsync(x, y, cancellationToken));
             var taken = new List<(string, int)>();
             if (well.Patch.Stored > 0)
             {
@@ -467,7 +467,7 @@ public sealed class OilService(
     private async Task<IReadOnlyList<MachineStatus>> OnPlotAsync(int x, int y, Guid? owner, CancellationToken cancellationToken)
     {
         var statuses = new List<MachineStatus>();
-        var now = time.GetUtcNow();
+        var now = await plotClock.NowAsync(x, y, cancellationToken);
         foreach (var opened in (await OpenAsync(x, y, cancellationToken)).Where(w => owner is null || w.Object.Owner == owner))
         {
             var well = await AdvanceAsync(x, y, opened, cancellationToken);
@@ -499,7 +499,7 @@ public sealed class OilService(
     /// <summary>Works a well up to now and writes it back with what it took from its deposit.</summary>
     private async Task<WellOnPlot> AdvanceAsync(int x, int y, WellOnPlot well, CancellationToken cancellationToken)
     {
-        var now = time.GetUtcNow();
+        var now = await plotClock.NowAsync(x, y, cancellationToken);
         var left = await LeftAsync(x, y, well.Field, well.Reserve, cancellationToken);
         var pumped = well.Patch.Advance(now, well.Clock.At(now), left);
         await SaveAsync(x, y, well, pumped, cancellationToken);
@@ -668,7 +668,7 @@ public abstract class WellHandler(IServiceScopeFactory scopes, TimeProvider time
         var (well, taken, xp) = await RunAsync(
             scope.ServiceProvider.GetRequiredService<OilService>(), scope.ServiceProvider.GetServices<IPlotAutomation>(),
             client.RequireAccount(), request, cancellationToken);
-        var now = time.GetUtcNow();
+        var now = await scope.ServiceProvider.GetRequiredService<IPlotClock>().NowAsync(request.X, request.Y, cancellationToken);
         var patch = well.Patch;
         return new Reply("well", new
         {
