@@ -17,6 +17,7 @@ class AFWPlot;
 class SFWRailWindow;
 class SFWExportWindow;
 class SFWCharacterCreator;
+class SFWAdventuresWindow;
 class SFWHud;
 class SFWResearchWindow;
 class SFWContractsWindow;
@@ -145,6 +146,8 @@ public:
 	// Plot actions; each refreshes what it changes and reports errors as toasts
 	void Mine(int32 MineId, TFunction<void(bool bOk)> Done);
 	void Place(const FString& Kind, FIntPoint Tile, int32 Rotation);
+	// Adventures (Y), as in the 2D game: the holiday, the album, expeditions, puzzles, the mentor, the trophy case
+	void OpenAdventures();
 	void Pickup(const FString& ObjectId);
 	// The plot's railway station (T), its export chest, and a buying market or a rail port by its object id, as in the 2D game
 	void OpenRail();
@@ -190,6 +193,11 @@ public:
 	// Puts the mined resources in the chest of that line
 	UFUNCTION(Exec)
 	void FWStoreLine();
+	// Adventures for tests: a tab (and whose trophy case), a puzzle by its index on the puzzles tab
+	UFUNCTION(Exec)
+	void FWAdventures(int32 Tab = 0, const FString& Whose = TEXT(""));
+	UFUNCTION(Exec)
+	void FWPuzzle(int32 Index);
 	// Hovers above the belts of the plot, looking at them
 	UFUNCTION(Exec)
 	void FWViewBelts(float Height = 700.f);
@@ -359,6 +367,7 @@ private:
 	TSharedPtr<SFWCompanyWindow> Company;
 	TSharedPtr<SFWBankWindow> Bank;
 	TSharedPtr<SWidget> ShownWidget;
+	TSharedPtr<SFWAdventuresWindow> Adventures;
 	TSharedPtr<SFWHud> Hud;
 	TSharedPtr<SFWResearchWindow> Research;
 	TSharedPtr<SFWContractsWindow> Contracts;

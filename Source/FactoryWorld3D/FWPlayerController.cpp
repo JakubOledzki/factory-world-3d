@@ -19,6 +19,7 @@
 #include "AudioMixerBlueprintLibrary.h"
 #include "Components/AudioComponent.h"
 #include "Engine/StaticMesh.h"
+#include "UI/SFWAdventuresWindow.h"
 #include "Game/FWArt.h"
 #include "Game/FWAudio.h"
 #include "UI/SFWCityWindow.h"
@@ -1549,6 +1550,29 @@ UTexture2D* AFWPlayerController::GetIcon(const FString& Item) const
 	}
 	const FString Name = FString::Printf(TEXT("icon_%s"), *Mesh->GetName());
 	return FWArt::Texture(*FString::Printf(TEXT("/Game/External/Icons/%s.%s"), *Name, *Name));
+}
+
+void AFWPlayerController::OpenAdventures()
+{
+	SAssignNew(Adventures, SFWAdventuresWindow).Controller(this);
+	ShowWidget(Adventures.ToSharedRef(), Adventures);
+}
+
+void AFWPlayerController::FWAdventures(int32 Tab, const FString& Whose)
+{
+	if (!Adventures.IsValid())
+	{
+		OpenAdventures();
+	}
+	Adventures->ShowTab(Tab, Whose);
+}
+
+void AFWPlayerController::FWPuzzle(int32 Index)
+{
+	if (Adventures.IsValid())
+	{
+		Adventures->OpenPuzzle(Index);
+	}
 }
 
 void AFWPlayerController::Toast(const FText& Text, bool bError)

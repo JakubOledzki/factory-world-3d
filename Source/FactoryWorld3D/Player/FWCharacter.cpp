@@ -560,6 +560,7 @@ void AFWCharacter::CreateInput()
 	Mapping->MapKey(MakeAction(TEXT("Bank"), EInputActionValueType::Boolean), EKeys::Z);
 	Mapping->MapKey(MakeAction(TEXT("Interact"), EInputActionValueType::Boolean), EKeys::E);
 	Mapping->MapKey(MakeAction(TEXT("Pickup"), EInputActionValueType::Boolean), EKeys::RightMouseButton);
+	Mapping->MapKey(MakeAction(TEXT("Adventures"), EInputActionValueType::Boolean), EKeys::Y);
 	Mapping->MapKey(MakeAction(TEXT("Primary"), EInputActionValueType::Boolean), EKeys::LeftMouseButton);
 	Mapping->MapKey(MakeAction(TEXT("City"), EInputActionValueType::Boolean), EKeys::H);
 	Mapping->MapKey(MakeAction(TEXT("Country"), EInputActionValueType::Boolean), EKeys::P);
@@ -626,6 +627,13 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	});
 	Input->BindAction(Actions[TEXT("Sprint")], ETriggerEvent::Started, this, &AFWCharacter::SprintStart);
 	Input->BindAction(Actions[TEXT("Sprint")], ETriggerEvent::Completed, this, &AFWCharacter::SprintStop);
+	Input->BindActionValueLambda(Actions[TEXT("Adventures")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenAdventures();
+		}
+	});
 	Input->BindAction(Actions[TEXT("Interact")], ETriggerEvent::Started, this, &AFWCharacter::InteractStart);
 	Input->BindAction(Actions[TEXT("Interact")], ETriggerEvent::Completed, this, &AFWCharacter::InteractStop);
 	Input->BindActionValueLambda(Actions[TEXT("Chat")], ETriggerEvent::Started, [this](const FInputActionValue&)
