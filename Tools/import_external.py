@@ -468,3 +468,138 @@ if os.path.isdir(AUDIO):
         wave.set_editor_property("sound_class_object", classes[group])
         library.save_loaded_asset(wave)
     unreal.log_warning(f"FWIMPORT audio: {len(library.list_assets(destination, recursive=False, include_folder=False))} sounds")
+
+# The world map's pictures from Tools/blender/make_world_map.py and make_world_tiles.py: the overview of the Earth
+# (mipmaps, from afar), the detail pieces (closer up, no mipmaps: never seen smaller than they are), the biome tiles
+# seen from above (mipmaps) and the clouds (mipmaps, repeating)
+WORLD_MAP = os.path.join(MODELS, "worldmap")
+if os.path.isdir(WORLD_MAP):
+    destination = "/Game/External/WorldMap"
+    if library.list_assets(destination, recursive=True):
+        library.delete_directory(destination)
+    files = [os.path.join(WORLD_MAP, f) for f in sorted(os.listdir(WORLD_MAP)) if f.endswith(".png")]
+    for path in run(files, destination):
+        texture = unreal.load_asset(path)
+        if not isinstance(texture, unreal.Texture2D):
+            continue
+        name = texture.get_name()
+        detail = name.startswith("world_detail") or name == "world_biomes"
+        texture.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_UI if detail else unreal.TextureGroup.TEXTUREGROUP_WORLD)
+        texture.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS if detail else unreal.TextureMipGenSettings.TMGS_SIMPLE_AVERAGE)
+        texture.set_editor_property("never_stream", True)
+        texture.set_editor_property("filter", unreal.TextureFilter.TF_TRILINEAR if not detail else unreal.TextureFilter.TF_BILINEAR)
+        if name == "world_overview" or detail:
+            texture.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_DEFAULT)
+        if name == "world_biomes":
+            # Biome ids as grey levels, read exactly: linear, uncompressed, nearest
+            texture.set_editor_property("srgb", False)
+            texture.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_GRAYSCALE)
+            texture.set_editor_property("filter", unreal.TextureFilter.TF_NEAREST)
+        if name == "world_clouds":
+            texture.set_editor_property("address_x", unreal.TextureAddress.TA_WRAP)
+            texture.set_editor_property("address_y", unreal.TextureAddress.TA_WRAP)
+        library.save_loaded_asset(texture)
+        unreal.log_warning(f"FWIMPORT world map {name}")
+
+# The map's close-up material (M_FWWorldMap, user interface): each plot's biome (world_biomes) picked from the tiles of
+# world_tiles, which repeat every few plots; four neighbouring plots blended along borders made wavy by a little noise,
+# so biomes run into each other rather than meeting at square edges; the relief of the overview shading the tiles. The
+# game sets the view (centre, zoom, size) every frame and fades it in close up.
+WORLD_MAP_HLSL = r"""
+float2 view = float2(ViewW, ViewH);
+float2 map = float2(MapW, MapH);
+float2 plot = float2(CenterX, CenterY) + (UV * view - view * 0.5) / Zoom;
+// Wavy borders: the point looked up is moved a little, more where the noise says so
+float2 warp = float2(sin(plot.y * 2.3 + sin(plot.x * 1.1) * 1.7) + 0.5 * sin(plot.y * 5.1 + plot.x * 3.3),
+                     cos(plot.x * 2.1 + sin(plot.y * 1.3) * 1.5) + 0.5 * cos(plot.x * 4.7 - plot.y * 3.9)) * 0.16;
+float2 q = plot + warp - 0.5;
+float2 cell = floor(q);
+float2 f = q - cell;
+// Two samplings of each texture, at different scales and offsets, mixed by slow noise: no regular repeat to the eye
+float2 tile = plot / Repeat;
+float2 tile2 = plot / (Repeat * 1.618) + float2(0.37, 0.71);
+// Kept a few texels inside each tile of the atlas, so filtering never bleeds in the neighbouring biome
+float2 tileUv = lerp(0.004, 0.996, frac(tile));
+float2 tileUv2 = lerp(0.004, 0.996, frac(tile2));
+float2 gx = ddx(tile) * 0.25;
+float2 gy = ddy(tile) * 0.25;
+float2 gx2 = ddx(tile2) * 0.25;
+float2 gy2 = ddy(tile2) * 0.25;
+float m = smoothstep(0.42, 0.58, 0.5 + 0.9 * (sin(plot.x * 0.41 + sin(plot.y * 0.27) * 2.1) * cos(plot.y * 0.37 + sin(plot.x * 0.23) * 1.9)));
+float3 sum = 0;
+float total = 0;
+float best = -1;
+float bestBiome = 0;
+for (int j = 0; j < 2; j++)
+{
+    for (int i = 0; i < 2; i++)
+    {
+        float2 c = cell + float2(i, j);
+        c.x = c.x - floor(c.x / map.x) * map.x;
+        c.y = clamp(c.y, 0, map.y - 1);
+        float biome = floor(Biomes.SampleLevel(BiomesSampler, (c + 0.5) / map, 0).r * 255.0 / 16.0);
+        float w = (i == 1 ? f.x : 1 - f.x) * (j == 1 ? f.y : 1 - f.y);
+        w = w * w * w * w;
+        float2 at = float2(biome - floor(biome / 4) * 4, floor(biome / 4));
+        float3 color = lerp(Tiles.SampleGrad(TilesSampler, (at + tileUv) / 4.0, gx, gy).rgb,
+                            Tiles.SampleGrad(TilesSampler, (at + tileUv2) / 4.0, gx2, gy2).rgb, m);
+        sum += color * w;
+        total += w;
+        if (w > best) { best = w; bestBiome = biome; }
+    }
+}
+float3 col = sum / max(total, 1e-5);
+// The relief: how much lighter or darker the overview is here than its own surroundings
+float2 ouv = float2(plot.x / map.x, plot.y / map.y);
+float3 here = Overview.SampleLevel(OverviewSampler, ouv, 0).rgb;
+float3 around = Overview.SampleLevel(OverviewSampler, ouv, 4).rgb;
+float lumHere = dot(here, float3(0.3, 0.59, 0.11));
+float lumAround = dot(around, float3(0.3, 0.59, 0.11));
+float water = (bestBiome < 1.5) ? 1.0 : 0.0;
+col *= lerp(clamp((lumHere + 0.02) / (lumAround + 0.02), 0.55, 1.6), 1.0, water * 0.8);
+return col;
+"""
+
+if os.path.isdir(WORLD_MAP):
+    folder = "/Game/Materials"
+    path = f"{folder}/M_FWWorldMap"
+    if library.does_asset_exist(path):
+        library.delete_asset(path)
+    m = tools.create_asset("M_FWWorldMap", folder, unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property("material_domain", unreal.MaterialDomain.MD_UI)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    custom = mel.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 0)
+    custom.set_editor_property("code", WORLD_MAP_HLSL)
+    custom.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    names = ["UV", "CenterX", "CenterY", "Zoom", "ViewW", "ViewH", "MapW", "MapH", "Repeat", "Biomes", "Tiles", "Overview"]
+    inputs = []
+    for name in names:
+        item = unreal.CustomInput()
+        item.set_editor_property("input_name", name)
+        inputs.append(item)
+    custom.set_editor_property("inputs", inputs)
+    mel.connect_material_expressions(mel.create_material_expression(m, unreal.MaterialExpressionTextureCoordinate, -900, -400), "", custom, "UV")
+    defaults = {"CenterX": 3466.0, "CenterY": 1471.0, "Zoom": 40.0, "ViewW": 1920.0, "ViewH": 1080.0, "MapW": 6933.0, "MapH": 2942.0, "Repeat": 5.0}
+    y = -300
+    for name, value in defaults.items():
+        node = mel.create_material_expression(m, unreal.MaterialExpressionScalarParameter, -900, y)
+        node.set_editor_property("parameter_name", name)
+        node.set_editor_property("default_value", value)
+        mel.connect_material_expressions(node, "", custom, name)
+        y += 60
+    for name, texture in (("Biomes", "world_biomes"), ("Tiles", "world_tiles"), ("Overview", "world_overview")):
+        node = mel.create_material_expression(m, unreal.MaterialExpressionTextureObjectParameter, -900, y)
+        node.set_editor_property("parameter_name", name)
+        node.set_editor_property("texture", unreal.load_asset(f"/Game/External/WorldMap/{texture}"))
+        if name == "Biomes":
+            node.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_GRAYSCALE)
+        mel.connect_material_expressions(node, "", custom, name)
+        y += 80
+    fade = mel.create_material_expression(m, unreal.MaterialExpressionScalarParameter, -400, 300)
+    fade.set_editor_property("parameter_name", "Fade")
+    fade.set_editor_property("default_value", 1.0)
+    mel.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.connect_material_property(fade, "", unreal.MaterialProperty.MP_OPACITY)
+    mel.recompile_material(m)
+    library.save_asset(path)
+    unreal.log_warning("FWIMPORT world map material")
