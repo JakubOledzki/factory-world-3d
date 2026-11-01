@@ -9,6 +9,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
+#include "UI/SFWDeviceWindow.h"
 #include "Misc/Paths.h"
 #include "UnrealClient.h"
 #include "EngineUtils.h"
@@ -895,6 +896,41 @@ void AFWPlayerController::StationAction(const TCHAR* Type, const TCHAR* Field, c
 			}
 		}
 	});
+}
+
+bool AFWPlayerController::IsDevice(const FString& Kind)
+{
+	return SFWDeviceWindow::ModeOf(Kind) != SFWDeviceWindow::EMode::None;
+}
+
+void AFWPlayerController::OpenDevice(const FString& ObjectId, const FString& Kind)
+{
+	SAssignNew(Device, SFWDeviceWindow).Controller(this).Object(ObjectId).Kind(Kind);
+	ShowWidget(Device.ToSharedRef(), Device);
+}
+
+void AFWPlayerController::FWDevice(const FString& Kind)
+{
+	if (!Plot || !GetPawn())
+	{
+		return;
+	}
+	const FIntPoint At = Plot->TileAt(GetPawn()->GetActorLocation());
+	const FFWPlotObject* Nearest = nullptr;
+	for (const TPair<FString, FFWPlotObject>& Pair : Plot->GetObjects())
+	{
+		if (Pair.Value.Kind == Kind && (!Nearest || (Pair.Value.Tile - At).SizeSquared() < (Nearest->Tile - At).SizeSquared()))
+		{
+			Nearest = &Pair.Value;
+		}
+	}
+	if (!Nearest)
+	{
+		UE_LOG(LogFWGame, Warning, TEXT("No %s on the plot"), *Kind);
+		return;
+	}
+	FWGoto(Nearest->Tile.X - 2, Nearest->Tile.Y + 2, -45.f, -25.f);
+	OpenDevice(Nearest->Id, Nearest->Kind);
 }
 
 void AFWPlayerController::StationLoad(const TCHAR* Type, const FString& Item, int32 Quantity, bool bFuel)

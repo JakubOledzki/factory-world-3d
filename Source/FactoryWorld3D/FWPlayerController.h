@@ -124,6 +124,9 @@ public:
 	// Sends "<station>.<action>" for the open work place with one more field (string, or a number when >= 0)
 	void StationAction(const TCHAR* Type, const TCHAR* Field, const FString& Value, int64 Number = -1);
 	void StationLoad(const TCHAR* Type, const FString& Item, int32 Quantity, bool bFuel = false);
+	// A device that works by itself (power source, mining drill, oil or gas well, grid tie) and its window, as in the 2D game
+	static bool IsDevice(const FString& Kind);
+	void OpenDevice(const FString& ObjectId, const FString& Kind);
 	// The server's clock now (ms), from the last station reply
 	double ServerNowMs() const;
 	FString ItemName(const FString& Item) const;
@@ -250,6 +253,9 @@ public:
 	void FWMarketItem(const FString& Item);
 	UFUNCTION(Exec)
 	void FWTrade(int32 Buy, const FString& Item, int32 Quantity);
+	// Walks to the nearest device of a kind (power_generator, furniture_drill, ...) and opens its window, for tests
+	UFUNCTION(Exec)
+	void FWDevice(const FString& Kind);
 	UFUNCTION(Exec)
 	void FWMarketOffer(int32 Sell, int32 Quantity, float PriceDollars);
 	// Places an item on the nearest free spot around the player
@@ -357,6 +363,7 @@ private:
 	double NextBirdAt = 0.0;
 	float GustBoost = 0.f;
 	float WindLevel = 0.f;
+	TSharedPtr<class SFWDeviceWindow> Device;
 	float ForestLevel = 0.f;
 	double WalkUntil = 0.0;
 
