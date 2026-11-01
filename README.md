@@ -42,6 +42,18 @@ Projekt jest ustawiony na najwyższą jakość obrazu (`Config/DefaultEngine.ini
 
 Używamy wyłącznie własnych modeli (Blender, skrypty w Pythonie) oraz darmowych zasobów z licencją pozwalającą na użycie komercyjne (np. Poly Haven, ambientCG – CC0; Fab – tylko z licencją komercyjną). Żadnych zasobów, nazw ani treści z innych gier.
 
+## Fabryka: plany, timelapse, galeria (G)
+
+G otwiera okno całej fabryki, jak w grze 2D:
+
+- **Plany** — stań w środku kawałka fabryki i zapisz to, co stoi do N pól wokół ciebie, pod nazwą (taśmy, podajniki, maszyny w tym samym układzie i obrocie); „Postaw przed sobą” stawia plan kilka pól przed tobą, gdy masz w plecaku jego obiekty (inaczej mówi, czego brakuje); „Usuń”,
+- **Timelapse** — działka z góry, dzień po dniu, od pierwszego warsztatu: odtwarzanie, pauza i suwak,
+- **Galeria fabryk** — najczęściej lubiane działki publiczne z „Odwiedź”; na cudzej działce „Podoba mi się” i „Wróć do siebie”.
+
+Po powrocie z przerwy wyskakuje „Gdy cię nie było”: wpływy, wydatki i to, co maszyny wyprodukowały pod twoją nieobecność.
+
+Do testów: `FWFactory 0|1|2`, `FWPlanSave nazwa 6`, `FWPlanUse 0`, `FWVisit x y` (`FWVisit -1 -1` wraca do siebie).
+
 ## Połączenie z serwerem
 
 Klient łączy się z serwerem Factory World pod adresem z `Config/DefaultGame.ini`:

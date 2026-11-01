@@ -21,6 +21,7 @@
 #include "Net/FWNetSubsystem.h"
 #include "UI/SFWHud.h"
 #include "AudioMixerBlueprintLibrary.h"
+#include "UI/SFWFactoryWindow.h"
 #include "Components/AudioComponent.h"
 #include "Engine/StaticMesh.h"
 #include "UI/SFWAdventuresWindow.h"
@@ -595,6 +596,8 @@ void AFWPlayerController::EnterPlot(int32 X, int32 Y)
 			FText::AsNumber(This->Plot->GetPlotY(), &FNumberFormattingOptions::DefaultNoGrouping())));
 		This->RefreshInventory();
 		This->RefreshWallet();
+		This->EnteredPlot = Reply.Payload;
+		This->CheckAwayReport();
 		This->NextPollAt = 0.0;
 	});
 }
@@ -1478,6 +1481,65 @@ void AFWPlayerController::SetHotbarSlot(int32 Slot, const FString& Item)
 			Reply.Type == TEXT("hotbar") ? This->ApplyHotbar(Reply.Payload) : This->ToastError(Reply);
 		}
 	});
+}
+
+void AFWPlayerController::OpenFactory()
+{
+	SAssignNew(Factory, SFWFactoryWindow).Controller(this);
+	ShowWidget(Factory.ToSharedRef(), Factory);
+}
+
+void AFWPlayerController::VisitPlot(int32 X, int32 Y)
+{
+	CloseWindow();
+	if (X < 0)
+	{
+		ChoosePlot();
+	}
+	else
+	{
+		EnterPlot(X, Y);
+	}
+}
+
+void AFWPlayerController::CheckAwayReport()
+{
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Net()->Request(TEXT("report.away"), nullptr, [WeakThis](const FFWNetReply& Reply)
+	{
+		AFWPlayerController* This = WeakThis.Get();
+		bool bAway = false;
+		if (This && Reply.Type == TEXT("report.away") && Reply.Payload->TryGetBoolField(TEXT("away"), bAway) && bAway && !This->ShownWidget.IsValid())
+		{
+			TSharedRef<SFWAwayWindow> Window = SNew(SFWAwayWindow).Controller(This).Report(Reply.Payload);
+			This->ShowWidget(Window, Window);
+		}
+	});
+}
+
+void AFWPlayerController::FWFactory(int32 Tab)
+{
+	if (!Factory.IsValid() || ShownWidget != Factory)
+	{
+		OpenFactory();
+	}
+	Factory->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWPlanSave(const FString& Name, int32 Radius)
+{
+	if (Factory.IsValid() && ShownWidget == Factory)
+	{
+		Factory->SavePlan(Name, Radius);
+	}
+}
+
+void AFWPlayerController::FWPlanUse(int32 Index)
+{
+	if (Factory.IsValid() && ShownWidget == Factory)
+	{
+		Factory->UsePlan(Index);
+	}
 }
 
 void AFWPlayerController::StorageTransfer(bool bPut, const FString& Item, int32 Quantity)

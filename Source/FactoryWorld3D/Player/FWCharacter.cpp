@@ -565,6 +565,7 @@ void AFWCharacter::CreateInput()
 	Mapping->MapKey(MakeAction(TEXT("City"), EInputActionValueType::Boolean), EKeys::H);
 	Mapping->MapKey(MakeAction(TEXT("Country"), EInputActionValueType::Boolean), EKeys::P);
 	Mapping->MapKey(MakeAction(TEXT("Build"), EInputActionValueType::Boolean), EKeys::B);
+	Mapping->MapKey(MakeAction(TEXT("Factory"), EInputActionValueType::Boolean), EKeys::G);
 	Mapping->MapKey(MakeAction(TEXT("Rotate"), EInputActionValueType::Boolean), EKeys::R);
 	Mapping->MapKey(MakeAction(TEXT("Contracts"), EInputActionValueType::Boolean), EKeys::J);
 	Mapping->MapKey(MakeAction(TEXT("Stats"), EInputActionValueType::Boolean), EKeys::L);
@@ -669,6 +670,13 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	});
 	Input->BindAction(Actions[TEXT("Build")], ETriggerEvent::Started, this, &AFWCharacter::ToggleBuild);
 	Input->BindAction(Actions[TEXT("Rotate")], ETriggerEvent::Started, this, &AFWCharacter::Rotate);
+	Input->BindActionValueLambda(Actions[TEXT("Factory")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenFactory();
+		}
+	});
 	Input->BindAction(Actions[TEXT("Scroll")], ETriggerEvent::Started, this, &AFWCharacter::Scroll);
 	Input->BindActionValueLambda(Actions[TEXT("Contracts")], ETriggerEvent::Started, [this](const FInputActionValue&)
 	{

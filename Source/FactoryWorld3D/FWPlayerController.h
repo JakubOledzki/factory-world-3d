@@ -101,6 +101,13 @@ public:
 	void RefreshWallet();
 	void CloseWindow();
 	void ApplyUserSettings(const FFWUserSettings& Settings);
+	// The whole factory (G): plans, the timelapse, the gallery of factories; a visit to another plot (X < 0: back home)
+	void OpenFactory();
+	void VisitPlot(int32 X, int32 Y);
+	// What plot.enter said about the plot stood on (its likes, the player's rights there)
+	const TSharedPtr<FJsonObject>& GetEnteredPlot() const { return EnteredPlot; }
+	// "Gdy cię nie było": shown once, on the first return after a break
+	void CheckAwayReport();
 	// Inventory moves, each answered by the server with the new state
 	void MoveTile(int32 From, int32 To);
 	void SetHotbarSlot(int32 Slot, const FString& Item);
@@ -188,6 +195,15 @@ public:
 	void FWShop(const FString& Kind, const FString& Item = TEXT(""), int32 Quantity = 1, float Dollars = 1.f);
 	UFUNCTION(Exec)
 	void FWMine(int32 Times = 1);
+	// The factory window for tests: a tab; a plan saved from what stands within Radius tiles, a plan put up; a visit
+	UFUNCTION(Exec)
+	void FWFactory(int32 Tab = 0);
+	UFUNCTION(Exec)
+	void FWPlanSave(const FString& Name, int32 Radius = 6);
+	UFUNCTION(Exec)
+	void FWPlanUse(int32 Index);
+	UFUNCTION(Exec)
+	void FWVisit(int32 X, int32 Y) { VisitPlot(X, Y); }
 	UFUNCTION(Exec)
 	void FWPlace(const FString& Kind, int32 TileX, int32 TileY, int32 Rotation);
 	UFUNCTION(Exec)
@@ -430,6 +446,8 @@ private:
 	int64 BalanceCents = 0;
 	TArray<FFWToast> Toasts;
 	bool bHotbarFilled = false;
+	TSharedPtr<class SFWFactoryWindow> Factory;
+	TSharedPtr<FJsonObject> EnteredPlot;
 	bool bPolling = false;
 	double NextPollAt = 0.0;
 
