@@ -212,6 +212,8 @@ PAINTED = {"FW_PaintedSteel": (0.12, 0.15, 0.12), "FW_Worn": (0.42, 0.3, 0.04), 
 SLOT_TEXTURES = {
     "FW_Rubber": "rubberized_track", "FW_Wood": "weathered_planks", "FW_Concrete": "concrete_floor_worn_001",
     "FW_Grate": "metal_grate_rusty",
+    # Workshop furniture and kilns
+    "FW_Brick": "red_brick_03", "FW_Stone": "castle_wall_slates", "FW_TableWood": "wood_table_001",
     # Hand tools (Tools/blender/make_tools.py)
     "FW_ToolSteel": "metal_plate", "FW_Grip": "rubberized_track",
 }
