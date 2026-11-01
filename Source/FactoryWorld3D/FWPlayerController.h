@@ -9,6 +9,9 @@ class AFWCharacterStudio;
 class SFWMarketWindow;
 class UTexture2D;
 class UAudioComponent;
+class SFWCityWindow;
+class SFWCountryWindow;
+class SFWPoliceWindow;
 class AFWPlot;
 class SFWCharacterCreator;
 class SFWHud;
@@ -118,6 +121,10 @@ public:
 	void Place(const FString& Kind, FIntPoint Tile, int32 Rotation);
 	void Pickup(const FString& ObjectId);
 	void PutAllInStorage(const FString& ObjectId);
+	// The town of this plot (H), the country and politics (P) and the police, as in the 2D game
+	void OpenCity();
+	void OpenCountry();
+	void OpenPolice();
 
 	// Console commands for testing without mouse and keyboard; a file of "seconds command" lines passed
 	// with -FWAutoTest=<path> runs them one after another.
@@ -144,6 +151,13 @@ public:
 	// Finds a free row near the player and builds chest → inserter → belts eastwards, then looks at it
 	UFUNCTION(Exec)
 	void FWBuildLine(int32 BeltCount = 5);
+	// Politics for tests: the town, the country (on a tab, or a country by code) and the police on a tab
+	UFUNCTION(Exec)
+	void FWCity(int32 Tab = 0);
+	UFUNCTION(Exec)
+	void FWCountry(int32 Tab = 4, const FString& Code = TEXT(""));
+	UFUNCTION(Exec)
+	void FWPolice(int32 Tab = 0);
 	// Puts the mined resources in the chest of that line
 	UFUNCTION(Exec)
 	void FWStoreLine();
@@ -270,6 +284,9 @@ private:
 	double StationServerMs = 0.0;
 	double StationReceivedAt = 0.0;
 	double NextStationPoll = 0.0;
+	TSharedPtr<SFWCityWindow> City;
+	TSharedPtr<SFWCountryWindow> Country;
+	TSharedPtr<SFWPoliceWindow> Police;
 	void ApplyStation(const FFWNetReply& Reply);
 	void PollStation();
 	TMap<FString, TSharedPtr<FSlateBrush>> IconBrushes;
