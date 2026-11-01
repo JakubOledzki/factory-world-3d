@@ -103,6 +103,9 @@ public:
 	void StationLoad(const TCHAR* Type, const FString& Item, int32 Quantity, bool bFuel = false);
 	// The server's clock now (ms), from the last station reply
 	double ServerNowMs() const;
+	// A shop in a city or a works canteen and its window, as in the 2D game
+	static bool IsShop(const FString& Kind);
+	void OpenShop(const FString& ObjectId, const FString& Kind);
 	FString ItemName(const FString& Item) const;
 	const TArray<FFWToast>& GetToasts() const { return Toasts; }
 	bool IsInWorld() const { return Plot != nullptr; }
@@ -131,6 +134,9 @@ public:
 	// Walks downhill from the plot until the ground is below Meters above sea level (plots with real terrain)
 	UFUNCTION(Exec)
 	void FWGotoAltitude(float Meters, float Yaw = 0.f, float Pitch = 0.f);
+	// Walks to the nearest shop or canteen (furniture_shop, furniture_canteen) and opens it; with an item, puts it on the shelves
+	UFUNCTION(Exec)
+	void FWShop(const FString& Kind, const FString& Item = TEXT(""), int32 Quantity = 1, float Dollars = 1.f);
 	UFUNCTION(Exec)
 	void FWMine(int32 Times = 1);
 	UFUNCTION(Exec)
@@ -275,6 +281,7 @@ private:
 	TMap<FString, TSharedPtr<FSlateBrush>> IconBrushes;
 	TMap<FString, FString> Names;
 	TArray<FString> Hotbar;
+	TSharedPtr<class SFWShopWindow> Shop;
 	int32 SelectedSlot = 0;
 	int64 BalanceCents = 0;
 	TArray<FFWToast> Toasts;

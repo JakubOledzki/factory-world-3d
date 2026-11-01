@@ -117,6 +117,15 @@ Bez niego kreator działa, tylko podgląd jest pusty.
 
 Fryzury, zarost i ubrania to prawdziwe modele 3D (`Tools/blender/make_character_gear.py`): po jednym na każdy styl, który podaje serwer (5 fryzur, 3 rodzaje zarostu, t-shirt, bezrękawnik, bluza z kapturem, spodnie, buty). Każdy jest wycięty z ciała manekina, odsunięty od skóry i pogrubiony, więc ma te same wagi kości co ciało i porusza się razem z nim. Kucyk i kaptur to dodatkowe kształty. Włosy i zarost to warstwy pasków („hair cards”) z pasmami wyciętymi przezroczystością, anizotropowym połyskiem i jaśniejszymi końcówkami, na ciemnej warstwie spodniej. Kolory wybrane w kreatorze nakładają materiały `M_FWHairCard` i `M_FWHair` i `M_FWCloth` (tkaniny CC0 z Poly Haven: dzianina, polar, dżins, skóra). Modele tworzy `Tools/setup_assets.ps1` (eksport manekina z edytora, Blender, import), gdy manekin jest już skopiowany. Bez nich podgląd pokazuje malowanego manekina.
 
+## Sklep i stołówka
+
+E przy budynku, jak w grze 2D:
+
+- **sklep** (stoi tylko w mieście): towar na półkach z ceną i ilością, ilu klientów kupuje po tej cenie (po cenie handlarza wszyscy, po dwukrotnej połowa, po trzykrotnej nikt), wystawianie z plecaka (wybór przedmiotu, ilość, cena z podpowiedzią), „Zdejmij”, ilu klientów na godzinę i ile już sprzedano; pieniądze same wpływają do portfela,
+- **stołówka zakładowa**: jak długo załogi są najedzone i o ile szybciej pracują maszyny, ile maszyn karmi, wydawanie dań z plecaka (+1, +10, wszystko).
+
+Do testów: `FWShop furniture_shop` (albo `furniture_canteen`) podchodzi do budynku i otwiera okno; potem `FWShop furniture_shop iron_ingot 10 25` wystawia 10 sztabek po 25 $.
+
 ## Plecak, skrzynie i menu
 
 - **Tab / I** otwiera plecak: pola ułożone tak jak na serwerze, z ikonami i liczbą sztuk, a pod nimi pasek szybkiego wyboru. Przedmioty przeciąga się między polami (`inventory.move`) i na pasek (`hotbar.set`). Przeciągnięcie z paska do plecaka czyści pole paska.

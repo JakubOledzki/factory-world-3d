@@ -11,6 +11,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "UnrealClient.h"
+#include "UI/SFWShopWindow.h"
 #include "EngineUtils.h"
 #include "Game/FWCatalog.h"
 #include "Game/FWGameSettings.h"
@@ -1005,6 +1006,46 @@ void AFWPlayerController::MoveTile(int32 From, int32 To)
 			Reply.Type == TEXT("inventory") ? This->ApplyInventory(Reply.Payload) : This->ToastError(Reply);
 		}
 	});
+}
+
+bool AFWPlayerController::IsShop(const FString& Kind)
+{
+	return SFWShopWindow::ModeOf(Kind) != SFWShopWindow::EMode::None;
+}
+
+void AFWPlayerController::OpenShop(const FString& ObjectId, const FString& Kind)
+{
+	SAssignNew(Shop, SFWShopWindow).Controller(this).Object(ObjectId).Kind(Kind);
+	ShowWidget(Shop.ToSharedRef(), Shop);
+}
+
+void AFWPlayerController::FWShop(const FString& Kind, const FString& Item, int32 Quantity, float Dollars)
+{
+	if (Shop.IsValid() && ShownWidget == Shop && !Item.IsEmpty())
+	{
+		Shop->Stock(Item, Quantity, Dollars);
+		return;
+	}
+	if (!Plot || !GetPawn())
+	{
+		return;
+	}
+	const FIntPoint At = Plot->TileAt(GetPawn()->GetActorLocation());
+	const FFWPlotObject* Nearest = nullptr;
+	for (const TPair<FString, FFWPlotObject>& Pair : Plot->GetObjects())
+	{
+		if (Pair.Value.Kind == Kind && (!Nearest || (Pair.Value.Tile - At).SizeSquared() < (Nearest->Tile - At).SizeSquared()))
+		{
+			Nearest = &Pair.Value;
+		}
+	}
+	if (!Nearest)
+	{
+		UE_LOG(LogFWGame, Warning, TEXT("No %s on the plot"), *Kind);
+		return;
+	}
+	FWGoto(Nearest->Tile.X - 3, Nearest->Tile.Y + 3, -45.f, -25.f);
+	OpenShop(Nearest->Id, Nearest->Kind);
 }
 
 void AFWPlayerController::SetHotbarSlot(int32 Slot, const FString& Item)
