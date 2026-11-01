@@ -37,3 +37,7 @@ Content/Characters/
 
 # MetaHuman heads built locally by Tools/make_metahumans.py (MetaHuman license: Unreal Engine only, not redistributed)
 Content/MetaHumans/
+
+# The 3D game's server: build output
+Server/**/bin/
+Server/**/obj/

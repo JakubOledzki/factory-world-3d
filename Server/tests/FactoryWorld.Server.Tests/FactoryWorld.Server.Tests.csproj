@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FactoryWorld.Server\FactoryWorld.Server.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.Characters\FactoryWorld.Modules.Characters.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.Recycling\FactoryWorld.Modules.Recycling.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.Market\FactoryWorld.Modules.Market.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.World\FactoryWorld.Modules.World.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.Law\FactoryWorld.Modules.Law.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.Crafting\FactoryWorld.Modules.Crafting.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.Logistics\FactoryWorld.Modules.Logistics.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.Power\FactoryWorld.Modules.Power.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.Tutorial\FactoryWorld.Modules.Tutorial.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.Contracts\FactoryWorld.Modules.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.Research\FactoryWorld.Modules.Research.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.Achievements\FactoryWorld.Modules.Achievements.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FactoryWorld.Modules.Bots\FactoryWorld.Modules.Bots.csproj" />
+  </ItemGroup>
+
+</Project>

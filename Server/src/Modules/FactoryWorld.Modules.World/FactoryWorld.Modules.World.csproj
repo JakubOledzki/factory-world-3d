@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\FactoryWorld.Modules.Abstractions\FactoryWorld.Modules.Abstractions.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Made by tools/build_world.py; the client has the same file in client/world/. -->
+    <EmbeddedResource Include="Data\biomes.bin.gz" LogicalName="biomes.bin.gz" />
+    <EmbeddedResource Include="Data\cities.tsv.gz" LogicalName="cities.tsv.gz" />
+    <EmbeddedResource Include="Data\counties.bin.gz" LogicalName="counties.bin.gz" />
+    <!-- Made by tools/build_countries.py; the client has the same file in client/world/. -->
+    <EmbeddedResource Include="Data\countries.bin.gz" LogicalName="countries.bin.gz" />
+  </ItemGroup>
+
+</Project>

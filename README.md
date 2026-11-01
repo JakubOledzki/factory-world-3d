@@ -1,8 +1,8 @@
 # Factory World 3D
 
-Trójwymiarowy klient gry [Factory World](https://github.com/JakubOledzki/factory-world): budowanie fabryk z perspektywy pierwszej osoby, z realistyczną grafiką w Unreal Engine 5.
+Gra o budowaniu fabryk z perspektywy pierwszej osoby, z realistyczną grafiką w Unreal Engine 5, na wzór [Factory World](https://github.com/JakubOledzki/factory-world).
 
-Cała logika gry działa na serwerze Factory World (C#/.NET, PostgreSQL), tym samym, z którego korzysta wersja 2D. Ten projekt jest tylko nowym klientem: łączy się z serwerem przez WebSocket i mówi tym samym protokołem JSON (opis w README repozytorium `factory-world`, sekcja „Protokół”).
+Gra 3D jest osobną grą z własnym światem. Cała logika działa na jej własnym serwerze w katalogu `Server/` (C#/.NET, PostgreSQL, osobna baza i osobne konta; jak go uruchomić, opisuje [Server/README.md](Server/README.md)). Serwer powstał jako kopia serwera gry 2D i od tej pory rozwija się tutaj niezależnie. Klient łączy się z nim przez WebSocket protokołem JSON (opis w README repozytorium `factory-world`, sekcja „Protokół”).
 
 ## Pociągi
 
@@ -66,18 +66,18 @@ Do testów: `FWFactory 0|1|2`, `FWPlanSave nazwa 6`, `FWPlanUse 0`, `FWVisit x y
 
 ## Połączenie z serwerem
 
-Klient łączy się z serwerem Factory World pod adresem z `Config/DefaultGame.ini`:
+Gra 3D ma własny serwer w katalogu `Server/` (osobna baza, osobne konta; nie łączy się z serwerem gry 2D). Klient łączy się z nim pod adresem z `Config/DefaultGame.ini`:
 
 ```ini
 [/Script/FactoryWorld3D.FWNetSubsystem]
-ServerUrl="ws://localhost:5080/ws"
+ServerUrl="ws://localhost:5081/ws"
 ```
 
 Adres musi być w cudzysłowie, bo w plikach `.ini` Unreala `//` zaczyna komentarz.
 
-Serwer lokalnie: w repozytorium `factory-world` uruchom `docker compose up` albo bazę PostgreSQL (użytkownik i hasło `factory`, baza `factory_world`) i `dotnet run --project server/src/FactoryWorld.Server --launch-profile http`.
+Jak uruchomić serwer lokalnie, opisuje [Server/README.md](Server/README.md).
 
-Po starcie gra pokazuje ekran logowania (e-mail i hasło konta z Factory World). Sesja jest zapisywana w `Saved/Auth/session.token`, więc przy następnym uruchomieniu gra loguje się sama.
+Po starcie gra pokazuje ekran logowania (e-mail i hasło konta na serwerze gry 3D). Sesja jest zapisywana w `Saved/Auth/session.token`, więc przy następnym uruchomieniu gra loguje się sama.
 
 Polecenia konsoli (klawisz `~`) do testów:
 
@@ -345,7 +345,7 @@ powershell -ExecutionPolicy Bypass -File Tools\package.ps1 -Configuration Develo
 
 Skrypt kompiluje grę, przygotowuje zasoby (cook) i pakuje wszystko do `D:\Factory-World\Builds\<konfiguracja>\Windows`. Najpierw trzeba uruchomić `Tools\setup_assets.ps1`, bo grafika z `Content/External` nie jest w gicie i trafia do paczki z tego komputera (`DirectoriesToAlwaysCook` w `Config/DefaultGame.ini`). Ostrzeżenia z przygotowania zasobów są zapisywane w `CookWarnings.txt` obok paczki.
 
-- Adres serwera: `FactoryWorld3D.exe -ServerUrl=ws://adres:5080/ws` albo `ServerUrl` w `Saved\Config\Windows\Game.ini`.
+- Adres serwera: `FactoryWorld3D.exe -ServerUrl=ws://adres:5081/ws` albo `ServerUrl` w `Saved\Config\Windows\Game.ini`.
 - Wersja Shipping pomija `Saved/DevLogin.ini`, więc zawsze pokazuje ekran logowania. Wersja Development loguje się automatycznie, jeśli ten plik istnieje.
 
 ## Miasto, państwo i policja

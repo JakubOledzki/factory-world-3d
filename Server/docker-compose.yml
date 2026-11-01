@@ -1,0 +1,31 @@
+# Local development of the 3D game's server: `docker compose up` starts its database and the server.
+# To run the server from your IDE instead, start only the database: `docker compose up db` (then point
+# ConnectionStrings__Game at port 5433).
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: factoryworld3d
+      POSTGRES_USER: factory
+      POSTGRES_PASSWORD: factory
+    ports:
+      - "5433:5432"
+    volumes:
+      - db3d-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U factory -d factoryworld3d"]
+      interval: 5s
+      retries: 10
+
+  server:
+    build: .
+    environment:
+      ConnectionStrings__Game: "Host=db;Port=5432;Database=factoryworld3d;Username=factory;Password=factory"
+    ports:
+      - "5081:5081"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db3d-data:
