@@ -110,9 +110,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<USkeletalMeshComponent> Body;
 	UPROPERTY()
-	TMap<FString, TObjectPtr<USkeletalMeshComponent>> ArmsGear;
+	TMap<FString, TObjectPtr<USkinnedMeshComponent>> ArmsGear;
 	UPROPERTY()
-	TMap<FString, TObjectPtr<USkeletalMeshComponent>> BodyGear;
+	TMap<FString, TObjectPtr<USkinnedMeshComponent>> BodyGear;
 	struct FArmRef
 	{
 		FTransform Upper, Lower, Hand;

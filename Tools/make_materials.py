@@ -393,6 +393,22 @@ for character_name, arms_only in (("M_FWCharacter", False), ("M_FWCharacterArms"
     lib.connect_material_property(custom, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
     if arms_only:
         arm_mask(m, interpolator)
+    else:
+        # Under a MetaHuman head (Source/FactoryWorld3D/Game/FWGear.cpp): the painted head and neck cut away
+        cut = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -400, 400)
+        cut.set_editor_property("code", "float ax = abs(P.x); return (Hide > 0.5 && P.z > Height && ax < 12.0) ? 0.0 : 1.0;")
+        cut.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
+        cut_inputs = []
+        for name in ("P", "Hide", "Height"):
+            item = unreal.CustomInput()
+            item.set_editor_property("input_name", name)
+            cut_inputs.append(item)
+        cut.set_editor_property("inputs", cut_inputs)
+        lib.connect_material_expressions(interpolator, "", cut, "P")
+        lib.connect_material_expressions(scalar_param(m, "HideHead", 0.0, -900, 450), "", cut, "Hide")
+        lib.connect_material_expressions(scalar_param(m, "HeadCut", 156.0, -900, 530), "", cut, "Height")
+        m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+        lib.connect_material_property(cut, "", unreal.MaterialProperty.MP_OPACITY_MASK)
     lib.recompile_material(m)
     unreal.EditorAssetLibrary.save_asset(m.get_path_name())
 unreal.log("FW character material saved")

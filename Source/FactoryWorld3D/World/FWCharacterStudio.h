@@ -36,6 +36,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 private:
 	void UpdateCamera(float DeltaSeconds);
@@ -49,7 +50,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<UCameraComponent> Camera;
 	UPROPERTY()
-	TMap<FString, TObjectPtr<USkeletalMeshComponent>> Gear;
+	TMap<FString, TObjectPtr<USkinnedMeshComponent>> Gear;
+	// r.VolumetricFog before the room was shown (restored after)
+	int32 VolumetricFogBefore = -1;
 
 	float Yaw = 200.f;
 	float ZoomTarget = 0.f;

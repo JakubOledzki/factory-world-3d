@@ -75,6 +75,24 @@ Opis danych i licencji: https://registry.opendata.aws/copernicus-dem/
 
 Podgląd w kreatorze postaci to manekin `SKM_Manny_Simple` z animacją `MM_Idle`, z szablonów, które każda instalacja Unreal Engine 5 ma w `Templates/TemplateResources`. Licencja: treści Epic dla projektów Unreal Engine (Unreal Engine EULA), można ich używać w grze, ale nie rozpowszechniać osobno. Dlatego nie ma ich w gicie (`Content/Characters/`), a kopiuje je `Tools/copy_mannequins.ps1`. Wygląd postaci maluje nasz materiał. Fryzury, zarost i ubrania robi nasz skrypt `Tools/blender/make_character_gear.py` z ciała manekina (pliki też nie trafiają do gita). Tkaniny ubrań to tekstury CC0 z Poly Haven: [cotton_jersey](https://polyhaven.com/a/cotton_jersey), [knitted_fleece](https://polyhaven.com/a/knitted_fleece), [denim_fabric_05](https://polyhaven.com/a/denim_fabric_05) i [leather_white](https://polyhaven.com/a/leather_white).
 
+## Twarze MetaHuman (Epic Games, MetaHuman Creator)
+
+Głowy w kreatorze postaci i u gracza to cztery postacie MetaHuman, po jednej na każdy wariant twarzy z serwera (0 spokojna, 1 zmęczona, 2 pogodna, 3 dojrzała). Powstają z presetów MetaHuman Creator dołączonych do silnika (`Dominic`, `Victor`, `Mateo`, `Walter`) w skrypcie `Tools/make_metahumans.py`. Skrypt ujednolica odcień skóry, usuwa fryzury i zarost presetów (gra zakłada własne), zleca rigging i tekstury chmurze MetaHuman i składa głowy potokiem „Optimized” (LOD-y MetaHuman) do `Content/MetaHumans/Built`. Kolor skóry i oczu z palety serwera nakłada gra w materiale. Włosy, zarost i ubrania zostają nasze.
+
+Licencja: [MetaHuman](https://www.unrealengine.com/en-US/eula/mhc) (warunki Unreal Engine EULA). Postaci MetaHuman wolno używać w grach i projektach zbudowanych w Unreal Engine, także komercyjnych, ale **nie wolno ich rozpowszechniać osobno** ani używać poza Unreal Engine. Dlatego nie ma ich w gicie (`.gitignore`: `Content/MetaHumans/`). Do gotowej gry trafiają tylko siatki i tekstury twarzy (`Config/DefaultGame.ini`).
+
+Żeby je zbudować u siebie, potrzebne są:
+
+1. Wtyczka MetaHuman Creator (włączona w `FactoryWorld3D.uproject`) i jej dane: Epic Games Launcher > Unreal Engine > Biblioteka > UE 5.8 > Opcje > „MetaHuman Creator Core Data”.
+2. Konto Epic: przy pierwszym uruchomieniu otwiera się strona logowania z kodem urządzenia, a logowanie zostaje zapamiętane.
+3. Uruchomienie skryptu w pełnym edytorze (ścieżki pełne, tu przykładowe), bo tekstury wypiekają się na GPU. Edytor sam zamyka się po budowie (ok. 15 minut na cztery głowy):
+
+```
+UnrealEditor.exe D:/Factory-World/factory-world-3d/FactoryWorld3D.uproject -ExecCmds="py D:/Factory-World/factory-world-3d/Tools/make_metahumans.py"
+```
+
+Bez tych plików gra działa dalej, z malowaną głową manekina.
+
 ## Dźwięki (nasze)
 
 Wszystkie dźwięki gry są syntezowane przez nasz skrypt `Tools/make_audio.py` (szum, filtry, drgania tłumione, modulacja częstotliwości). Nie ma żadnych nagrań ani próbek z zewnątrz.

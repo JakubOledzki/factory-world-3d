@@ -7,6 +7,7 @@ class AActor;
 class USceneComponent;
 class USkeletalMeshComponent;
 class USkinnedMeshComponent;
+class UFWHeadComponent;
 
 // A character's look as it is drawn: colours from the server's palettes, styles as indices
 struct FFWLook
@@ -35,10 +36,15 @@ namespace FWGear
 	// Shows the piece (e.g. "hair_3") of a kind ("hair"), creating it the first time, and hides the others of that
 	// kind; an empty piece hides them all. ArmsOnly pieces use the first-person "...Arms" materials. Returns the piece.
 	USkeletalMeshComponent* Wear(AActor* Owner, USceneComponent* Parent, USkinnedMeshComponent* Leader,
-		TMap<FString, TObjectPtr<USkeletalMeshComponent>>& Gear, const FString& Kind, const FString& Piece,
+		TMap<FString, TObjectPtr<USkinnedMeshComponent>>& Gear, const FString& Kind, const FString& Piece,
 		const FLinearColor& Color, bool bArmsOnly = false);
 
+	// Puts the MetaHuman head of the look's face style (Tools/make_metahumans.py, /Game/MetaHumans) on a figure, posed
+	// from its body, its skin and eyes tinted to the look; hides the others. Returns it, or none when not built.
+	UFWHeadComponent* WearHead(AActor* Owner, USkinnedMeshComponent* Body, TMap<FString, TObjectPtr<USkinnedMeshComponent>>& Gear,
+		const FFWLook& Look);
+
 	// Dresses a figure in the whole look (body paint on its own material, every piece over it)
-	void Dress(AActor* Owner, USkinnedMeshComponent* Body, TMap<FString, TObjectPtr<USkeletalMeshComponent>>& Gear,
+	void Dress(AActor* Owner, USkinnedMeshComponent* Body, TMap<FString, TObjectPtr<USkinnedMeshComponent>>& Gear,
 		const FFWLook& Look, bool bArmsOnly = false);
 }

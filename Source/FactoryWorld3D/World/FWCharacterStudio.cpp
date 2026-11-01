@@ -8,6 +8,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
+#include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
 namespace
@@ -43,11 +44,27 @@ AFWCharacterStudio::AFWCharacterStudio()
 	P.bOverride_DepthOfFieldFstop = true;
 	P.DepthOfFieldFstop = 2.8f;
 	P.bOverride_DepthOfFieldFocalDistance = true;
+	// A small closed room: Lumen's bounce light at a lower quality and screen-space reflections are enough (the
+	// frame rate)
+	P.bOverride_LumenFinalGatherQuality = true;
+	P.LumenFinalGatherQuality = 0.25f;
+	P.bOverride_LumenSceneLightingQuality = true;
+	P.LumenSceneLightingQuality = 0.5f;
+	P.bOverride_LumenSceneDetail = true;
+	P.LumenSceneDetail = 0.5f;
+	P.bOverride_ReflectionMethod = true;
+	P.ReflectionMethod = EReflectionMethod::ScreenSpace;
 }
 
 void AFWCharacterStudio::BeginPlay()
 {
 	Super::BeginPlay();
+	// The world's volumetric fog never reaches into the room: off while it is shown (the frame rate)
+	if (IConsoleVariable* Fog = IConsoleManager::Get().FindConsoleVariable(TEXT("r.VolumetricFog")))
+	{
+		VolumetricFogBefore = Fog->GetInt();
+		Fog->Set(0, ECVF_SetByCode);
+	}
 
 	UStaticMesh* Plane = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Plane.Plane"));
 	UStaticMesh* Cylinder = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
@@ -97,8 +114,9 @@ void AFWCharacterStudio::BeginPlay()
 		Paneled(Cylinder, FTransform(FRotator::ZeroRotator, FVector(0, 0, PedestalHeight / 2), FVector(1.7f, 1.7f, PedestalHeight / 100.f)), FLinearColor(0.012f, 0.012f, 0.013f), 0.25f);
 	}
 
-	// Three-point lighting: a warm key from the front left, a cool fill from the right, a rim from behind
-	auto Rect = [this](const FVector& At, const FVector& LookAt, float Candelas, const FLinearColor& Color, float Width, float Height)
+	// Three-point lighting: a warm key from the front left, a cool fill from the right (no shadows, the frame rate),
+	// a rim from behind
+	auto Rect = [this](const FVector& At, const FVector& LookAt, float Candelas, const FLinearColor& Color, float Width, float Height, bool bShadows)
 	{
 		URectLightComponent* Light = NewObject<URectLightComponent>(this);
 		Light->SetupAttachment(Root);
@@ -111,11 +129,12 @@ void AFWCharacterStudio::BeginPlay()
 		Light->SetSourceWidth(Width);
 		Light->SetSourceHeight(Height);
 		Light->SetAttenuationRadius(2000.f);
+		Light->SetCastShadows(bShadows);
 		Light->RegisterComponent();
 	};
-	Rect(FVector(260, -240, 300), FVector(0, 0, 130), 2600.f, FLinearColor(1.f, 0.9f, 0.8f), 140.f, 100.f);
-	Rect(FVector(280, 300, 150), FVector(0, 0, 110), 700.f, FLinearColor(0.75f, 0.85f, 1.f), 160.f, 160.f);
-	Rect(FVector(0, 0, 520), FVector(0, 0, 0), 500.f, FLinearColor(1.f, 0.97f, 0.92f), 200.f, 200.f);
+	Rect(FVector(260, -240, 300), FVector(0, 0, 130), 2600.f, FLinearColor(1.f, 0.9f, 0.8f), 140.f, 100.f, true);
+	Rect(FVector(280, 300, 150), FVector(0, 0, 110), 700.f, FLinearColor(0.75f, 0.85f, 1.f), 160.f, 160.f, false);
+	Rect(FVector(0, 0, 520), FVector(0, 0, 0), 500.f, FLinearColor(1.f, 0.97f, 0.92f), 200.f, 200.f, true);
 	USpotLightComponent* Rim = NewObject<USpotLightComponent>(this);
 	Rim->SetupAttachment(Root);
 	Rim->SetMobility(EComponentMobility::Movable);
@@ -127,6 +146,8 @@ void AFWCharacterStudio::BeginPlay()
 	Rim->SetOuterConeAngle(28.f);
 	Rim->SetInnerConeAngle(16.f);
 	Rim->SetAttenuationRadius(1500.f);
+	// Lighting the outline from behind, its shadows would hardly show
+	Rim->SetCastShadows(false);
 	Rim->RegisterComponent();
 
 	// The mannequin, painted per region, breathing in its idle
@@ -147,6 +168,15 @@ void AFWCharacterStudio::BeginPlay()
 		}
 	}
 	UpdateCamera(0.f);
+}
+
+void AFWCharacterStudio::EndPlay(const EEndPlayReason::Type Reason)
+{
+	if (IConsoleVariable* Fog = IConsoleManager::Get().FindConsoleVariable(TEXT("r.VolumetricFog")); Fog && VolumetricFogBefore >= 0)
+	{
+		Fog->Set(VolumetricFogBefore, ECVF_SetByCode);
+	}
+	Super::EndPlay(Reason);
 }
 
 bool AFWCharacterStudio::HasFigure() const
