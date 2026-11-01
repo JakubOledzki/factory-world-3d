@@ -38,6 +38,12 @@ Projekt jest ustawiony na najwyższą jakość obrazu (`Config/DefaultEngine.ini
 - niebo fizyczne (Sky Atmosphere), chmury wolumetryczne i mgła wolumetryczna
 - domyślna skalowalność: Epic
 
+## Pola i las leśnika
+
+Na działce widać to, co rośnie samo, jak w grze 2D: **pola zagród** (zaorana ziemia w rzędach, na niej uprawa — młoda i zielona, rośnie z czasem, a dojrzała gotowa do zbioru: pszenica, kukurydza, kapusta, marchew, ziemniaki, słonecznik, burak cukrowy, len, konopie) i **drzewa sadzone przez leśnika** (sadzonki rosnące w drzewa do ścięcia). Gra pyta serwer o nie co kilka sekund (`farmstead.get`, `forestry.get`).
+
+Modele upraw robi `Tools/blender/make_crops.py` (geometria, kolor w kolorze wierzchołków, Nanite); importuje je `Tools/import_external.py`, a `Tools/setup_assets.ps1` uruchamia oba.
+
 ## Zasoby
 
 Używamy wyłącznie własnych modeli (Blender, skrypty w Pythonie) oraz darmowych zasobów z licencją pozwalającą na użycie komercyjne (np. Poly Haven, ambientCG – CC0; Fab – tylko z licencją komercyjną). Żadnych zasobów, nazw ani treści z innych gier.
