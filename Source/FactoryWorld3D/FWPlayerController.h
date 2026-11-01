@@ -17,6 +17,8 @@ class SFWPromptWidget;
 class SWidget;
 class UFWNetSubsystem;
 struct FFWNetReply;
+class SFWCompanyWindow;
+class SFWBankWindow;
 
 struct FFWStack
 {
@@ -106,6 +108,9 @@ public:
 	FString ItemName(const FString& Item) const;
 	const TArray<FFWToast>& GetToasts() const { return Toasts; }
 	bool IsInWorld() const { return Plot != nullptr; }
+	// The company (K) and the banks (Z, as B builds in 3D), as in the 2D game
+	void OpenCompany();
+	void OpenBank();
 
 	void SelectSlot(int32 Slot);
 	// The icon of an item for the HUD, rendered from its model (Tools/blender/render_icons.py)
@@ -204,6 +209,13 @@ public:
 	// Walks straight ahead for a while (footsteps without a keyboard)
 	UFUNCTION(Exec)
 	void FWWalk(float Seconds);
+	// Company and banks for tests: open on a tab, a company message with one text field, the bank window on a bank
+	UFUNCTION(Exec)
+	void FWCompany(int32 Tab = 0);
+	UFUNCTION(Exec)
+	void FWCompanyDo(const FString& Type, const FString& Field, const FString& Value);
+	UFUNCTION(Exec)
+	void FWBank();
 	UFUNCTION(Exec)
 	void FWRecordStop(const FString& Name);
 
@@ -256,6 +268,8 @@ private:
 	TSharedPtr<SFWMarketWindow> Market;
 	TSharedPtr<SFWLoginWidget> LoginWidget;
 	TSharedPtr<SFWPromptWidget> Prompt;
+	TSharedPtr<SFWCompanyWindow> Company;
+	TSharedPtr<SFWBankWindow> Bank;
 	TSharedPtr<SWidget> ShownWidget;
 	TSharedPtr<SFWHud> Hud;
 

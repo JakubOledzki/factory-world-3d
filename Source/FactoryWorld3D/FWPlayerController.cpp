@@ -28,6 +28,8 @@
 #include "UI/SFWStationWindow.h"
 #include "Engine/Texture2D.h"
 #include "Camera/CameraComponent.h"
+#include "UI/SFWBankWindow.h"
+#include "UI/SFWCompanyWindow.h"
 #include "UI/SFWLoginWidget.h"
 #include "World/FWCharacterStudio.h"
 #include "Player/FWCharacter.h"
@@ -1137,6 +1139,54 @@ void AFWPlayerController::ApplyHotbar(const TSharedPtr<FJsonObject>& HotbarPaylo
 			}
 		}
 	}
+}
+
+void AFWPlayerController::OpenCompany()
+{
+	SAssignNew(Company, SFWCompanyWindow).Controller(this);
+	ShowWidget(Company.ToSharedRef(), Company);
+}
+
+void AFWPlayerController::OpenBank()
+{
+	SAssignNew(Bank, SFWBankWindow).Controller(this);
+	ShowWidget(Bank.ToSharedRef(), Bank);
+}
+
+void AFWPlayerController::FWCompany(int32 Tab)
+{
+	if (!Company.IsValid())
+	{
+		OpenCompany();
+	}
+	Company->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWCompanyDo(const FString& Type, const FString& Field, const FString& Value)
+{
+	if (!Company.IsValid())
+	{
+		OpenCompany();
+	}
+	TSharedPtr<FJsonObject> P = Payload();
+	if (!Field.IsEmpty())
+	{
+		// Numbers go as numbers, the rest as text
+		if (Value.IsNumeric())
+		{
+			P->SetNumberField(Field, FCString::Atod(*Value));
+		}
+		else
+		{
+			P->SetStringField(Field, Value);
+		}
+	}
+	Company->Act(*Type, P);
+}
+
+void AFWPlayerController::FWBank()
+{
+	OpenBank();
 }
 
 void AFWPlayerController::RefreshWallet()
