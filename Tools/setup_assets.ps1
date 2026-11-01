@@ -18,6 +18,10 @@ Write-Host "== Poly Haven (CC0)"
 node Tools/fetch_polyhaven.mjs
 if ($LASTEXITCODE -ne 0) { throw "download failed" }
 
+Write-Host "== World map (the 2D game's world files)"
+node Tools/build_world_map.mjs
+if ($LASTEXITCODE -ne 0) { throw "world map failed" }
+
 Write-Host "== ambientCG decals (CC0)"
 New-Item -ItemType Directory -Force RawAssets\ambientcg | Out-Null
 foreach ($id in @("Leaking007", "Leaking008", "Leaking009")) {

@@ -151,6 +151,16 @@ U góry jest wyszukiwarka i stan konta.
 
 Do testów: `FWMarket`, `FWMarketTab <0–2>`, `FWMarketItem <przedmiot>`, `FWTrade <1 kup / 0 sprzedaj> <przedmiot> <ile>`, `FWMarketOffer <1 sprzedaż / 0 kupno> <ile> <cena $>`.
 
+## Mapa świata
+
+Klawisz **N** (jak w grze 2D) otwiera mapę świata: cała Ziemia w działkach 5 × 5 km, kolory terenu i granice państw, nazwy miast (im bliżej, tym mniejsze miasta). Przeciągnij, aby przesunąć, kółkiem przybliżasz; mapa zawija się ze wschodu na zachód. Twoje działki są złote, działki innych graczy w widoku czerwone (`world.info`, `world.area`).
+
+Kliknięcie wybiera działkę: położenie, teren, państwo, właściciel i cena (`world.plot`). Wolną działkę można kupić (`world.buy`), na swoją albo publiczną wejść (`plot.enter`), a swoją nazwać (`world.rename`).
+
+Dane mapy pochodzą z plików gry 2D: `node Tools/build_world_map.mjs` pobiera `biomes.bin.gz`, `countries.bin.gz` i `towns.tsv.gz`, kopiuje je do `Content/External/WorldData` i rysuje `RawAssets/processed/world_map.png`, który `Tools/import_external.py` importuje jako `/Game/External/WorldMap`. Bez tych plików mapa pokazuje same działki.
+
+Do testów: `FWMap`, `FWMapCenter <x> <y> <pikseli na działkę>`, `FWMapSelect <x> <y>`, `FWGoPlot <x> <y>`.
+
 ## Ręce i cień gracza
 
 W widoku z pierwszej osoby widać ręce postaci w jej ubraniu (rękawy koszulki, bluzy albo gołe ramiona przy bezrękawniku) i w jej kolorze skóry. Ręce trzyma przed kamerą dwukośćowe IK na manekinie, bez gotowych animacji:
