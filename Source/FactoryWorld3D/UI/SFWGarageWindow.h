@@ -2,17 +2,22 @@
 
 #include "CoreMinimal.h"
 #include "Dom/JsonObject.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Widgets/SCompoundWidget.h"
 
 class AFWPlayerController;
 class FFWForm;
 class SBox;
 class SScrollBox;
+class UTexture2D;
 struct FFWNetReply;
+struct FSlateBrush;
 
 /**
  * The player's garage (U), as in the 2D game (garage.gd and its windows). Tabs:
- *   Segregacja: sorting trash by hand at the bin, bag after bag (recycling.sort / stop, garage.get)
+ *   Segregacja: sorting trash by hand at the bin, a small game: a bag's five pieces are dragged into the metal, plastic
+ *     and glass bins; a wrong bin sends the piece back, and the bag is done when all are in (recycling.sort / put / stop,
+ *     garage.get; the server checks every piece)
  *   Sortownia: the automatic sorting machine (sorter_window.gd; sorter.get / load / take)
  *   Ulepszenia: floor, walls, lighting, shelves and heating, level by level for money and materials, each with a
  *     bonus for good (upgrades_window.gd; garage.upgrades / upgrade)
@@ -39,6 +44,8 @@ public:
 	// Also for the tests
 	void ShowTab(int32 InTab);
 	void ToggleSorting();
+	// Puts piece Piece of the open bag into Bin ("metal", "plastic", "glass")
+	void PutPiece(int32 Piece, const FString& Bin);
 	void PlaceFurniture(const FString& Kind);
 	void LoadSorter(int32 Quantity);
 	void WearOutfit(int32 Number, bool bSave);
@@ -51,6 +58,9 @@ private:
 	void Sort();
 	void Rebuild();
 	TSharedRef<SWidget> MakeSorting();
+	TSharedRef<SWidget> MakeSortingGame();
+	const FSlateBrush* WasteBrush(const FString& Name);
+	bool HasRound() const;
 	TSharedRef<SWidget> MakeSorter();
 	TSharedRef<SWidget> MakeUpgrades();
 	TSharedRef<SWidget> MakeWardrobe();
@@ -68,9 +78,19 @@ private:
 	TSharedPtr<FJsonObject> Upgrades;
 	TSharedPtr<FJsonObject> Wardrobe;
 	FString Track = TEXT("floor");
-	// Sorting by hand goes on bag after bag while the window is open
-	bool bHandSorting = false;
 	bool bSortPending = false;
+	// The sorting game: the piece being dragged and the one on its way to the server (-1 for none), when each piece last
+	// came back out of a wrong bin, and the bin that last took or threw back a piece
+	int32 DraggingPiece = -1;
+	int32 PendingPiece = -1;
+	TMap<int32, double> WrongAt;
+	FString FlashBin;
+	double FlashAt = -10.0;
+	bool bFlashGood = false;
+	// What the last finished bag gave, shown until the next one is opened
+	FText LastBag;
+	TMap<FString, TSharedPtr<FSlateBrush>> WasteBrushes;
+	TArray<TStrongObjectPtr<UTexture2D>> WasteTextures;
 	// What came out of the last bags, newest first: item id and name
 	TArray<TPair<FString, FString>> Recent;
 	double ClockOffset = 0.0;

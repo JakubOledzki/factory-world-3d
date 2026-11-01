@@ -98,9 +98,7 @@ public sealed class TutorialTests(ServerFactory factory) : IClassFixture<ServerF
 
     private async Task SortBagAsync(GameClient client)
     {
-        await client.SendAsync("recycling.sort", new { count = 1 });
-        factory.Time.Advance(TimeSpan.FromSeconds(10));
-        Assert.Equal(1, (await client.SendAsync("garage.get")).Payload().GetProperty("results").GetArrayLength());
+        Assert.Equal(1, (await HandSorting.SortBagAsync(client)).Payload().GetProperty("results").GetArrayLength());
     }
 
     private static async Task<string> PlaceAsync(GameClient client, (int X, int Y) plot, string kind, int tileX, int tileY, int rotation = East)

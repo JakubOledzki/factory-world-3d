@@ -235,6 +235,32 @@ namespace FactoryWorld.Modules.Recycling.Migrations
 
                     b.ToTable("sorting_jobs", "recycling");
                 });
+
+            modelBuilder.Entity("FactoryWorld.Modules.Recycling.SortingRound", b =>
+                {
+                    b.Property<Guid>("OwnerId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("Pieces")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("pieces");
+
+                    b.Property<int>("Sorted")
+                        .HasColumnType("integer")
+                        .HasColumnName("sorted");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.HasKey("OwnerId");
+
+                    b.ToTable("sorting_rounds", "recycling");
+                });
 #pragma warning restore 612, 618
         }
     }
