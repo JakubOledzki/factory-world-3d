@@ -10,6 +10,7 @@ class AFWGrowth;
 class SFWMarketWindow;
 class SFWWorldMap;
 class UTexture2D;
+class AFWGarageRoom;
 class UAudioComponent;
 class SFWCityWindow;
 class SFWCountryWindow;
@@ -116,6 +117,11 @@ public:
 	// after clothes changed
 	void OpenGarage();
 	void RefreshLook();
+	// The garage as a room (U): in and out of it, what E does at the thing looked at, and what it would do
+	void ToggleGarageRoom();
+	bool IsInGarage() const { return bInGarage; }
+	void GarageInteract();
+	FText GarageHint() const;
 	void StorageTransfer(bool bPut, const FString& Item, int32 Quantity);
 	void StorageTransferAll(bool bPut);
 	// A building that farms the land around it (farmstead, forester, beehive, feeder) and its window, as in the 2D game
@@ -227,6 +233,11 @@ public:
 	void FWGarageOutfit(int32 Number, int32 Save = 0);
 	UFUNCTION(Exec)
 	void FWGarageHang(const FString& Item);
+	// The garage room for tests: in or out; standing at a point of the room (cm from its middle) looking Yaw/Pitch
+	UFUNCTION(Exec)
+	void FWGarageRoom();
+	UFUNCTION(Exec)
+	void FWGarageStand(float X, float Y, float Yaw = 90.f, float Pitch = -10.f);
 	UFUNCTION(Exec)
 	void FWStoreAt(int32 TileX, int32 TileY);
 	UFUNCTION(Exec)
@@ -467,6 +478,13 @@ private:
 	int32 SelectedSlot = 0;
 	int64 BalanceCents = 0;
 	TSharedPtr<class SFWGarageWindow> GarageWindow;
+	UPROPERTY()
+	TObjectPtr<AFWGarageRoom> GarageRoom;
+	bool bInGarage = false;
+	FTransform PlotSpot;
+	double NextGaragePoll = 0.0;
+	bool GarageTarget(FString& OutKind, FString& OutId) const;
+	void PollGarageRoom();
 	TArray<FFWToast> Toasts;
 	bool bHotbarFilled = false;
 	TSharedPtr<class SFWFactoryWindow> Factory;

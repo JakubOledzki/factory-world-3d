@@ -209,6 +209,8 @@ FACTORY = os.path.join(MODELS, "factory")
 # Painted parts are flat paint (a palette colour) with the subtle roughness of worn concrete, not a
 # photographed rusty plate, which tiled as blotches; grime darkens their lower parts
 PAINTED = {"FW_PaintedSteel": (0.12, 0.15, 0.12), "FW_Worn": (0.42, 0.3, 0.04), "FW_Steel": (0.2, 0.2, 0.21)}
+# The garage (Tools/blender/make_garage.py): barrels, bins and gas cylinders in plain paint
+PAINTED.update({"FW_PaintBlue": (0.02, 0.09, 0.3), "FW_PaintRed": (0.32, 0.03, 0.02), "FW_PaintWhite": (0.55, 0.55, 0.52), "FW_PaintGreen": (0.04, 0.16, 0.06)})
 SLOT_TEXTURES = {
     "FW_Rubber": "rubberized_track", "FW_Wood": "weathered_planks", "FW_Concrete": "concrete_floor_worn_001",
     "FW_Grate": "metal_grate_rusty",

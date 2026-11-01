@@ -90,7 +90,14 @@ Polecenia konsoli (klawisz `~`) do testów:
 
 ## Garaż (U)
 
-U otwiera garaż, jak w grze 2D (tam to osobne pomieszczenie):
+U przenosi do garażu: pomieszczenia 8 × 6 m z bramą rolowaną, lampą pod sufitem i meblami tam, gdzie stawia je serwer (`garage.get`). Ulepszenia widać w środku: podłoga (od betonu w plamach przez płytki i deski do marmuru) i ściany (od pustaków przez tynk, boazerię i klinkier) zmieniają powierzchnię, z poziomem oświetlenia przybywa lamp, z regałami półek na ścianie, z ogrzewaniem koza i kaloryfery. Wewnątrz ekspozycja jest jak w pomieszczeniu, nie jak w słońcu. E przy rzeczy, na którą patrzysz:
+
+- przy **koszu** — segregacja, przy **sortowni** — sortownia, przy **szafie** — garderoba, przy **tablicy** obok bramy — ulepszenia, przy innych meblach — meble garażu; **stół warsztatowy, kowadło i piec** działają jak na działce,
+- przy **bramie** (albo U) — z powrotem na działkę, w to samo miejsce.
+
+Modele pomieszczenia i mebli robi `Tools/blender/make_garage.py` (importowane jak modele fabryki).
+
+Okno garażu (zakładki poniżej) otwiera się przy tych rzeczach:
 
 - **Segregacja** — ręczne segregowanie śmieci z kosza, worek po worku (każdy daje losowy surowiec i 5 XP), z paskiem postępu i tym, co ostatnio wypadło; zamknięcie okna przerywa worek, a śmieci wracają do kosza,
 - **Sortownia** — automatyczna sortownia: wkładanie worków (1, 10, wszystko), postęp, posegregowane przedmioty z „Wyjmij”, szanse na surowce,
@@ -98,7 +105,7 @@ U otwiera garaż, jak w grze 2D (tam to osobne pomieszczenie):
 - **Garderoba** — komplety ubrań (zapisz to, co masz na sobie; załóż jednym kliknięciem), ubrania w szafie i wieszanie z plecaka,
 - **Meble** — garaż z góry z meblami, stawianie mebli z plecaka w pierwszym wolnym miejscu i chowanie ich do plecaka.
 
-Do testów: `FWGarage 0..4`, `FWGarageSort`, `FWGaragePlace furniture_wardrobe`, `FWGarageSorter 5`, `FWGarageOutfit 1 1`, `FWGarageHang clothes_beanie`.
+Do testów: `FWGarageRoom` (wejście i wyjście), `FWGarageStand x y yaw pitch` (stań w garażu), `FWGarage 0..4`, `FWGarageSort`, `FWGaragePlace furniture_wardrobe`, `FWGarageSorter 5`, `FWGarageOutfit 1 1`, `FWGarageHang clothes_beanie`.
 
 ## Gra na działce (demo)
 

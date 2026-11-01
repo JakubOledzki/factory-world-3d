@@ -19,6 +19,7 @@
 #include "Game/FWCatalog.h"
 #include "Game/FWGameSettings.h"
 #include "UI/SFWGarageWindow.h"
+#include "World/FWGarageRoom.h"
 #include "Net/FWNetSubsystem.h"
 #include "UI/SFWHud.h"
 #include "AudioMixerBlueprintLibrary.h"
@@ -1687,6 +1688,137 @@ void AFWPlayerController::FWGarageHang(const FString& Item)
 	}
 }
 
+void AFWPlayerController::ToggleGarageRoom()
+{
+	APawn* Walker = GetPawn();
+	if (!Walker || !Plot)
+	{
+		return;
+	}
+	CloseWindow();
+	if (bInGarage)
+	{
+		// Out of the door, back where the player stood on the plot
+		bInGarage = false;
+		Walker->SetActorLocation(PlotSpot.GetLocation(), false, nullptr, ETeleportType::TeleportPhysics);
+		SetControlRotation(PlotSpot.Rotator());
+		return;
+	}
+	if (!GarageRoom)
+	{
+		// High above the plot, out of sight of it and of its mountains
+		GarageRoom = GetWorld()->SpawnActor<AFWGarageRoom>(Plot->GetActorLocation() + FVector(0.f, 0.f, 500000.f), FRotator::ZeroRotator);
+	}
+	PlotSpot = FTransform(GetControlRotation(), Walker->GetActorLocation());
+	bInGarage = true;
+	NextGaragePoll = 0.0;
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Send(TEXT("garage.get"), nullptr, [WeakThis](const FFWNetReply& Reply)
+	{
+		AFWPlayerController* This = WeakThis.Get();
+		if (!This || !This->bInGarage || !This->GarageRoom || !This->GetPawn())
+		{
+			return;
+		}
+		if (Reply.Type != TEXT("garage"))
+		{
+			This->ToastError(Reply);
+			return;
+		}
+		This->GarageRoom->Build(Reply.Payload);
+		const FTransform Entrance = This->GarageRoom->Entrance();
+		This->GetPawn()->SetActorLocation(Entrance.GetLocation(), false, nullptr, ETeleportType::TeleportPhysics);
+		This->SetControlRotation(Entrance.Rotator());
+		This->Toast(LOCTEXT("InGarage", "Garaż: E przy koszu, sortowni, szafie i tablicy ulepszeń; brama albo U wychodzi"));
+	});
+}
+
+void AFWPlayerController::PollGarageRoom()
+{
+	NextGaragePoll = FPlatformTime::Seconds() + 4.0;
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Send(TEXT("garage.get"), nullptr, [WeakThis](const FFWNetReply& Reply)
+	{
+		AFWPlayerController* This = WeakThis.Get();
+		if (This && This->bInGarage && This->GarageRoom && Reply.Type == TEXT("garage"))
+		{
+			This->GarageRoom->Build(Reply.Payload);
+		}
+	});
+}
+
+bool AFWPlayerController::GarageTarget(FString& OutKind, FString& OutId) const
+{
+	if (!bInGarage || !GarageRoom || !PlayerCameraManager)
+	{
+		return false;
+	}
+	const FVector Eye = PlayerCameraManager->GetCameraLocation();
+	return GarageRoom->Pick(Eye, Eye + PlayerCameraManager->GetCameraRotation().Vector() * 260.f, GetPawn(), OutKind, OutId);
+}
+
+FText AFWPlayerController::GarageHint() const
+{
+	FString Kind, Id;
+	if (!GarageTarget(Kind, Id))
+	{
+		return FText::GetEmpty();
+	}
+	if (Kind == TEXT("door"))
+	{
+		return LOCTEXT("HintDoor", "Brama  [E] wyjdź na działkę");
+	}
+	if (Kind == TEXT("board"))
+	{
+		return LOCTEXT("HintBoard", "Tablica  [E] ulepszenia garażu");
+	}
+	const FText Name = FText::FromString(GarageRoom->NameOf(Kind));
+	static const TMap<FString, FText> Uses = {
+		{ TEXT("furniture_trash_bin"), LOCTEXT("UseBin", "segreguj śmieci") }, { TEXT("furniture_sorting_machine"), LOCTEXT("UseSorter", "sortownia") },
+		{ TEXT("furniture_wardrobe"), LOCTEXT("UseWardrobe", "garderoba") }, { TEXT("furniture_workbench"), LOCTEXT("UseBench", "wytwarzaj") },
+		{ TEXT("furniture_anvil"), LOCTEXT("UseAnvil", "wytwarzaj") }, { TEXT("furniture_furnace"), LOCTEXT("UseFurnace", "wytapiaj") } };
+	const FText* Use = Uses.Find(Kind);
+	return Use ? FText::Format(LOCTEXT("HintUse", "{0}  [E] {1}"), Name, *Use) : FText::Format(LOCTEXT("HintFurniture", "{0}  [E] meble garażu"), Name);
+}
+
+void AFWPlayerController::GarageInteract()
+{
+	FString Kind, Id;
+	if (!GarageTarget(Kind, Id))
+	{
+		return;
+	}
+	if (Kind == TEXT("door"))
+	{
+		ToggleGarageRoom();
+		return;
+	}
+	if (FWCatalog::StationOf(Kind) >= 0)
+	{
+		// The workbench, anvil and furnace work as on the plot
+		OpenStation(Id, Kind);
+		return;
+	}
+	const int32 Tab = Kind == TEXT("board") ? 2 : Kind == TEXT("furniture_trash_bin") ? 0 : Kind == TEXT("furniture_sorting_machine") ? 1
+		: Kind == TEXT("furniture_wardrobe") ? 3 : 4;
+	OpenGarage();
+	GarageWindow->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWGarageRoom()
+{
+	ToggleGarageRoom();
+}
+
+void AFWPlayerController::FWGarageStand(float X, float Y, float Yaw, float Pitch)
+{
+	if (bInGarage && GarageRoom && GetPawn())
+	{
+		GetPawn()->SetActorLocation(GarageRoom->GetActorTransform().TransformPosition(FVector(X, Y, 100.f)), false, nullptr, ETeleportType::TeleportPhysics);
+		SetControlRotation(FRotator(Pitch, Yaw, 0.f));
+	}
+}
+
 void AFWPlayerController::FWChestNearest()
 {
 	if (!Plot || !GetPawn())
@@ -2330,6 +2462,11 @@ void AFWPlayerController::Tick(float DeltaSeconds)
 		Growth->Init(this, Plot);
 	}
 	UpdateAmbience(DeltaSeconds);
+	// The garage room follows what the garage window changes (furniture, upgrades)
+	if (bInGarage && Now >= NextGaragePoll)
+	{
+		PollGarageRoom();
+	}
 	if (!StationId.IsEmpty() && Now >= NextStationPoll)
 	{
 		PollStation();
