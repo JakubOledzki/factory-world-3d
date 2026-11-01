@@ -4,6 +4,10 @@ Trójwymiarowy klient gry [Factory World](https://github.com/JakubOledzki/factor
 
 Cała logika gry działa na serwerze Factory World (C#/.NET, PostgreSQL), tym samym, z którego korzysta wersja 2D. Ten projekt jest tylko nowym klientem: łączy się z serwerem przez WebSocket i mówi tym samym protokołem JSON (opis w README repozytorium `factory-world`, sekcja „Protokół”).
 
+## Pociągi
+
+Pociągi przyjeżdżają na stację działki i z niej odjeżdżają, jak w grze 2D: pociąg z towarem dla działki wtacza się ze wschodu, hamuje przy peronie, stoi chwilę przy rozładunku i odjeżdża na zachód; pociąg wysłany z działki stoi przy peronie, gdy go ładują, i rusza na zachód. Im większy ładunek, tym więcej wagonów (do pięciu, krytych i odkrytych z towarem). Gra bierze rozkład ze stacji (`station.get`). Modele lokomotywy spalinowej i wagonów robi `Tools/blender/make_trains.py`. Do testów: `FWTrain sekundy ilość` zapowiada pociąg.
+
 ## Wymagania
 
 - Unreal Engine **5.8** (Epic Games Launcher)
