@@ -1015,12 +1015,12 @@ bool AFWPlot::DrawArtObject(FFWPlotObject& Object)
 	}
 	if (Kind == TEXT("power_solar_panel"))
 	{
-		UStaticMesh* Panel = FWArt::Factory(TEXT("solar_panel"));
-		if (!Panel)
+		UStaticMesh* SolarPanel = FWArt::Factory(TEXT("solar_panel"));
+		if (!SolarPanel)
 		{
 			return false;
 		}
-		Place(Panel, FVector::ZeroVector, FRotator::ZeroRotator, 1.25f, true);
+		Place(SolarPanel, FVector::ZeroVector, FRotator::ZeroRotator, 1.25f, true);
 		return true;
 	}
 	if (Kind == TEXT("power_wind_turbine") || Kind == TEXT("power_large_wind_turbine"))

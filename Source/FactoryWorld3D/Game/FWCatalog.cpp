@@ -57,6 +57,15 @@ namespace FWCatalog
 			|| Kind == TEXT("logistics_splitter") || Kind == TEXT("logistics_underground_belt");
 	}
 
+	int32 StationOf(const FString& Kind)
+	{
+		static const TSet<FString> Crafting = { TEXT("furniture_workbench"), TEXT("furniture_anvil"), TEXT("furniture_shipyard"), TEXT("furniture_tailor") };
+		static const TSet<FString> Furnaces = { TEXT("furniture_furnace"), TEXT("furniture_brick_furnace"), TEXT("furniture_blast_furnace") };
+		// The same list as the 2D client's plot.gd (MACHINES)
+		static const TSet<FString> Machines = { TEXT("furniture_mill"), TEXT("furniture_oil_press"), TEXT("furniture_pickling_barrel"), TEXT("furniture_bakery"), TEXT("furniture_kitchen"),TEXT("furniture_sawmill"), TEXT("furniture_electric_sawmill"), TEXT("furniture_industrial_sawmill"),TEXT("furniture_assembler"), TEXT("furniture_fast_assembler"), TEXT("furniture_express_assembler"),TEXT("furniture_quarry"), TEXT("furniture_crusher"), TEXT("furniture_stonemason"), TEXT("furniture_foundry"),TEXT("furniture_roller_mill"), TEXT("furniture_flour_works"), TEXT("furniture_mechanized_quarry"), TEXT("furniture_open_pit_mine"),TEXT("furniture_cone_crusher"), TEXT("furniture_ore_processing_plant"),TEXT("furniture_fishing_boat"), TEXT("furniture_rowing_boat"), TEXT("furniture_smokehouse"), TEXT("furniture_cannery"), TEXT("furniture_salt_pan"),TEXT("furniture_fish_farm"), TEXT("furniture_distillery"), TEXT("furniture_refinery"), TEXT("furniture_cracker"), TEXT("furniture_chemical_plant"),TEXT("furniture_glassworks"), TEXT("furniture_arc_furnace"), TEXT("furniture_water_well"), TEXT("furniture_desalinator"), TEXT("furniture_drying_yard"),TEXT("furniture_cement_kiln"), TEXT("furniture_concrete_mixer"), TEXT("furniture_ice_melter"), TEXT("furniture_cold_store"), TEXT("furniture_server_room"),TEXT("furniture_ice_core_drill"), TEXT("furniture_polar_station"), TEXT("furniture_ice_hotel"), TEXT("furniture_viewpoint"),TEXT("furniture_assembly_hall"), TEXT("furniture_multistorey_factory"), TEXT("furniture_city_sorter"), TEXT("furniture_design_office"),TEXT("furniture_laboratory"), TEXT("furniture_service_workshop"), TEXT("furniture_paper_mill"), TEXT("furniture_carpentry"), TEXT("furniture_charcoal_kiln"),TEXT("furniture_tar_kiln"), TEXT("furniture_machine_shop"), TEXT("furniture_robotic_hall"), TEXT("furniture_oxygen_converter"), TEXT("furniture_rolling_mill"),TEXT("furniture_continuous_caster"), TEXT("furniture_steel_combine"), TEXT("furniture_megafactory"),TEXT("furniture_slaughterhouse"), TEXT("furniture_dairy"), TEXT("furniture_potato_distillery"), TEXT("furniture_biogas_plant"),TEXT("furniture_coke_oven"), TEXT("furniture_jeweler"), TEXT("furniture_spinning_mill"), TEXT("furniture_loom"), TEXT("furniture_sugar_factory"), TEXT("furniture_electrolyzer") };
+		return Crafting.Contains(Kind) ? 0 : Furnaces.Contains(Kind) ? 1 : Machines.Contains(Kind) ? 2 : -1;
+	}
+
 	bool IsInserter(const FString& Kind)
 	{
 		return Kind.StartsWith(TEXT("logistics_")) && Kind.EndsWith(TEXT("inserter"));

@@ -674,6 +674,10 @@ void AFWCharacter::InteractStart()
 	{
 		PC->OpenInventory(Object->Id);
 	}
+	else if (const FFWPlotObject* Station = Plot->FindObjectAt(TargetTile); Station && FWCatalog::StationOf(Station->Kind) >= 0)
+	{
+		PC->OpenStation(Station->Id, Station->Kind);
+	}
 }
 
 void AFWCharacter::InteractStop()

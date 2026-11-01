@@ -28,6 +28,8 @@ namespace FWCatalog
 
 	bool IsBelt(const FString& Kind);
 	bool IsInserter(const FString& Kind);
+	// Work places with a window: 0 workbench (crafting), 1 furnace, 2 processing machine, -1 none
+	int32 StationOf(const FString& Kind);
 	bool IsStorage(const FString& Kind);
 	// Places a tick an item moves on a belt of this kind.
 	int32 BeltSpeed(const FString& Kind);
