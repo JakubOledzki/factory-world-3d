@@ -518,13 +518,14 @@ float2 f = q - cell;
 // Two samplings of each texture, at different scales and offsets, mixed by slow noise: no regular repeat to the eye
 float2 tile = plot / Repeat;
 float2 tile2 = plot / (Repeat * 1.618) + float2(0.37, 0.71);
-float2 tileUv = frac(tile);
-float2 tileUv2 = frac(tile2);
+// Kept a few texels inside each tile of the atlas, so filtering never bleeds in the neighbouring biome
+float2 tileUv = lerp(0.004, 0.996, frac(tile));
+float2 tileUv2 = lerp(0.004, 0.996, frac(tile2));
 float2 gx = ddx(tile) * 0.25;
 float2 gy = ddy(tile) * 0.25;
 float2 gx2 = ddx(tile2) * 0.25;
 float2 gy2 = ddy(tile2) * 0.25;
-float m = saturate(0.5 + 0.9 * (sin(plot.x * 0.41 + sin(plot.y * 0.27) * 2.1) * cos(plot.y * 0.37 + sin(plot.x * 0.23) * 1.9)));
+float m = smoothstep(0.42, 0.58, 0.5 + 0.9 * (sin(plot.x * 0.41 + sin(plot.y * 0.27) * 2.1) * cos(plot.y * 0.37 + sin(plot.x * 0.23) * 1.9)));
 float3 sum = 0;
 float total = 0;
 float best = -1;

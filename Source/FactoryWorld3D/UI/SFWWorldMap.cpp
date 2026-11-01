@@ -279,14 +279,14 @@ int32 SFWWorldMap::OnPaint(const FPaintArgs& Args, const FGeometry& Geometry, co
 		Stops.Add(FSlateGradientStop(FVector2D(0.f, ViewSize.Y), FLinearColor::FromSRGBColor(FColor(168, 196, 222))));
 		FSlateDrawElement::MakeGradient(Out, LayerId, Geometry.ToPaintGeometry(), Stops, Orient_Horizontal);
 	}
-	auto Clouds = [&](int32 Layer, float TileSize, FVector2D Offset, float Alpha)
+	auto Clouds = [&](int32 Layer, float CloudTile, FVector2D Offset, float Alpha)
 	{
 		if (!CloudBrush.IsValid() || Alpha <= 0.01f)
 		{
 			return;
 		}
 		// The texture is twice as wide as high and repeats seamlessly: laid side by side over the view
-		const FVector2D Size(TileSize * 2.f, TileSize);
+		const FVector2D Size(CloudTile * 2.f, CloudTile);
 		const FVector2D Start(FMath::Fmod(FMath::Fmod(Offset.X, Size.X) - Size.X, Size.X), FMath::Fmod(FMath::Fmod(Offset.Y, Size.Y) - Size.Y, Size.Y));
 		for (double Y = Start.Y - Size.Y; Y < ViewSize.Y; Y += Size.Y)
 		{
