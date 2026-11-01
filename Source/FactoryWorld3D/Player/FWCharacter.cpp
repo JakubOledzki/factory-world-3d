@@ -561,6 +561,8 @@ void AFWCharacter::CreateInput()
 	Mapping->MapKey(MakeAction(TEXT("Inventory"), EInputActionValueType::Boolean), EKeys::Tab);
 	Mapping->MapKey(Actions[TEXT("Inventory")], EKeys::I);
 	Mapping->MapKey(MakeAction(TEXT("Menu"), EInputActionValueType::Boolean), EKeys::Escape);
+	Mapping->MapKey(MakeAction(TEXT("Contracts"), EInputActionValueType::Boolean), EKeys::J);
+	Mapping->MapKey(MakeAction(TEXT("Stats"), EInputActionValueType::Boolean), EKeys::L);
 	// The mouse wheel steps through the hotbar
 	Mapping->MapKey(MakeAction(TEXT("Scroll"), EInputActionValueType::Axis1D), EKeys::MouseWheelAxis);
 	const FKey SlotKeys[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five };
@@ -615,6 +617,20 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		if (AFWPlayerController* PC = GetFWController())
 		{
 			PC->OpenSettings();
+		}
+	});
+	Input->BindActionValueLambda(Actions[TEXT("Contracts")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenContracts();
+		}
+	});
+	Input->BindActionValueLambda(Actions[TEXT("Stats")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenStats();
 		}
 	});
 	for (int32 Slot = 0; Slot < 5; ++Slot)
@@ -677,6 +693,10 @@ void AFWCharacter::InteractStart()
 	else if (const FFWPlotObject* Computer = Plot->FindObjectAt(TargetTile); Computer && Computer->Kind == TEXT("furniture_computer"))
 	{
 		PC->OpenMarket();
+	}
+	else if (const FFWPlotObject* Table = Plot->FindObjectAt(TargetTile); Table && Table->Kind == TEXT("furniture_research_table"))
+	{
+		PC->OpenResearch();
 	}
 	else if (const FFWPlotObject* Station = Plot->FindObjectAt(TargetTile); Station && FWCatalog::StationOf(Station->Kind) >= 0)
 	{

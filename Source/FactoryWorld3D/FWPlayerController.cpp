@@ -26,6 +26,9 @@
 #include "UI/SFWSettingsWindow.h"
 #include "UI/SFWMarketWindow.h"
 #include "UI/SFWStationWindow.h"
+#include "UI/SFWContractsWindow.h"
+#include "UI/SFWResearchWindow.h"
+#include "UI/SFWStatsWindow.h"
 #include "Engine/Texture2D.h"
 #include "Camera/CameraComponent.h"
 #include "UI/SFWLoginWidget.h"
@@ -672,6 +675,7 @@ const FSlateBrush* AFWPlayerController::GetIconBrush(const FString& Item)
 		Brush = MakeShared<FSlateBrush>();
 		Brush->SetResourceObject(Texture);
 		Brush->ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
+		IconTextures.Add(Texture);
 	}
 	IconBrushes.Add(Item, Brush);
 	return Brush.Get();
@@ -911,6 +915,10 @@ void AFWPlayerController::FWOpenNearest(const FString& Kind)
 	{
 		OpenMarket();
 	}
+	else if (Kind == TEXT("furniture_research_table"))
+	{
+		OpenResearch();
+	}
 	else if (FWCatalog::IsStorage(Kind))
 	{
 		OpenInventory(Nearest->Id);
@@ -926,6 +934,88 @@ void AFWPlayerController::OpenMarket()
 	SAssignNew(Market, SFWMarketWindow).Controller(this);
 	ShowWidget(Market.ToSharedRef(), Market);
 	RefreshWallet();
+}
+
+void AFWPlayerController::OpenResearch()
+{
+	SAssignNew(Research, SFWResearchWindow).Controller(this);
+	ShowWidget(Research.ToSharedRef(), Research);
+}
+
+void AFWPlayerController::OpenContracts()
+{
+	SAssignNew(Contracts, SFWContractsWindow).Controller(this);
+	ShowWidget(Contracts.ToSharedRef(), Contracts);
+	RefreshWallet();
+}
+
+void AFWPlayerController::OpenStats()
+{
+	SAssignNew(Stats, SFWStatsWindow).Controller(this);
+	ShowWidget(Stats.ToSharedRef(), Stats);
+}
+
+void AFWPlayerController::FWResearchPick(const FString& Technology)
+{
+	if (Research.IsValid())
+	{
+		Research->Choose(Technology);
+	}
+}
+
+void AFWPlayerController::FWResearchStart()
+{
+	if (Research.IsValid())
+	{
+		Research->Start();
+	}
+}
+
+void AFWPlayerController::FWContracts(int32 Tab)
+{
+	if (!Contracts.IsValid())
+	{
+		OpenContracts();
+	}
+	Contracts->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWContractFirst(const FString& Action, const FString& List, int32 Quantity)
+{
+	const int64 Id = Contracts.IsValid() ? Contracts->FirstId(*List) : 0;
+	if (Id == 0)
+	{
+		UE_LOG(LogFWGame, Warning, TEXT("No contract on %s"), *List);
+		return;
+	}
+	TSharedPtr<FJsonObject> P = Payload();
+	P->SetNumberField(TEXT("id"), double(Id));
+	if (Action == TEXT("deliver"))
+	{
+		P->SetNumberField(TEXT("quantity"), Quantity);
+	}
+	Contracts->Act(*(TEXT("contracts.") + Action), P);
+}
+
+void AFWPlayerController::FWContractCreate(const FString& Item, int32 Quantity, float RewardDollars, int32 Hours)
+{
+	if (Contracts.IsValid())
+	{
+		Contracts->Create(Item, Quantity, RewardDollars * 100.0, Hours);
+	}
+}
+
+void AFWPlayerController::FWStats(int32 Minutes, const FString& Item)
+{
+	if (!Stats.IsValid())
+	{
+		OpenStats();
+	}
+	Stats->SetPeriod(Minutes);
+	if (!Item.IsEmpty())
+	{
+		Stats->SelectItem(Item);
+	}
 }
 
 void AFWPlayerController::Send(const TCHAR* Type, TSharedPtr<FJsonObject> P, TFunction<void(const FFWNetReply&)> OnReply)

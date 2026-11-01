@@ -7,6 +7,9 @@
 
 class AFWCharacterStudio;
 class SFWMarketWindow;
+class SFWResearchWindow;
+class SFWContractsWindow;
+class SFWStatsWindow;
 class UTexture2D;
 class UAudioComponent;
 class AFWPlot;
@@ -88,6 +91,11 @@ public:
 	void StorageTransferAll(bool bPut);
 	// The market, at the plot's computer
 	void OpenMarket();
+	// The research table (E at it), contracts (J) and production statistics (L), as in the 2D game
+	void OpenResearch();
+	void OpenContracts();
+	void OpenStats();
+	void RefreshWallet();
 	// A request to the server for the windows; replies go to the callback
 	void Send(const TCHAR* Type, TSharedPtr<FJsonObject> Payload, TFunction<void(const FFWNetReply&)> OnReply);
 	void SetBalanceCents(int64 Cents) { BalanceCents = Cents; }
@@ -177,6 +185,22 @@ public:
 	// Market for tests: open it, pick a tab (0-2), an item's board, trade with the NPC trader (1 buy / 0 sell)
 	UFUNCTION(Exec)
 	void FWMarket() { OpenMarket(); }
+	// Research, contracts and statistics for tests: open them; pick a technology and start it; a contracts tab, an
+	// action on the first order of a list (deliver/accept/abandon/cancel), a new order; a statistics period and item
+	UFUNCTION(Exec)
+	void FWResearch() { OpenResearch(); }
+	UFUNCTION(Exec)
+	void FWResearchPick(const FString& Technology);
+	UFUNCTION(Exec)
+	void FWResearchStart();
+	UFUNCTION(Exec)
+	void FWContracts(int32 Tab = 0);
+	UFUNCTION(Exec)
+	void FWContractFirst(const FString& Action, const FString& List, int32 Quantity = 1);
+	UFUNCTION(Exec)
+	void FWContractCreate(const FString& Item, int32 Quantity, float RewardDollars, int32 Hours);
+	UFUNCTION(Exec)
+	void FWStats(int32 Minutes = 10, const FString& Item = TEXT(""));
 	UFUNCTION(Exec)
 	void FWMarketTab(int32 Tab);
 	UFUNCTION(Exec)
@@ -225,7 +249,6 @@ private:
 	void ChoosePlot();
 	void OfferStarterPlot(int32 Radius, int32 Index);
 	void EnterPlot(int32 X, int32 Y);
-	void RefreshWallet();
 	void PollLogistics();
 	void ApplyHotbar(const TSharedPtr<FJsonObject>& Payload);
 	void ApplyInventory(const TSharedPtr<FJsonObject>& Payload);
@@ -254,6 +277,9 @@ private:
 	double WalkUntil = 0.0;
 
 	TSharedPtr<SFWMarketWindow> Market;
+	TSharedPtr<SFWResearchWindow> Research;
+	TSharedPtr<SFWContractsWindow> Contracts;
+	TSharedPtr<SFWStatsWindow> Stats;
 	TSharedPtr<SFWLoginWidget> LoginWidget;
 	TSharedPtr<SFWPromptWidget> Prompt;
 	TSharedPtr<SWidget> ShownWidget;
@@ -273,6 +299,9 @@ private:
 	void ApplyStation(const FFWNetReply& Reply);
 	void PollStation();
 	TMap<FString, TSharedPtr<FSlateBrush>> IconBrushes;
+	// The textures of those brushes: Slate does not keep them from the garbage collector
+	UPROPERTY()
+	TArray<TObjectPtr<UTexture2D>> IconTextures;
 	TMap<FString, FString> Names;
 	TArray<FString> Hotbar;
 	int32 SelectedSlot = 0;

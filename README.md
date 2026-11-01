@@ -178,6 +178,16 @@ Wszystkie dźwięki (49) są syntezowane przez nasz skrypt `Tools/make_audio.py`
 
 Do testów: `FWRecordStart <s>` i `FWRecordStop <nazwa>` nagrywają to, co gra gra, do `Saved/BouncedWavFiles`, a `FWWalk <s>` idzie prosto. Gra w tle jest wyciszona (domyślnie w Unrealu), więc do nagrań bez fokusu uruchom ją z `-ini:Engine:[Audio]:UnfocusedVolumeMultiplier=1.0`.
 
+## Badania, zlecenia i statystyki
+
+Jak w grze 2D:
+
+- **Stół badawczy** (E przy stole `furniture_research_table`): drzewko technologii osobno dla każdej gałęzi (zakładki u góry, z postępem). Karty stoją w kolumnach etapów, połączone krzywymi z tym, czego wymagają; wymagania z innych gałęzi to małe ikony na karcie. Po prawej opis, co odblokowuje, koszt (wymagane/masz), czas i XP, przyciski **Zbadaj** / **Przerwij badanie** i przyspieszanie danymi badawczymi (`research.get/start/cancel/boost`). Badania spółki: dokładanie przedmiotów i pieniędzy (`research.companyStart/contribute/companyCancel`).
+- **Zlecenia** (J): zlecenia firm i przyjęte zlecenia graczy z dostarczaniem z ekwipunku i rezygnacją, tablica zleceń innych graczy, własne zlecenia z formularzem i odwoływaniem (`contracts.get/deliver/abandon/accept/create/cancel`).
+- **Statystyki produkcji** (L): okres 10 min / 1 h / 24 h, wąskie gardła (maszyny stojące i czego im brak, kończące się zapasy), praca maszyn, wykres produkcji i zużycia wybranego przedmiotu oraz tabela na minutę (`stats.production`, co 5 s).
+
+Do testów: `FWResearch`, `FWResearchPick <id>`, `FWResearchStart`, `FWContracts <0–2>`, `FWContractFirst <deliver/accept/abandon/cancel> <npc/taken/board/issued> [ile]`, `FWContractCreate <przedmiot> <ile> <nagroda $> <godziny>`, `FWStats <minuty> [przedmiot]`.
+
 ## Automatyczne logowanie (tylko do testów)
 
 Żeby gra od razu wchodziła na działkę, bez ekranu logowania, utwórz plik `Saved/DevLogin.ini`:
