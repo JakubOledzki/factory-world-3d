@@ -558,11 +558,11 @@ void AFWCharacter::CreateInput()
 	Mapping->MapKey(MakeAction(TEXT("Primary"), EInputActionValueType::Boolean), EKeys::LeftMouseButton);
 	Mapping->MapKey(MakeAction(TEXT("Build"), EInputActionValueType::Boolean), EKeys::B);
 	Mapping->MapKey(MakeAction(TEXT("Rotate"), EInputActionValueType::Boolean), EKeys::R);
+	Mapping->MapKey(MakeAction(TEXT("Contracts"), EInputActionValueType::Boolean), EKeys::J);
+	Mapping->MapKey(MakeAction(TEXT("Stats"), EInputActionValueType::Boolean), EKeys::L);
 	Mapping->MapKey(MakeAction(TEXT("Inventory"), EInputActionValueType::Boolean), EKeys::Tab);
 	Mapping->MapKey(Actions[TEXT("Inventory")], EKeys::I);
 	Mapping->MapKey(MakeAction(TEXT("Menu"), EInputActionValueType::Boolean), EKeys::Escape);
-	Mapping->MapKey(MakeAction(TEXT("Contracts"), EInputActionValueType::Boolean), EKeys::J);
-	Mapping->MapKey(MakeAction(TEXT("Stats"), EInputActionValueType::Boolean), EKeys::L);
 	// The mouse wheel steps through the hotbar
 	Mapping->MapKey(MakeAction(TEXT("Scroll"), EInputActionValueType::Axis1D), EKeys::MouseWheelAxis);
 	const FKey SlotKeys[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five };
@@ -605,20 +605,6 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	Input->BindAction(Actions[TEXT("Build")], ETriggerEvent::Started, this, &AFWCharacter::ToggleBuild);
 	Input->BindAction(Actions[TEXT("Rotate")], ETriggerEvent::Started, this, &AFWCharacter::Rotate);
 	Input->BindAction(Actions[TEXT("Scroll")], ETriggerEvent::Started, this, &AFWCharacter::Scroll);
-	Input->BindActionValueLambda(Actions[TEXT("Inventory")], ETriggerEvent::Started, [this](const FInputActionValue&)
-	{
-		if (AFWPlayerController* PC = GetFWController())
-		{
-			PC->OpenInventory();
-		}
-	});
-	Input->BindActionValueLambda(Actions[TEXT("Menu")], ETriggerEvent::Started, [this](const FInputActionValue&)
-	{
-		if (AFWPlayerController* PC = GetFWController())
-		{
-			PC->OpenSettings();
-		}
-	});
 	Input->BindActionValueLambda(Actions[TEXT("Contracts")], ETriggerEvent::Started, [this](const FInputActionValue&)
 	{
 		if (AFWPlayerController* PC = GetFWController())
@@ -631,6 +617,20 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		if (AFWPlayerController* PC = GetFWController())
 		{
 			PC->OpenStats();
+		}
+	});
+	Input->BindActionValueLambda(Actions[TEXT("Inventory")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenInventory();
+		}
+	});
+	Input->BindActionValueLambda(Actions[TEXT("Menu")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenSettings();
 		}
 	});
 	for (int32 Slot = 0; Slot < 5; ++Slot)
