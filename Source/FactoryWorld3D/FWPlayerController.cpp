@@ -34,6 +34,9 @@
 #include "UI/SFWPromptWidget.h"
 #include "World/FWEnvironment.h"
 #include "World/FWPlot.h"
+#include "UI/SFWAchievementsWindow.h"
+#include "UI/SFWBadgeToast.h"
+#include "UI/SFWChat.h"
 
 #define LOCTEXT_NAMESPACE "FWGame"
 
@@ -561,6 +564,14 @@ void AFWPlayerController::EnterPlot(int32 X, int32 Y)
 			SAssignNew(This->Hud, SFWHud).Controller(This);
 			World->GetGameViewport()->AddViewportWidgetContent(This->Hud.ToSharedRef(), 10);
 		}
+		// The chat in the corner and the badge cards over everything, made once
+		if (!This->Chat.IsValid())
+		{
+			SAssignNew(This->Chat, SFWChat).Controller(This);
+			World->GetGameViewport()->AddViewportWidgetContent(This->Chat.ToSharedRef(), 20);
+			SAssignNew(This->BadgeToast, SFWBadgeToast).Controller(This);
+			World->GetGameViewport()->AddViewportWidgetContent(This->BadgeToast.ToSharedRef(), 200);
+		}
 		// The player's own settings from the last time
 		This->ApplyUserSettings(FFWUserSettings::Load());
 		This->Toast(FText::Format(LOCTEXT("Welcome", "Działka {0}:{1}"),
@@ -980,7 +991,83 @@ void AFWPlayerController::CloseWindow()
 		FWAudio::Play2D(this, TEXT("chest_close"), 0.6f);
 		Storage = FFWStorageView();
 	}
+	if (Chat.IsValid() && Chat->IsOpen())
+	{
+		Chat->SetOpen(false);
+	}
 	HideWidget();
+}
+
+void AFWPlayerController::OpenChat()
+{
+	if (!Chat.IsValid())
+	{
+		return;
+	}
+	if (ShownWidget.IsValid())
+	{
+		CloseWindow();
+	}
+	Chat->SetOpen(true);
+	FInputModeUIOnly InputMode;
+	InputMode.SetWidgetToFocus(Chat->GetInput());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+	SetShowMouseCursor(true);
+}
+
+void AFWPlayerController::CloseChat()
+{
+	if (Chat.IsValid())
+	{
+		Chat->SetOpen(false);
+	}
+	SetInputMode(FInputModeGameOnly());
+	SetShowMouseCursor(false);
+}
+
+void AFWPlayerController::OpenAchievements()
+{
+	SAssignNew(Achievements, SFWAchievementsWindow).Controller(this);
+	ShowWidget(Achievements.ToSharedRef(), Achievements);
+}
+
+void AFWPlayerController::FWSay(const FString& InChannel, const FString& Text)
+{
+	if (Chat.IsValid())
+	{
+		Chat->SetChannel(InChannel);
+		Chat->Say(Text);
+	}
+}
+
+void AFWPlayerController::FWAchievements(int32 Tab)
+{
+	if (!Achievements.IsValid())
+	{
+		OpenAchievements();
+	}
+	Achievements->ShowTab(Tab);
+}
+
+void AFWPlayerController::FWRanking(const FString& Ranking)
+{
+	if (!Achievements.IsValid())
+	{
+		OpenAchievements();
+	}
+	Achievements->ShowRanking(Ranking);
+}
+
+void AFWPlayerController::FWBadgeTest(const FString& Name)
+{
+	if (BadgeToast.IsValid())
+	{
+		TSharedPtr<FJsonObject> Badge = MakeShared<FJsonObject>();
+		Badge->SetStringField(TEXT("name"), Name);
+		Badge->SetStringField(TEXT("description"), TEXT("Przykładowa odznaka do sprawdzenia karty"));
+		BadgeToast->Show(Badge);
+	}
 }
 
 void AFWPlayerController::ApplyUserSettings(const FFWUserSettings& Settings)

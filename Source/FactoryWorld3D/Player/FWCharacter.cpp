@@ -552,6 +552,8 @@ void AFWCharacter::CreateInput()
 	}
 	Mapping->MapKey(MakeAction(TEXT("Look"), EInputActionValueType::Axis2D), EKeys::Mouse2D);
 	Mapping->MapKey(MakeAction(TEXT("Jump"), EInputActionValueType::Boolean), EKeys::SpaceBar);
+	Mapping->MapKey(MakeAction(TEXT("Chat"), EInputActionValueType::Boolean), EKeys::Enter);
+	Mapping->MapKey(MakeAction(TEXT("Achievements"), EInputActionValueType::Boolean), EKeys::O);
 	Mapping->MapKey(MakeAction(TEXT("Sprint"), EInputActionValueType::Boolean), EKeys::LeftShift);
 	Mapping->MapKey(MakeAction(TEXT("Interact"), EInputActionValueType::Boolean), EKeys::E);
 	Mapping->MapKey(MakeAction(TEXT("Pickup"), EInputActionValueType::Boolean), EKeys::RightMouseButton);
@@ -597,6 +599,20 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	Input->BindAction(Actions[TEXT("Sprint")], ETriggerEvent::Completed, this, &AFWCharacter::SprintStop);
 	Input->BindAction(Actions[TEXT("Interact")], ETriggerEvent::Started, this, &AFWCharacter::InteractStart);
 	Input->BindAction(Actions[TEXT("Interact")], ETriggerEvent::Completed, this, &AFWCharacter::InteractStop);
+	Input->BindActionValueLambda(Actions[TEXT("Chat")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenChat();
+		}
+	});
+	Input->BindActionValueLambda(Actions[TEXT("Achievements")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		if (AFWPlayerController* PC = GetFWController())
+		{
+			PC->OpenAchievements();
+		}
+	});
 	Input->BindAction(Actions[TEXT("Pickup")], ETriggerEvent::Started, this, &AFWCharacter::PickupStart);
 	Input->BindAction(Actions[TEXT("Pickup")], ETriggerEvent::Completed, this, &AFWCharacter::PickupStop);
 	Input->BindAction(Actions[TEXT("Primary")], ETriggerEvent::Started, this, &AFWCharacter::Primary);
