@@ -275,8 +275,8 @@ TSharedRef<SWidget> SFWStatsWindow::MakeTable()
 			[
 				SNew(STextBlock).Text(Name).Font(FWStyle::Font(11, bHeader ? TEXT("Bold") : TEXT("Regular"))).ColorAndOpacity(NameColor)
 			];
-		const TPair<FText, FLinearColor> Columns[] = { { Made, bHeader ? FWStyle::Muted : FWStatsChart::Made }, { Used, bHeader ? FWStyle::Muted : FWStatsChart::Used }, { Net, NetColor } };
-		for (const TPair<FText, FLinearColor>& Column : Columns)
+		const TPair<FText, FLinearColor> Cells[] = { { Made, bHeader ? FWStyle::Muted : FWStatsChart::Made }, { Used, bHeader ? FWStyle::Muted : FWStatsChart::Used }, { Net, NetColor } };
+		for (const TPair<FText, FLinearColor>& Column : Cells)
 		{
 			Line->AddSlot().AutoWidth().VAlign(VAlign_Center)
 			[

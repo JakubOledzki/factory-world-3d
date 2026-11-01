@@ -462,24 +462,24 @@ TSharedRef<SWidget> SFWResearchWindow::MakeTree()
 		Depth.Add(Id, D);
 		return D;
 	};
-	TArray<TArray<TSharedPtr<FJsonObject>>> Columns;
+	TArray<TArray<TSharedPtr<FJsonObject>>> Stages;
 	for (const TSharedPtr<FJsonObject>& Tech : Members)
 	{
 		const int32 D = DepthOf(FWUi::Str(Tech, TEXT("id")));
-		if (Columns.Num() <= D)
+		if (Stages.Num() <= D)
 		{
-			Columns.SetNum(D + 1);
+			Stages.SetNum(D + 1);
 		}
-		Columns[D].Add(Tech);
+		Stages[D].Add(Tech);
 	}
 	// Each card level with the middle of the cards it needs, as far as the cards above let it
 	TMap<FString, FVector2D> Places;
 	float Bottom = 0.f;
 	TArray<FVector2D> Titles;
-	for (int32 D = 0; D < Columns.Num(); ++D)
+	for (int32 D = 0; D < Stages.Num(); ++D)
 	{
 		TMap<FString, float> Wanted;
-		for (const TSharedPtr<FJsonObject>& Tech : Columns[D])
+		for (const TSharedPtr<FJsonObject>& Tech : Stages[D])
 		{
 			float Sum = 0.f;
 			int32 Parents = 0;
@@ -493,7 +493,7 @@ TSharedRef<SWidget> SFWResearchWindow::MakeTree()
 			}
 			Wanted.Add(FWUi::Str(Tech, TEXT("id")), Parents > 0 ? Sum / Parents : -1.f);
 		}
-		TArray<TSharedPtr<FJsonObject>> Column = Columns[D];
+		TArray<TSharedPtr<FJsonObject>> Column = Stages[D];
 		if (D > 0)
 		{
 			Column.StableSort([&Wanted](const TSharedPtr<FJsonObject>& A, const TSharedPtr<FJsonObject>& B)
@@ -535,7 +535,7 @@ TSharedRef<SWidget> SFWResearchWindow::MakeTree()
 		}
 		Canvas->AddSlot().Position(Places[Id]).Size(CardSize)[MakeCard(Tech, Outside)];
 	}
-	const FVector2D Size(Margin.X * 2 + Columns.Num() * (CardSize.X + Gap.X) - Gap.X, Bottom + Margin.X);
+	const FVector2D Size(Margin.X * 2 + Stages.Num() * (CardSize.X + Gap.X) - Gap.X, Bottom + Margin.X);
 	return SNew(SScrollBox).Orientation(Orient_Horizontal)
 		+ SScrollBox::Slot()
 		[
