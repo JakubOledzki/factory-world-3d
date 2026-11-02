@@ -169,9 +169,10 @@ def scan_material(name, masked):
     lib.connect_material_expressions(color, "RGB", mul, "A")
     lib.connect_material_expressions(tint, "", mul, "B")
     # Grime: the first ~60 cm above the object's base get darker and browner, as dust and mud splash up
-    # (Grime 0 turns it off; rocks and plants keep 0)
+    # (Grime 0 turns it off; rocks and plants keep 0). How much varies smoothly over a few metres; a random value per
+    # 7 cm square, as before, showed as a grid of light and dark squares
     grime_hlsl = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -350, -500)
-    grime_hlsl.set_editor_property("code", "float h = saturate((WP.z - Base.z) / 60.0); float n = frac(sin(dot(floor(WP.xy / 7.0), float2(12.9898, 78.233))) * 43758.5453); float g = (1.0 - h) * (1.0 - h) * Amount * (0.7 + 0.3 * n); return lerp(C, C * float3(0.55, 0.48, 0.4), g);")
+    grime_hlsl.set_editor_property("code", "float h = saturate((WP.z - Base.z) / 60.0); float n = 0.5 + 0.25 * sin(WP.x * 0.031 + 1.7 * sin(WP.y * 0.017)) + 0.25 * sin(WP.y * 0.027 + 1.3 * sin(WP.x * 0.013)); float g = (1.0 - h) * (1.0 - h) * Amount * (0.7 + 0.3 * n); return lerp(C, C * float3(0.55, 0.48, 0.4), g);")
     grime_hlsl.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
     grime_inputs = []
     for name in ("C", "WP", "Base", "Amount"):
@@ -184,10 +185,12 @@ def scan_material(name, masked):
     rust.set_editor_property("parameter_name", "Rust")
     rust.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/DefaultTexture.DefaultTexture"))
     wear_hlsl = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -550, -420)
-    wear_hlsl.set_editor_property("code", "float3 dn = fwidth(N); float dp = max(length(fwidth(WP)), 0.001); float curve = saturate(length(dn) / dp * 25.0 - 0.15); float mask = saturate(curve * (0.6 + noise)) * Wear; return lerp(Paint, Bare, mask);")
+    # The curvature (1 / radius, per cm) marks only tight bevels, under ~3 cm: a whole barrel or gas cylinder counted as
+    # an edge before and showed the bare metal all over. Where along an edge the paint is off is smooth noise.
+    wear_hlsl.set_editor_property("code", "float3 dn = fwidth(N); float dp = max(length(fwidth(WP)), 0.001); float edge = saturate((length(dn) / dp - 0.3) * 4.0); float n = 0.5 + 0.5 * sin(WP.x * 0.9 + 2.0 * sin(WP.y * 0.7 + WP.z * 0.5)); float mask = saturate(edge * (0.35 + 0.65 * n)) * Wear; return lerp(Paint, Bare, mask);")
     wear_hlsl.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
     wear_inputs = []
-    for name in ("Paint", "Bare", "N", "WP", "Wear", "noise"):
+    for name in ("Paint", "Bare", "N", "WP", "Wear"):
         item = unreal.CustomInput()
         item.set_editor_property("input_name", name)
         wear_inputs.append(item)
@@ -199,7 +202,6 @@ def scan_material(name, masked):
     lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionVertexNormalWS, -1100, -500), "", wear_hlsl, "N")
     lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionWorldPosition, -1100, -460), "", wear_hlsl, "WP")
     lib.connect_material_expressions(scalar_param(m, "Wear", 0.0, -1100, -580), "", wear_hlsl, "Wear")
-    lib.connect_material_expressions(rust, "R", wear_hlsl, "noise")
     lib.connect_material_expressions(wear_hlsl, "", grime_hlsl, "C")
     lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionWorldPosition, -700, -700), "", grime_hlsl, "WP")
     lib.connect_material_expressions(lib.create_material_expression(m, unreal.MaterialExpressionObjectPositionWS, -700, -620), "", grime_hlsl, "Base")

@@ -2370,6 +2370,13 @@ void AFWPlayerController::FWDevWorld()
 			This->Toast(LOCTEXT("DevWorld", "Świat testowy gotowy: pieniądze, narzędzia, trzy działki i maszyny"));
 			This->RefreshInventory();
 			This->RefreshWallet();
+			// Onto the first plot (grassland), where the test machines stand
+			const TArray<TSharedPtr<FJsonValue>>* Plots = nullptr;
+			if (Reply.Payload.IsValid() && Reply.Payload->TryGetArrayField(TEXT("plots"), Plots) && Plots->Num() > 0)
+			{
+				const TSharedPtr<FJsonObject> First = (*Plots)[0]->AsObject();
+				This->EnterPlot(int32(First->GetNumberField(TEXT("x"))), int32(First->GetNumberField(TEXT("y"))));
+			}
 		}
 	});
 }

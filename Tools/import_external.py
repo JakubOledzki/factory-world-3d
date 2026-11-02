@@ -211,6 +211,8 @@ FACTORY = os.path.join(MODELS, "factory")
 PAINTED = {"FW_PaintedSteel": (0.12, 0.15, 0.12), "FW_Worn": (0.42, 0.3, 0.04), "FW_Steel": (0.2, 0.2, 0.21)}
 # The garage (Tools/blender/make_garage.py): barrels, bins and gas cylinders in plain paint
 PAINTED.update({"FW_PaintBlue": (0.02, 0.09, 0.3), "FW_PaintRed": (0.32, 0.03, 0.02), "FW_PaintWhite": (0.55, 0.55, 0.52), "FW_PaintGreen": (0.04, 0.16, 0.06)})
+# Moulded plastic (the garage's bins): one even colour, satin, no texture to repeat
+PLASTIC = {"FW_PlasticBlue": (0.02, 0.1, 0.35), "FW_PlasticRed": (0.4, 0.04, 0.02), "FW_PlasticGreen": (0.03, 0.2, 0.06)}
 SLOT_TEXTURES = {
     "FW_Rubber": "rubberized_track", "FW_Wood": "weathered_planks", "FW_Concrete": "concrete_floor_worn_001",
     "FW_Grate": "metal_grate_rusty",
@@ -254,6 +256,11 @@ if os.path.isdir(FACTORY):
                     mel.set_material_instance_vector_parameter_value(asset, "Color", unreal.LinearColor(0.012, 0.02, 0.05, 1))
                     mel.set_material_instance_scalar_parameter_value(asset, "Roughness", 0.08)
                     mel.set_material_instance_scalar_parameter_value(asset, "Metallic", 0.35)
+                elif slot in PLASTIC:
+                    mel.set_material_instance_parent(asset, surface)
+                    mel.set_material_instance_vector_parameter_value(asset, "Color", unreal.LinearColor(*PLASTIC[slot], 1))
+                    mel.set_material_instance_scalar_parameter_value(asset, "Roughness", 0.42)
+                    mel.set_material_instance_scalar_parameter_value(asset, "Metallic", 0.0)
                 elif slot in SLOT_TEXTURES:
                     set_id = SLOT_TEXTURES[slot]
                     mel.set_material_instance_parent(asset, belt_master if slot == "FW_Rubber" else scan)
@@ -272,8 +279,8 @@ if os.path.isdir(FACTORY):
                         mel.set_material_instance_texture_parameter_value(asset, "ARM", rough)
                     mel.set_material_instance_scalar_parameter_value(asset, "MetalScale", 0.0)
                     mel.set_material_instance_vector_parameter_value(asset, "Tint", unreal.LinearColor(*PAINTED[slot], 1.0))
-                    # Chipped edges show the bare steel underneath
-                    bare = texture_set("metal_grate_rusty", "diff")
+                    # Chipped edges show the bare steel underneath (a plain plate: the grate's holes made a grid)
+                    bare = texture_set("metal_plate", "diff")
                     if bare and slot != "FW_Steel":
                         mel.set_material_instance_texture_parameter_value(asset, "Rust", bare)
                         mel.set_material_instance_scalar_parameter_value(asset, "Wear", 1.0)
