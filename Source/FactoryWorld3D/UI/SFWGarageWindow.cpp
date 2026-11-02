@@ -1645,16 +1645,30 @@ TSharedRef<SWidget> SFWGarageWindow::MakeFurniture()
 			[
 				SNew(STextBlock).Font(FWStyle::Font(13)).ColorAndOpacity(FWStyle::Text).Text(FText::FromString(FString::Printf(TEXT("%s  ×%d"), *Stack.Name, Stack.Quantity)))
 			]
+			// Carried in the room with its ghost at the crosshair, or put on a cell of the plan above
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 6, 0)
+			[
+				PC && PC->IsInGarage()
+					? FWUi::SmallButton(LOCTEXT("Carry", "Postaw w garażu"), [WeakThis, Kind]()
+					{
+						TSharedPtr<SFWGarageWindow> This = WeakThis.Pin();
+						if (AFWPlayerController* Inner = This ? This->Controller.Get() : nullptr)
+						{
+							Inner->CarryToGarage(Kind);
+						}
+					}, true)
+					: SNullWidget::NullWidget
+			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				FWUi::SmallButton(Placing == Kind ? LOCTEXT("Choosing", "Kliknij miejsce na planie") : LOCTEXT("Place", "Wybierz miejsce"), [WeakThis, Kind]()
+				FWUi::SmallButton(Placing == Kind ? LOCTEXT("Choosing", "Kliknij miejsce na planie") : LOCTEXT("Place", "Na planie"), [WeakThis, Kind]()
 				{
 					if (TSharedPtr<SFWGarageWindow> This = WeakThis.Pin())
 					{
 						This->Placing = This->Placing == Kind ? FString() : Kind;
 						This->Rebuild();
 					}
-				}, Placing != Kind)
+				}, !PC || !PC->IsInGarage())
 			]
 		];
 	}

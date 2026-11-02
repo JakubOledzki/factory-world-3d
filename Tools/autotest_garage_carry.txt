@@ -1,0 +1,23 @@
+# Moving the garage's furniture in the room: Tools\dev\autotest.ps1 -Script Tools\autotest_garage_carry.txt -Tag garage_carry
+# Each line: seconds after the previous command, then a console command.
+14 FWClose
+1 FWGarageRoom
+5 FWGarageLook furniture_gas_cylinder 170
+2 FWShot c0_cylinder
+1 FWGarageTake furniture_gas_cylinder
+1 FWGarageStand 0 -150 90 -35
+3 FWShot c1_carrying
+1 FWRotate
+1 FWClick
+3 FWShot c2_placed
+1 FWGarageTake furniture_gas_cylinder
+1 FWGarageStand 150 -150 60 -30
+3 FWShot c3_carrying_again
+1 FWRightClick
+2 FWShot c4_left_in_backpack
+1 FWBuildMode
+2 FWShot c5_b_carries
+1 FWClick
+3 FWShot c6_placed_again
+1 FWGarage 4 0
+3 FWShot c7_window

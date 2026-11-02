@@ -26,6 +26,7 @@
 #include "InputModifiers.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
+#include "World/FWGarageRoom.h"
 #include "World/FWPlot.h"
 
 #define LOCTEXT_NAMESPACE "FWCharacter"
@@ -80,6 +81,7 @@ AFWCharacter::AFWCharacter()
 	Ghost->SetUsingAbsoluteRotation(true);
 	Ghost->SetUsingAbsoluteScale(true);
 	Ghost->SetStaticMesh(Cube.Object);
+	GhostCube = Cube.Object;
 	Ghost->SetMaterial(0, GhostBase.Object);
 	Ghost->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Ghost->SetCastShadow(false);
@@ -955,6 +957,14 @@ void AFWCharacter::PickupStart()
 	// In the garage: the piece of furniture looked at, put away into the backpack
 	if (AFWPlayerController* PC = GetFWController(); PC && PC->IsInGarage())
 	{
+		// Carrying one to its place: it stays in the backpack
+		if (!GaragePlacing.IsEmpty())
+		{
+			PC->Toast(FText::Format(LOCTEXT("LeftInBag", "{0} zostaje w plecaku."),
+				FText::FromString(PC->GetGarageRoom() ? PC->GetGarageRoom()->NameOf(GaragePlacing) : PC->ItemName(GaragePlacing))));
+			SetGaragePlacing(FString());
+			return;
+		}
 		FString Kind, Id;
 		if (Hold == EHold::None && PC->GetGarageTarget(Kind, Id) && Kind != TEXT("door") && Kind != TEXT("board"))
 		{
@@ -990,6 +1000,26 @@ void AFWCharacter::Primary()
 {
 	AFWPlot* Plot = GetPlot();
 	AFWPlayerController* PC = GetFWController();
+	// In the garage: the piece carried is put down where its ghost stands
+	if (PC && PC->IsInGarage())
+	{
+		FIntPoint Cell;
+		FTransform Where;
+		bool bFits = false;
+		if (GaragePlacing.IsEmpty() || !GaragePlacement(Cell, Where, bFits))
+		{
+			return;
+		}
+		if (!bFits)
+		{
+			FWAudio::Play2D(this, TEXT("build_invalid"), 0.6f);
+			PC->Toast(LOCTEXT("GarageBlocked", "Tu coś już stoi: wybierz wolne miejsce."), true);
+			return;
+		}
+		PlayGesture(EGesture::Place);
+		PC->GaragePlace(GaragePlacing, Cell, BuildRotation & 3);
+		return;
+	}
 	if (!bBuildMode || !Plot || !PC || !bHasTarget)
 	{
 		return;
@@ -1012,8 +1042,33 @@ void AFWCharacter::Primary()
 
 void AFWCharacter::ToggleBuild()
 {
-	bBuildMode = !bBuildMode;
 	AFWPlayerController* PC = GetFWController();
+	// In the garage B carries a piece of furniture from the backpack (the one on the hotbar first), or stops
+	if (PC && PC->IsInGarage())
+	{
+		const AFWGarageRoom* Room = PC->GetGarageRoom();
+		if (!GaragePlacing.IsEmpty() || !Room)
+		{
+			SetGaragePlacing(FString());
+			return;
+		}
+		FString Kind = Room->IsFurniture(PC->GetSelectedItem()) ? PC->GetSelectedItem() : FString();
+		for (const FFWStack& Stack : PC->GetInventory())
+		{
+			if (Kind.IsEmpty() && Stack.Quantity > 0 && Room->IsFurniture(Stack.Id))
+			{
+				Kind = Stack.Id;
+			}
+		}
+		if (Kind.IsEmpty())
+		{
+			PC->Toast(LOCTEXT("NoGarageFurniture", "W plecaku nie ma mebli do garażu."), true);
+			return;
+		}
+		SetGaragePlacing(Kind);
+		return;
+	}
+	bBuildMode = !bBuildMode;
 	const AFWPlot* Plot = GetPlot();
 	if (bBuildMode && PC && Plot && !Plot->IsPlaceable(PC->GetSelectedItem()))
 	{
@@ -1032,7 +1087,7 @@ void AFWCharacter::ToggleBuild()
 void AFWCharacter::Rotate()
 {
 	BuildRotation = (BuildRotation + 1) & 3;
-	if (bBuildMode)
+	if (bBuildMode || !GaragePlacing.IsEmpty())
 	{
 		FWAudio::Play2D(this, TEXT("build_rotate"), 0.5f);
 		PlayGesture(EGesture::Rotate);
@@ -1044,6 +1099,13 @@ void AFWCharacter::SelectSlot(int32 Slot)
 	if (AFWPlayerController* PC = GetFWController())
 	{
 		PC->SelectSlot(Slot);
+		// In the garage a piece of furniture on the hotbar is taken to be placed
+		if (PC->IsInGarage())
+		{
+			const AFWGarageRoom* Room = PC->GetGarageRoom();
+			SetGaragePlacing(Room && Room->IsFurniture(PC->GetSelectedItem()) && PC->FindStack(PC->GetSelectedItem()) ? PC->GetSelectedItem() : FString());
+			return;
+		}
 		const AFWPlot* Plot = GetPlot();
 		bBuildMode = Plot && Plot->IsPlaceable(PC->GetSelectedItem());
 	}
@@ -1160,8 +1222,79 @@ void AFWCharacter::UpdateTarget()
 	}
 }
 
+void AFWCharacter::SetGaragePlacing(const FString& Kind)
+{
+	if (GaragePlacing == Kind)
+	{
+		return;
+	}
+	GaragePlacing = Kind;
+	if (!Kind.IsEmpty())
+	{
+		bBuildMode = false;
+		FWAudio::Play2D(this, TEXT("build_rotate"), 0.4f);
+	}
+}
+
+bool AFWCharacter::GaragePlacement(FIntPoint& OutCell, FTransform& OutTransform, bool& bOutFits) const
+{
+	const AFWPlayerController* PC = GetFWController();
+	const AFWGarageRoom* Room = PC && PC->IsInGarage() ? PC->GetGarageRoom() : nullptr;
+	if (!Room || GaragePlacing.IsEmpty() || !PC->PlayerCameraManager)
+	{
+		return false;
+	}
+	const FVector Eye = PC->PlayerCameraManager->GetCameraLocation();
+	return Room->Placement(GaragePlacing, BuildRotation & 3, Eye, Eye + PC->PlayerCameraManager->GetCameraRotation().Vector() * 600.f, OutCell, OutTransform, bOutFits);
+}
+
+bool AFWCharacter::UpdateGarageGhost()
+{
+	const AFWPlayerController* PC = GetFWController();
+	if (!PC || !PC->IsInGarage())
+	{
+		// Out of the garage nothing is carried
+		GaragePlacing.Reset();
+		return false;
+	}
+	FIntPoint Cell;
+	FTransform Where;
+	bool bFits = false;
+	const AFWGarageRoom* Room = PC->GetGarageRoom();
+	if (!Room || !GaragePlacement(Cell, Where, bFits))
+	{
+		Ghost->SetVisibility(false);
+		return true;
+	}
+	// The piece's own model, see-through, green where it fits and red where something stands
+	UStaticMesh* Mesh = Room->MeshOf(GaragePlacing);
+	if (Ghost->GetStaticMesh() != Mesh)
+	{
+		Ghost->SetStaticMesh(Mesh);
+		for (int32 Slot = 0; Slot < Ghost->GetNumMaterials(); ++Slot)
+		{
+			Ghost->SetMaterial(Slot, GhostMaterial);
+		}
+	}
+	Where.AddToTranslation(FVector(0.f, 0.f, 1.f));
+	Ghost->SetWorldTransform(Where);
+	GhostMaterial->SetVectorParameterValue(TEXT("Color"), bFits ? FLinearColor(0.2f, 1.f, 0.4f) : FLinearColor(1.f, 0.15f, 0.1f));
+	Ghost->SetVisibility(true);
+	return true;
+}
+
 void AFWCharacter::UpdateGhost()
 {
+	if (UpdateGarageGhost())
+	{
+		return;
+	}
+	// Back on a plot the ghost is the cube again
+	if (Ghost->GetStaticMesh() != GhostCube)
+	{
+		Ghost->SetStaticMesh(GhostCube);
+		Ghost->SetMaterial(0, GhostMaterial);
+	}
 	const AFWPlot* Plot = GetPlot();
 	const AFWPlayerController* PC = GetFWController();
 	const FString Kind = PC ? PC->GetSelectedItem() : FString();
@@ -1282,6 +1415,14 @@ FText AFWCharacter::GetTargetText() const
 {
 	if (const AFWPlayerController* InGarage = GetFWController(); InGarage && InGarage->IsInGarage())
 	{
+		if (!GaragePlacing.IsEmpty())
+		{
+			static const FText Ways[] = { LOCTEXT("ToDoor", "przodem do bramy"), LOCTEXT("ToRight", "przodem w prawo"), LOCTEXT("ToBack", "przodem do tylnej ściany"),
+				LOCTEXT("ToLeft", "przodem w lewo") };
+			return FText::Format(LOCTEXT("GaragePlacing", "{0} ({1})  [LPM] postaw   [R] obróć   [PPM] zostaw w plecaku"),
+				FText::FromString(InGarage->GetGarageRoom() ? InGarage->GetGarageRoom()->NameOf(GaragePlacing) : InGarage->ItemName(GaragePlacing)),
+				Ways[BuildRotation & 3]);
+		}
 		return InGarage->GarageHint();
 	}
 	const AFWPlot* Plot = GetPlot();

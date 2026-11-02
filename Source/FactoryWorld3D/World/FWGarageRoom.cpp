@@ -19,6 +19,8 @@ namespace FWGarageLayout
 	constexpr float Depth = 600.f;
 	constexpr float Height = 320.f;
 	constexpr float Cell = 50.f;
+	constexpr int32 Columns = int32(Width / Cell);
+	constexpr int32 Rows = int32(Depth / Cell);
 
 	// The surface of the floor by its upgrade level: a texture set and a tint (raw concrete to marble)
 	TPair<FString, FLinearColor> FloorLook(int32 Level)
@@ -126,6 +128,18 @@ FString AFWGarageRoom::KindOf(const FString& Id) const
 		if (Pick.Value.Value == Id)
 		{
 			return Pick.Value.Key;
+		}
+	}
+	return FString();
+}
+
+FString AFWGarageRoom::IdOf(const FString& Kind) const
+{
+	for (const TPair<TWeakObjectPtr<const UPrimitiveComponent>, TPair<FString, FString>>& Pick : Picks)
+	{
+		if (Pick.Value.Key == Kind)
+		{
+			return Pick.Value.Value;
 		}
 	}
 	return FString();
@@ -298,6 +312,7 @@ void AFWGarageRoom::Build(const TSharedPtr<FJsonObject>& Garage)
 
 	// The furniture: cell (x, y) of its top-left corner, its footprint turned by the rotation. Row 0 is the room's -Y
 	// side, where the door is: the 2D game keeps the middle of it free (the pallet and the tyres stand to the sides)
+	Taken.Reset();
 	if (Objects)
 	{
 		for (const TSharedPtr<FJsonValue>& Value : *Objects)
@@ -305,23 +320,71 @@ void AFWGarageRoom::Build(const TSharedPtr<FJsonObject>& Garage)
 			const TSharedPtr<FJsonObject> Object = Value->AsObject();
 			const FString Kind = Object->GetStringField(TEXT("kind"));
 			const int32 Rotation = int32(Object->GetNumberField(TEXT("rotation"))) & 3;
-			const TSharedPtr<FJsonObject>* Size = nullptr;
-			int32 W = 1, D = 1;
-			if (Furniture.IsValid() && Furniture->TryGetObjectField(Kind, Size))
-			{
-				W = int32((*Size)->GetNumberField(TEXT("width")));
-				D = int32((*Size)->GetNumberField(TEXT("depth")));
-			}
-			if (Rotation % 2 == 1)
-			{
-				Swap(W, D);
-			}
-			const float X = (Object->GetNumberField(TEXT("x")) + W / 2.0) * FWGarageLayout::Cell - FWGarageLayout::Width / 2;
-			const float Y = (Object->GetNumberField(TEXT("y")) + D / 2.0) * FWGarageLayout::Cell - FWGarageLayout::Depth / 2;
-			UStaticMeshComponent* Component = Piece(*FWGarageLayout::Model(Kind), FTransform(FRotator(0.f, 180.f - 90.f * Rotation, 0.f), FVector(X, Y, 0.f)));
+			const FIntPoint Size = Footprint(Kind, Rotation);
+			const FIntPoint Cell(int32(Object->GetNumberField(TEXT("x"))), int32(Object->GetNumberField(TEXT("y"))));
+			Taken.Add(FIntRect(Cell, Cell + Size));
+			UStaticMeshComponent* Component = Piece(*FWGarageLayout::Model(Kind), PieceTransform(Cell, Size, Rotation));
 			Picks.Add(Component, TPair<FString, FString>(Kind, Object->GetStringField(TEXT("id"))));
 		}
 	}
+}
+
+FIntPoint AFWGarageRoom::Footprint(const FString& Kind, int32 Rotation) const
+{
+	const TSharedPtr<FJsonObject>* Size = nullptr;
+	int32 W = 1, D = 1;
+	if (Furniture.IsValid() && Furniture->TryGetObjectField(Kind, Size))
+	{
+		W = FMath::Max(1, int32((*Size)->GetNumberField(TEXT("width"))));
+		D = FMath::Max(1, int32((*Size)->GetNumberField(TEXT("depth"))));
+	}
+	return Rotation % 2 == 1 ? FIntPoint(D, W) : FIntPoint(W, D);
+}
+
+FTransform AFWGarageRoom::PieceTransform(const FIntPoint& Cell, const FIntPoint& Size, int32 Rotation)
+{
+	const float X = (Cell.X + Size.X / 2.0) * FWGarageLayout::Cell - FWGarageLayout::Width / 2;
+	const float Y = (Cell.Y + Size.Y / 2.0) * FWGarageLayout::Cell - FWGarageLayout::Depth / 2;
+	return FTransform(FRotator(0.f, 180.f - 90.f * (Rotation & 3), 0.f), FVector(X, Y, 0.f));
+}
+
+bool AFWGarageRoom::IsFurniture(const FString& Kind) const
+{
+	return !Kind.IsEmpty() && Furniture.IsValid() && Furniture->HasField(Kind);
+}
+
+UStaticMesh* AFWGarageRoom::MeshOf(const FString& Kind) const
+{
+	UStaticMesh* Mesh = FWArt::Factory(*FWGarageLayout::Model(Kind));
+	return Mesh ? Mesh : LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+}
+
+bool AFWGarageRoom::Placement(const FString& Kind, int32 Rotation, const FVector& From, const FVector& To, FIntPoint& OutCell, FTransform& OutTransform,
+	bool& bOutFits) const
+{
+	// Where the line meets the floor (the room's z = 0), in the room's own space
+	const FVector A = GetActorTransform().InverseTransformPosition(From);
+	const FVector B = GetActorTransform().InverseTransformPosition(To);
+	if (A.Z <= 0.f || B.Z >= 0.f)
+	{
+		return false;
+	}
+	const FVector Floor = A + (B - A) * (A.Z / (A.Z - B.Z));
+	// The piece's middle there, its corner on whole cells, kept inside the walls when the line ends at one
+	const FIntPoint Size = Footprint(Kind, Rotation);
+	const float CentreX = (Floor.X + FWGarageLayout::Width / 2) / FWGarageLayout::Cell;
+	const float CentreY = (Floor.Y + FWGarageLayout::Depth / 2) / FWGarageLayout::Cell;
+	OutCell = FIntPoint(FMath::Clamp(FMath::RoundToInt(CentreX - Size.X / 2.f), 0, FMath::Max(0, FWGarageLayout::Columns - Size.X)),
+		FMath::Clamp(FMath::RoundToInt(CentreY - Size.Y / 2.f), 0, FMath::Max(0, FWGarageLayout::Rows - Size.Y)));
+	const FIntRect Here(OutCell, OutCell + Size);
+	bOutFits = Size.X <= FWGarageLayout::Columns && Size.Y <= FWGarageLayout::Rows
+		&& !Taken.ContainsByPredicate([&Here](const FIntRect& Other)
+		{
+			// Touching sides is fine, as on the server
+			return Here.Min.X < Other.Max.X && Other.Min.X < Here.Max.X && Here.Min.Y < Other.Max.Y && Other.Min.Y < Here.Max.Y;
+		});
+	OutTransform = PieceTransform(OutCell, Size, Rotation) * GetActorTransform();
+	return true;
 }
 
 bool AFWGarageRoom::Pick(const FVector& From, const FVector& To, const AActor* Ignore, FString& OutKind, FString& OutId) const

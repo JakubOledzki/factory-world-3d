@@ -36,10 +36,21 @@ public:
 
 	// A piece of furniture's name by its kind, from garage.get
 	FString NameOf(const FString& Kind) const;
-	// The kind of the piece with this id, empty for none
+	// The kind of the piece with this id, empty for none; the id of the first piece of a kind, empty for none
 	FString KindOf(const FString& Id) const;
+	FString IdOf(const FString& Kind) const;
 	// The middle of the first piece of this kind (its bounds), false for none
 	bool CentreOf(const FString& Kind, FVector& OutCentre) const;
+
+	// Whether this kind can stand in the garage (garage.get lists it among the furniture)
+	bool IsFurniture(const FString& Kind) const;
+	// The model a piece of this kind is drawn with
+	UStaticMesh* MeshOf(const FString& Kind) const;
+	// Where a piece of this kind, turned by Rotation quarter turns, would stand with its middle where a line from the eye
+	// meets the floor: its front-left cell (as garage.place takes it), where its model goes in the world, and whether it
+	// fits there without touching anything; false when the line does not reach the floor
+	bool Placement(const FString& Kind, int32 Rotation, const FVector& From, const FVector& To, FIntPoint& OutCell, FTransform& OutTransform,
+		bool& bOutFits) const;
 
 private:
 	UStaticMeshComponent* Piece(const TCHAR* Model, const FTransform& Transform, bool bCollide = true);
@@ -47,8 +58,15 @@ private:
 	void Shell();
 	void Upgrades(const TSharedPtr<FJsonObject>& Levels);
 
+	// Cells taken (width along x, depth along y) by a piece of this kind turned by Rotation quarter turns
+	FIntPoint Footprint(const FString& Kind, int32 Rotation) const;
+	// Where a piece's model goes in the room (relative to it), its front-left cell at Cell
+	static FTransform PieceTransform(const FIntPoint& Cell, const FIntPoint& Size, int32 Rotation);
+
 	FString Built;
 	TSharedPtr<FJsonObject> Furniture;
+	// The cells each piece of furniture stands on, to tell where another one fits
+	TArray<FIntRect> Taken;
 
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> Floor;
