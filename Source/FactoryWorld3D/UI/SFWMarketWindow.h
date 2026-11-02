@@ -110,6 +110,6 @@ private:
 		FString Item;
 		int32 Quantity = 0;
 	};
-	FSaleSlot Sale[SaleSlots];
+	FSaleSlot ForSale[SaleSlots];
 	int32 TradeSeq = 0;
 };

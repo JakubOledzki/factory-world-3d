@@ -856,7 +856,7 @@ bool SFWMarketWindow::SellPrice(const FString& Item, double& OutCents) const
 int32 SFWMarketWindow::OnSale(const FString& Item) const
 {
 	int32 Count = 0;
-	for (const FSaleSlot& Slot : Sale)
+	for (const FSaleSlot& Slot : ForSale)
 	{
 		Count += Slot.Item == Item ? Slot.Quantity : 0;
 	}
@@ -888,11 +888,11 @@ bool SFWMarketWindow::AddToSale(const FString& Item, int32 Quantity, int32 Slot)
 		Slot = INDEX_NONE;
 		for (int32 Index = 0; Index < SaleSlots && Slot == INDEX_NONE; ++Index)
 		{
-			Slot = Sale[Index].Quantity > 0 && Sale[Index].Item == Item ? Index : INDEX_NONE;
+			Slot = ForSale[Index].Quantity > 0 && ForSale[Index].Item == Item ? Index : INDEX_NONE;
 		}
 		for (int32 Index = 0; Index < SaleSlots && Slot == INDEX_NONE; ++Index)
 		{
-			Slot = Sale[Index].Quantity <= 0 ? Index : INDEX_NONE;
+			Slot = ForSale[Index].Quantity <= 0 ? Index : INDEX_NONE;
 		}
 		if (Slot == INDEX_NONE)
 		{
@@ -900,7 +900,7 @@ bool SFWMarketWindow::AddToSale(const FString& Item, int32 Quantity, int32 Slot)
 			return false;
 		}
 	}
-	FSaleSlot& Target = Sale[Slot];
+	FSaleSlot& Target = ForSale[Slot];
 	if (Target.Quantity > 0 && Target.Item == Item)
 	{
 		Target.Quantity += Quantity;
@@ -922,7 +922,7 @@ void SFWMarketWindow::DropOnSale(const FFWItemDrag& Drag, int32 Slot)
 		// From one slot of the grid to another: the two swap
 		if (Drag.Index != Slot && Drag.Index >= 0 && Drag.Index < SaleSlots)
 		{
-			Swap(Sale[Drag.Index], Sale[Slot]);
+			Swap(ForSale[Drag.Index], ForSale[Slot]);
 			Rebuild();
 		}
 		return;
@@ -934,7 +934,7 @@ void SFWMarketWindow::DropOnBackpack(const FFWItemDrag& Drag)
 {
 	if (Drag.From == EFWItemPlace::Sale && Drag.Index >= 0 && Drag.Index < SaleSlots)
 	{
-		Sale[Drag.Index] = FSaleSlot();
+		ForSale[Drag.Index] = FSaleSlot();
 		Rebuild();
 	}
 }
@@ -943,7 +943,7 @@ void SFWMarketWindow::SellAll()
 {
 	// One sale per item, however many slots it lies on, in the grid's order
 	TArray<TPair<FString, int32>> Sales;
-	for (const FSaleSlot& Slot : Sale)
+	for (const FSaleSlot& Slot : ForSale)
 	{
 		if (Slot.Quantity <= 0)
 		{
@@ -958,7 +958,7 @@ void SFWMarketWindow::SellAll()
 			Sales.Emplace(Slot.Item, Slot.Quantity);
 		}
 	}
-	for (FSaleSlot& Slot : Sale)
+	for (FSaleSlot& Slot : ForSale)
 	{
 		Slot = FSaleSlot();
 	}
@@ -985,7 +985,7 @@ void SFWMarketWindow::SellAll()
 
 TSharedRef<SWidget> SFWMarketWindow::MakeSale()
 {
-	const float TileSize = 72.f, Gap = 3.f;
+	const float SaleTileSize = 72.f, SaleGap = 3.f;
 	const int32 BackpackColumns = 8;
 	auto IconOf = [this](const FString& Id) { return Controller.IsValid() ? Controller->GetIconBrush(Id) : nullptr; };
 	auto NameOf = [this](const FString& Id)
@@ -1018,7 +1018,7 @@ TSharedRef<SWidget> SFWMarketWindow::MakeSale()
 			}
 		}
 	}
-	TSharedRef<SUniformGridPanel> BackpackGrid = SNew(SUniformGridPanel).SlotPadding(FMargin(Gap));
+	TSharedRef<SUniformGridPanel> BackpackGrid = SNew(SUniformGridPanel).SlotPadding(FMargin(SaleGap));
 	// Always a few empty tiles, so that there is room to drop what comes back from the grid
 	const int32 BackpackTiles = FMath::Max(BackpackColumns * 5, FMath::DivideAndRoundUp(Backpack.Num() + 1, BackpackColumns) * BackpackColumns);
 	for (int32 Index = 0; Index < BackpackTiles; ++Index)
@@ -1027,7 +1027,7 @@ TSharedRef<SWidget> SFWMarketWindow::MakeSale()
 		BackpackGrid->AddSlot(Index % BackpackColumns, Index / BackpackColumns)
 		[
 			SNew(SFWItemTile)
-			.Size(TileSize)
+			.Size(SaleTileSize)
 			.Place(EFWItemPlace::Inventory)
 			.Index(Index)
 			.Item(Tile.Item)
@@ -1042,26 +1042,26 @@ TSharedRef<SWidget> SFWMarketWindow::MakeSale()
 	List = BackpackScroll;
 
 	// The 5x5 grid of what is to be sold
-	TSharedRef<SUniformGridPanel> SaleGrid = SNew(SUniformGridPanel).SlotPadding(FMargin(Gap));
+	TSharedRef<SUniformGridPanel> SaleGrid = SNew(SUniformGridPanel).SlotPadding(FMargin(SaleGap));
 	for (int32 Slot = 0; Slot < SaleSlots; ++Slot)
 	{
 		SaleGrid->AddSlot(Slot % SaleColumns, Slot / SaleColumns)
 		[
 			SNew(SFWItemTile)
-			.Size(TileSize)
+			.Size(SaleTileSize)
 			.Place(EFWItemPlace::Sale)
 			.Index(Slot)
-			.Item_Lambda([this, Slot]() { return Sale[Slot].Quantity > 0 ? Sale[Slot].Item : FString(); })
-			.Quantity_Lambda([this, Slot]() { return Sale[Slot].Quantity; })
+			.Item_Lambda([this, Slot]() { return ForSale[Slot].Quantity > 0 ? ForSale[Slot].Item : FString(); })
+			.Quantity_Lambda([this, Slot]() { return ForSale[Slot].Quantity; })
 			.IconOf(IconOf)
 			.NameOf(NameOf)
 			.OnDropped_Lambda([this, Slot](const FFWItemDrag& Drag) { DropOnSale(Drag, Slot); })
-			.OnQuick_Lambda([this, Slot]() { Sale[Slot] = FSaleSlot(); Rebuild(); })
+			.OnQuick_Lambda([this, Slot]() { ForSale[Slot] = FSaleSlot(); Rebuild(); })
 		];
 	}
 	double TotalCents = 0.0;
 	int32 Pieces = 0;
-	for (const FSaleSlot& Slot : Sale)
+	for (const FSaleSlot& Slot : ForSale)
 	{
 		double Price = 0.0;
 		if (Slot.Quantity > 0 && SellPrice(Slot.Item, Price))
@@ -1076,7 +1076,7 @@ TSharedRef<SWidget> SFWMarketWindow::MakeSale()
 			+ SVerticalBox::Slot().AutoHeight()[FWUi::Heading(Text)]
 			+ SVerticalBox::Slot().AutoHeight().Padding(11, 0, 0, 8)[SNew(STextBlock).AutoWrapText(true).Text(Sub).Font(FWStyle::Font(10)).ColorAndOpacity(FWStyle::Muted)];
 	};
-	const float SaleWidth = SaleColumns * (TileSize + 2.f * Gap);
+	const float SaleWidth = SaleColumns * (SaleTileSize + 2.f * SaleGap);
 
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 10)
@@ -1100,7 +1100,7 @@ TSharedRef<SWidget> SFWMarketWindow::MakeSale()
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight()[Heading(LOCTEXT("SaleGrid", "Do sprzedaży"), LOCTEXT("SaleGridHint", "25 miejsc na to, co chcesz sprzedać."))]
 					+ SVerticalBox::Slot().AutoHeight()[SaleGrid]
-					+ SVerticalBox::Slot().AutoHeight().Padding(Gap, 14, Gap, 0)
+					+ SVerticalBox::Slot().AutoHeight().Padding(SaleGap, 14, SaleGap, 0)
 					[
 						SNew(SFWCard).Padding(FMargin(12.f, 8.f))
 						[
@@ -1116,13 +1116,13 @@ TSharedRef<SWidget> SFWMarketWindow::MakeSale()
 							]
 						]
 					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(Gap, 10, Gap, 0)
+					+ SVerticalBox::Slot().AutoHeight().Padding(SaleGap, 10, SaleGap, 0)
 					[
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 8, 0)
 						[
 							SNew(SButton).ButtonStyle(&FWStyle::SecondaryButton()).ContentPadding(FMargin(14.f, 8.f)).IsEnabled(Pieces > 0)
-							.OnClicked_Lambda([this]() { for (FSaleSlot& Slot : Sale) { Slot = FSaleSlot(); } Rebuild(); return FReply::Handled(); })
+							.OnClicked_Lambda([this]() { for (FSaleSlot& Slot : ForSale) { Slot = FSaleSlot(); } Rebuild(); return FReply::Handled(); })
 							[
 								SNew(STextBlock).Text(LOCTEXT("SaleClear", "Wyczyść")).Font(FWStyle::Font(12)).ColorAndOpacity(FWStyle::Text)
 							]
