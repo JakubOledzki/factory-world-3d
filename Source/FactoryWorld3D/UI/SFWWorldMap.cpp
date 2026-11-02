@@ -524,7 +524,7 @@ void SFWWorldMap::RebuildPanel()
 	TSharedRef<SVerticalBox> Box = SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 10)
 		[
-			SNew(STextBlock).Font(FWStyle::Font(18, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)
+			SNew(STextBlock).Font(FWStyle::Display(24)).ColorAndOpacity(FWStyle::Text)
 			.Text(PlotInfo.IsValid() && !PlotInfo->GetStringField(TEXT("name")).IsEmpty()
 				? FText::FromString(PlotInfo->GetStringField(TEXT("name"))) : FText::Format(LOCTEXT("PlotTitle", "Działka {0}"), FWMapUi::PlotText(Plot)))
 		]

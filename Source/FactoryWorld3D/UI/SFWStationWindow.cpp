@@ -72,6 +72,7 @@ void SFWStationWindow::Construct(const FArguments& InArgs)
 {
 	Controller = InArgs._Controller;
 	Station = InArgs._Station;
+	FWStyle::PlayUi(TEXT("ui_open"));
 	ChildSlot
 	[
 		SNew(SOverlay)
@@ -85,9 +86,10 @@ void SFWStationWindow::Construct(const FArguments& InArgs)
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 		[
+			FWUi::Appear(
 			SNew(SBorder)
 			.BorderImage(FWStyle::Panel())
-			.Padding(24.f)
+			.Padding(FMargin(28.f, 22.f, 28.f, 24.f))
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
@@ -110,11 +112,18 @@ void SFWStationWindow::Construct(const FArguments& InArgs)
 						}
 					})
 				]
-			]
+			])
 		]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 32.f)
+		// [E] [Esc] zamknij, as under the other windows
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 30.f)
 		[
-			SNew(STextBlock).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Muted).Text(LOCTEXT("Close", "E / Esc zamyka"))
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 4, 0)[FWUi::Key(LOCTEXT("EKey", "E"))]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 8, 0)[FWUi::Key(LOCTEXT("EscKey", "Esc"))]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(STextBlock).Font(FWStyle::Font(12)).ColorAndOpacity(FWStyle::Muted).Text(LOCTEXT("Close", "zamknij"))
+			]
 		]
 	];
 }

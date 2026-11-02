@@ -422,7 +422,7 @@ void SFWGarageWindow::Construct(const FArguments& InArgs)
 	{
 		Tabs->AddSlot().AutoWidth()[MakeTab(Names[Index], Index)];
 	}
-	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Font(16, TEXT("Bold"))).ColorAndOpacity(FWStyle::Good)
+	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Display(22)).ColorAndOpacity(FWStyle::Good)
 		.Text_Lambda([this]() { return Controller.IsValid() ? FWUi::Money(double(Controller->GetBalanceCents())) : FText::GetEmpty(); });
 	ChildSlot
 	[
@@ -952,7 +952,7 @@ TSharedRef<SWidget> SFWGarageWindow::MakeSortingGame()
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 			[
-				SNew(STextBlock).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent)
+				SNew(STextBlock).Font(FWStyle::Display(18, TEXT("SemiBold"))).ColorAndOpacity(FWStyle::Accent)
 				.Text(LOCTEXT("DragHint", "Przeciągnij każdy przedmiot do właściwego kosza"))
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
@@ -1350,7 +1350,7 @@ TSharedRef<SWidget> SFWGarageWindow::MakeUpgrades()
 	}
 	else
 	{
-		Add(SNew(STextBlock).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent).Text(LOCTEXT("Maxed", "Ulepszone do końca.")), 14.f);
+		Add(SNew(STextBlock).Font(FWStyle::Display(18, TEXT("SemiBold"))).ColorAndOpacity(FWStyle::Accent).Text(LOCTEXT("Maxed", "Ulepszone do końca.")), 14.f);
 	}
 
 	// All levels of the track

@@ -93,7 +93,7 @@ void SFWFarmWindow::Construct(const FArguments& InArgs)
 	}
 	const FString Known = PC ? PC->ItemName(Kind) : FString();
 	const FText Title = FText::FromString(Known.IsEmpty() || Known == Kind ? FWFarmText::Title(Kind) : Known);
-	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Font(16, TEXT("Bold"))).ColorAndOpacity(FWStyle::Good)
+	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Display(22)).ColorAndOpacity(FWStyle::Good)
 		.Text_Lambda([this]() { return Controller.IsValid() ? FWUi::Money(double(Controller->GetBalanceCents())) : FText::GetEmpty(); });
 	ChildSlot
 	[
@@ -292,7 +292,7 @@ TSharedRef<SWidget> SFWFarmWindow::MakeFarmstead()
 	auto Add = [&Page](TSharedRef<SWidget> Widget, float Top = 6.f) { Page->AddSlot().AutoHeight().Padding(0, Top, 0, 0)[Widget]; };
 	const int32 Side = 2 * int32(FWUi::Num(State, TEXT("radius"))) + 1;
 	const int32 Fields = int32(FWUi::Num(State, TEXT("fields"))), Ripe = int32(FWUi::Num(State, TEXT("ripe")));
-	Add(SNew(STextBlock).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent)
+	Add(SNew(STextBlock).Font(FWStyle::Display(18, TEXT("SemiBold"))).ColorAndOpacity(FWStyle::Accent)
 		.Text(FText::FromString(FString::Printf(TEXT("%s · poziom %d z 2"), *FWUi::Str(State, TEXT("name")), int32(FWUi::Num(State, TEXT("level")))))), 0.f);
 	Add(FWUi::Note(FText::FromString(FString::Printf(TEXT("Pole %d × %d: %d obsianych grządek, w tym %d dojrzałych. Zbiera jedną na %s s."),
 		Side, Side, Fields, Ripe, *Number(FWUi::Num(State, TEXT("reapSeconds"))))), FWStyle::Text));
@@ -399,7 +399,7 @@ TSharedRef<SWidget> SFWFarmWindow::MakeForester()
 	const int32 Trees = int32(FWUi::Num(State, TEXT("trees")));
 	double Grow = 0.0;
 	const bool bGrows = State->TryGetNumberField(TEXT("growSeconds"), Grow);
-	Add(SNew(STextBlock).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent)
+	Add(SNew(STextBlock).Font(FWStyle::Display(18, TEXT("SemiBold"))).ColorAndOpacity(FWStyle::Accent)
 		.Text(FText::FromString(FString::Printf(TEXT("%s · poziom %d z 3"), *FWUi::Str(State, TEXT("name")), int32(FWUi::Num(State, TEXT("level")))))), 0.f);
 	Add(FWUi::Note(FText::FromString(FString::Printf(TEXT("Las %d × %d pól: %d drzew, w tym %d do ścięcia. Drzewo rośnie tu %s, ścina jedno na %s s."),
 		Side, Side, Trees, int32(FWUi::Num(State, TEXT("grown"))), bGrows ? *Minutes(Grow) : TEXT("—"), *Number(FWUi::Num(State, TEXT("cutSeconds"))))), FWStyle::Text));

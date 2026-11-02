@@ -314,7 +314,7 @@ void SFWFilterWindow::Rebuild()
 		}
 		else
 		{
-			Add(SNew(SBorder).BorderImage(FWStyle::Panel()).Padding(10.f)
+			Add(SNew(SFWCard).Padding(10.f)
 				[
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 10, 0)[FWUi::Icon(PC, Filter, 36.f)]

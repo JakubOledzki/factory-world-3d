@@ -128,7 +128,7 @@ void SFWCompanyWindow::Construct(const FArguments& InArgs)
 			]
 		];
 	}
-	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Font(16, TEXT("Bold"))).ColorAndOpacity(FWStyle::Good)
+	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Display(22)).ColorAndOpacity(FWStyle::Good)
 		.Text_Lambda([this]() { return Controller.IsValid() ? FWUi::Money(double(Controller->GetBalanceCents())) : FText::GetEmpty(); });
 	ChildSlot
 	[
@@ -523,7 +523,7 @@ TSharedRef<SWidget> SFWCompanyWindow::MakeCompany(const TSharedPtr<FJsonObject>&
 	const bool bMayTake = Role != TEXT("worker");
 	TSharedRef<SVerticalBox> Page = SNew(SVerticalBox);
 	auto Add = [&Page](TSharedRef<SWidget> Widget, float Top = 4.f) { Page->AddSlot().AutoHeight().Padding(0, Top, 0, 0)[Widget]; };
-	Add(SNew(STextBlock).Font(FWStyle::Font(18, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text).Text(FText::FromString(FWUi::Str(Company, TEXT("name")))), 0.f);
+	Add(SNew(STextBlock).Font(FWStyle::Display(24)).ColorAndOpacity(FWStyle::Text).Text(FText::FromString(FWUi::Str(Company, TEXT("name")))), 0.f);
 	Add(FWUi::Note(FText::Format(LOCTEXT("YourRole", "Twoja rola: {0}. {1}"), FWCompanyText::RoleName(Role), FWCompanyText::RoleHelp(Role)), FWStyle::Text));
 
 	// Members, their roles; the owner invites and removes

@@ -91,7 +91,7 @@ void SFWCityWindow::Construct(const FArguments& InArgs)
 			SAssignNew(Header, STextBlock).Font(FWStyle::Font(12, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent).AutoWrapText(true)
 		]
 		+ SVerticalBox::Slot().FillHeight(1.f)[SAssignNew(Content, SBox)];
-	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Font(16, TEXT("Bold"))).ColorAndOpacity(FWStyle::Good)
+	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Display(22)).ColorAndOpacity(FWStyle::Good)
 		.Text_Lambda([this]() { return Controller.IsValid() ? FWUi::Money(double(Controller->GetBalanceCents())) : FText::GetEmpty(); });
 	ChildSlot
 	[
