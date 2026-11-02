@@ -9,6 +9,7 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Notifications/SProgressBar.h"
+#include "Widgets/SLeafWidget.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
@@ -20,6 +21,70 @@ namespace
 	constexpr double ToastSeconds = 4.0;
 	const FLinearColor Panel(0.02f, 0.025f, 0.03f, 0.72f);
 	const FLinearColor Accent(1.f, 0.62f, 0.15f);
+
+	// The ring round the crosshair while striking with the axe or pickaxe: one arc for each strike still to come; the
+	// arc of the strike just landed flies out and fades
+	class SStrikeRing : public SLeafWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SStrikeRing) {}
+			SLATE_ARGUMENT(TFunction<bool(int32&, int32&, float&)>, Strikes)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			Strikes = InArgs._Strikes;
+		}
+
+		virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(Size, Size); }
+
+		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& Geometry, const FSlateRect& Culling, FSlateWindowElementList& Out, int32 Layer,
+			const FWidgetStyle& Style, bool bParentEnabled) const override
+		{
+			int32 Left = 0, Total = 0;
+			float SinceHit = 100.f;
+			if (!Strikes || !Strikes(Left, Total, SinceHit) || Total <= 0)
+			{
+				return Layer;
+			}
+			const FVector2f Center = FVector2f(Geometry.GetLocalSize()) * 0.5f;
+			const float Gap = 9.f;  // degrees between arcs
+			const float Arc = 360.f / Total;
+			auto Draw = [&](int32 Index, float At, const FLinearColor& Color, float Thickness, int32 InLayer)
+			{
+				// Arcs clockwise from the top
+				TArray<FVector2f> Points;
+				const float From = -90.f + Index * Arc + Gap * 0.5f, To = -90.f + (Index + 1) * Arc - Gap * 0.5f;
+				for (int32 Step = 0; Step <= 16; ++Step)
+				{
+					const float Angle = FMath::DegreesToRadians(FMath::Lerp(From, To, Step / 16.f));
+					Points.Add(Center + FVector2f(FMath::Cos(Angle), FMath::Sin(Angle)) * At);
+				}
+				FSlateDrawElement::MakeLines(Out, InLayer, Geometry.ToPaintGeometry(), Points, ESlateDrawEffect::None, Color, true, Thickness);
+			};
+			for (int32 Index = 0; Index < Total; ++Index)
+			{
+				// Dark under every place, so the ring reads on snow as on rock
+				Draw(Index, RingRadius, FLinearColor(0.f, 0.f, 0.f, 0.45f), 7.f, Layer);
+				if (Index < Left)
+				{
+					Draw(Index, RingRadius, Index == Left - 1 && SinceHit < 0.15f ? FLinearColor::White : Accent, 4.f, Layer + 1);
+				}
+			}
+			// The arc just struck away
+			if (Left < Total && SinceHit < 0.35f)
+			{
+				const float T = SinceHit / 0.35f;
+				Draw(Left, RingRadius + 10.f * T, FLinearColor::White.CopyWithNewOpacity(1.f - T), 4.f * (1.f - T) + 1.f, Layer + 1);
+			}
+			return Layer + 1;
+		}
+
+	private:
+		static constexpr float Size = 90.f;
+		static constexpr float RingRadius = 30.f;
+		TFunction<bool(int32&, int32&, float&)> Strikes;
+	};
 
 	FText Money(int64 Cents)
 	{
@@ -56,6 +121,15 @@ void SFWHud::Construct(const FArguments& InArgs)
 					return Character && Character->HasTarget() ? Accent : FLinearColor(1.f, 1.f, 1.f, 0.8f);
 				})
 			]
+		]
+		// The strikes still to come round the crosshair
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+		[
+			SNew(SStrikeRing).Strikes([this](int32& Left, int32& Total, float& SinceHit)
+			{
+				const AFWCharacter* Character = GetCharacter();
+				return Character && Character->GetStrikes(Left, Total, SinceHit);
+			})
 		]
 		// What the crosshair points at, and the progress of holding E or the right button
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0, 90, 0, 0)
@@ -122,7 +196,7 @@ void SFWHud::Construct(const FArguments& InArgs)
 					{
 						return LOCTEXT("BuildHints", "BUDOWANIE   LPM postaw   R obróć   1–5 wybór   PPM (przytrzymaj) zabierz   B wyjdź");
 					}
-					return LOCTEXT("Hints", "WASD ruch   Shift bieg   Spacja skok   E kop (przytrzymaj) / otwórz skrzynię   PPM (przytrzymaj) zabierz   B budowanie   1–5 pasek   Tab plecak   Esc menu");
+					return LOCTEXT("Hints", "WASD ruch   Shift bieg   Spacja skok   E ścinaj / kop (przytrzymaj) · otwórz skrzynię   PPM (przytrzymaj) zabierz   B budowanie   1–5 pasek   Tab plecak   Esc menu");
 				})
 			]
 		]

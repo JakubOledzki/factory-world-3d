@@ -287,12 +287,12 @@ public sealed class DesertTests(ServerFactory factory) : IClassFixture<ServerFac
         foreach (var i in new[] { far, near })
         {
             factory.Time.Advance(HarvestRules.Time);
-            var dug = (await client.SendAsync("plot.harvest", new { x, y, tileX = i % PlotLayout.Size, tileY = i / PlotLayout.Size })).Payload();
+            var dug = (await factory.StrikeAsync(client, "plot.harvest", new { x, y, tileX = i % PlotLayout.Size, tileY = i / PlotLayout.Size })).Payload();
             Assert.Equal(4, dug.GetProperty("items").EnumerateArray().First(s => s.GetProperty("id").GetString() == Items.Sand).GetProperty("quantity").GetInt32());
         }
 
         factory.Time.Advance(HarvestRules.Time);
-        Assert.Equal("nothing_here", (await client.SendAsync("plot.harvest", new { x, y, tileX = far % PlotLayout.Size, tileY = far / PlotLayout.Size })).ErrorCode());
+        Assert.Equal("nothing_here", (await factory.StrikeAsync(client, "plot.harvest", new { x, y, tileX = far % PlotLayout.Size, tileY = far / PlotLayout.Size })).ErrorCode());
 
         // A reed fence three tiles from the second dune keeps the sand off it.
         await GiveAsync(client, Items.ReedFence, 1);
@@ -308,7 +308,7 @@ public sealed class DesertTests(ServerFactory factory) : IClassFixture<ServerFac
         Assert.Equal((byte)TileObject.None, after[near]);
 
         factory.Time.Advance(HarvestRules.Time);
-        var again = await client.SendAsync("plot.harvest", new { x, y, tileX = far % PlotLayout.Size, tileY = far / PlotLayout.Size });
+        var again = await factory.StrikeAsync(client, "plot.harvest", new { x, y, tileX = far % PlotLayout.Size, tileY = far / PlotLayout.Size });
         Assert.True(again.Type() == "plot.harvested", again.ToString());
         Assert.Equal((byte)TileObject.None, (await TilesAsync(client, x, y))[far]);
     }

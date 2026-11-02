@@ -276,7 +276,7 @@ public sealed class CoastTests(ServerFactory factory) : IClassFixture<ServerFact
         for (var i = 0; i < 2; i++)
         {
             factory.Time.Advance(TimeSpan.FromSeconds(5));
-            var caught = await client.SendAsync("plot.harvest", new { x, y, tileX = wx, tileY = wy });
+            var caught = await factory.StrikeAsync(client, "plot.harvest", new { x, y, tileX = wx, tileY = wy });
             Assert.True(caught.Type() == "plot.harvested", caught.ToString());
             var fish = caught.Payload().GetProperty("items")[0].GetProperty("id").GetString();
             Assert.Contains(fish, new[] { Items.Herring, Items.Cod });
@@ -287,13 +287,13 @@ public sealed class CoastTests(ServerFactory factory) : IClassFixture<ServerFact
 
         var (start, _) = SeaWeather.Next(factory.Time.GetUtcNow());
         factory.Time.Advance(start - factory.Time.GetUtcNow() + TimeSpan.FromMinutes(1));
-        Assert.Equal("storm", (await client.SendAsync("plot.harvest", new { x, y, tileX = wx, tileY = wy })).ErrorCode());
+        Assert.Equal("storm", (await factory.StrikeAsync(client, "plot.harvest", new { x, y, tileX = wx, tileY = wy })).ErrorCode());
 
         await GiveAsync(client, Items.Breakwater, 1);
         var other = ShoreTiles(tiles)[6];
         await PlaceAsync(client, x, y, Items.Breakwater, other.X, other.Y);
         factory.Time.Advance(TimeSpan.FromSeconds(5));
-        Assert.Equal("plot.harvested", (await client.SendAsync("plot.harvest", new { x, y, tileX = wx, tileY = wy })).Type());
+        Assert.Equal("plot.harvested", (await factory.StrikeAsync(client, "plot.harvest", new { x, y, tileX = wx, tileY = wy })).Type());
     }
 
     [Fact]
@@ -349,11 +349,11 @@ public sealed class CoastTests(ServerFactory factory) : IClassFixture<ServerFact
         Assert.NotEmpty(finds);
         var (tx, ty) = (finds[0] % PlotLayout.Size, finds[0] / PlotLayout.Size);
         factory.Time.Advance(TimeSpan.FromSeconds(2));
-        var picked = await client.SendAsync("plot.harvest", new { x, y, tileX = tx, tileY = ty });
+        var picked = await factory.StrikeAsync(client, "plot.harvest", new { x, y, tileX = tx, tileY = ty });
         Assert.True(picked.Type() == "plot.harvested", picked.ToString());
         Assert.NotEmpty(picked.Payload().GetProperty("items").EnumerateArray());
         factory.Time.Advance(TimeSpan.FromSeconds(2));
-        Assert.Equal("nothing_here", (await client.SendAsync("plot.harvest", new { x, y, tileX = tx, tileY = ty })).ErrorCode());
+        Assert.Equal("nothing_here", (await factory.StrikeAsync(client, "plot.harvest", new { x, y, tileX = tx, tileY = ty })).ErrorCode());
         var after = Tiles((await client.SendAsync("plot.enter", new { x, y })).Payload());
         Assert.Equal((byte)TileObject.None, after[ty * PlotLayout.Size + tx]);
     }

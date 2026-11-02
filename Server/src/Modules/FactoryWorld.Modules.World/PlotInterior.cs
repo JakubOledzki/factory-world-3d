@@ -471,10 +471,11 @@ public sealed class PlotService(
 
     /// <summary>
     /// Cuts a tree (grown by itself or planted), breaks a rock or digs a dune with the tool in the
-    /// player's slot, or pulls out a bush by hand. <paramref name="pace"/> gets how long the work takes and refuses it if too quick.
+    /// player's slot, or pulls out a bush by hand. <paramref name="pace"/> gets how long the work takes and whether it is struck
+    /// (a tree with an axe or saw, a rock with a pickaxe: <see cref="StrikeRules"/>), and refuses it if too quick.
     /// </summary>
     public Task<Harvest> HarvestAsync(
-        Guid player, int x, int y, int tileX, int tileY, Action<TimeSpan> pace, CancellationToken cancellationToken) =>
+        Guid player, int x, int y, int tileX, int tileY, Action<TimeSpan, bool> pace, CancellationToken cancellationToken) =>
         db.InTransactionAsync(async () =>
         {
             var biome = await RequireOwnerAsync(player, x, y, cancellationToken, PlotRight.Work);
@@ -492,7 +493,7 @@ public sealed class PlotService(
             var current = (TileObject)(await TilesAsync(x, y, biome, cancellationToken))[tileY * PlotLayout.Size + tileX];
             if (current == TileObject.Flotsam)
             {
-                pace(HarvestRules.Time);
+                pace(HarvestRules.Time, false);
                 return await beach.GatherAsync(player, x, y, tileX, tileY, async items => await GiveAsync(player, TileObject.Flotsam, items, cancellationToken), cancellationToken);
             }
 
@@ -500,14 +501,14 @@ public sealed class PlotService(
             {
                 // Snow dug away, maybe off something it buried; it comes back only with the next blizzard's avalanches.
                 pace(HarvestRules.TimeFor(current, await RequireToolAsync(player, Items.Shovel, cancellationToken), biome)
-                     / await SpeedAsync(player, Industries.Mining, cancellationToken, (x, y, tileX, tileY)));
+                     / await SpeedAsync(player, Industries.Mining, cancellationToken, (x, y, tileX, tileY)), false);
                 await MarkHarvestedAsync(x, y, tileX, tileY, always: true, cancellationToken);
                 return await GiveAsync(player, current, PlotLayout.Yield(current, Random.Shared.Next(100), biome), cancellationToken);
             }
 
             if (current == TileObject.Crevasse)
             {
-                pace(HarvestRules.Time);
+                pace(HarvestRules.Time, false);
                 await inventory.RemoveAsync(player, Items.Beams, PlotLayout.BridgeBeams, cancellationToken);
                 await MarkHarvestedAsync(x, y, tileX, tileY, always: false, cancellationToken);
                 return new Harvest(TileObject.Bridge, [], await progress.AddXpAsync(player, HarvestRules.XpPerHarvest, cancellationToken));
@@ -524,7 +525,8 @@ public sealed class PlotService(
             }
 
             var held = PlotLayout.ToolFor(obj) is { } tool ? await RequireToolAsync(player, tool, cancellationToken) : null;
-            pace(HarvestRules.TimeFor(obj, held, biome) / await SpeedAsync(player, HarvestRules.Industry(obj), cancellationToken, (x, y, tileX, tileY)));
+            pace(HarvestRules.TimeFor(obj, held, biome) / await SpeedAsync(player, HarvestRules.Industry(obj), cancellationToken, (x, y, tileX, tileY)),
+                Trees.IsTree(obj) || held is not null && Items.Pickaxes.ContainsKey(held));
             if (obj == TileObject.Water)
             {
                 // The water is never fished out; a storm at sea or on a lake keeps everyone ashore but those on a breakwater.
@@ -593,7 +595,7 @@ public sealed class PlotService(
     }
 
     private async Task<Harvest> CutPlantedAsync(
-        Guid player, int x, int y, int tileX, int tileY, (DateTimeOffset ReadyAt, TreeKind Kind, bool ByHand) tree, Action<TimeSpan> pace,
+        Guid player, int x, int y, int tileX, int tileY, (DateTimeOffset ReadyAt, TreeKind Kind, bool ByHand) tree, Action<TimeSpan, bool> pace,
         CancellationToken cancellationToken)
     {
         if (tree.ReadyAt > await plotClock.NowAsync(x, y, cancellationToken))
@@ -603,7 +605,7 @@ public sealed class PlotService(
 
         // The bark beetle may be in a tree of a monoculture planted by hand.
         var tool = await RequireToolAsync(player, Items.Axe, cancellationToken);
-        pace(HarvestRules.TimeFor(tree.Kind.Tile, tool) / await SpeedAsync(player, Industries.Forestry, cancellationToken, (x, y, tileX, tileY)));
+        pace(HarvestRules.TimeFor(tree.Kind.Tile, tool) / await SpeedAsync(player, Industries.Forestry, cancellationToken, (x, y, tileX, tileY)), true);
         var saw = Items.Saws.GetValueOrDefault(tool);
         var cut = await CutDownAsync(x, y, tileX, tileY, tree, saw, cancellationToken);
         return await GiveTreesAsync(player, x, y, tree.Kind.Tile, cut, await FellAroundAsync(x, y, map.BiomeAt(x, y), tileX, tileY, saw, cancellationToken), cancellationToken);
@@ -1062,9 +1064,9 @@ public sealed class EnterPlotHandler(IServiceScopeFactory scopes, WorldMap map, 
     }
 }
 
-public sealed class HarvestHandler(IServiceScopeFactory scopes, TimeProvider time) : IMessageHandler
+public sealed class HarvestHandler(IServiceScopeFactory scopes, TimeProvider time, OnlinePlayers online) : IMessageHandler
 {
-    private const string LastHarvest = "world.lastHarvest";
+    internal const string LastHarvest = "world.lastHarvest";
 
     public string Type => "plot.harvest";
 
@@ -1072,8 +1074,22 @@ public sealed class HarvestHandler(IServiceScopeFactory scopes, TimeProvider tim
     {
         var request = Payload.Read<HarvestRequest>(payload);
         await using var scope = scopes.CreateAsyncScope();
+        var target = new StrikeTarget(request.X, request.Y, request.TileX, request.TileY);
         var harvest = await scope.ServiceProvider.GetRequiredService<PlotService>().HarvestAsync(
-            client.RequireAccount(), request.X, request.Y, request.TileX, request.TileY, work => CheckPace(client, time, work), cancellationToken);
+            client.RequireAccount(), request.X, request.Y, request.TileX, request.TileY,
+            (work, struck) =>
+            {
+                // The server's own bots gather in one go, at the same pace.
+                if (struck && !online.IsBot(client.RequireAccount()))
+                {
+                    Strikes.CheckLast(client, time, target, work);
+                }
+                else
+                {
+                    CheckPace(client, time, work);
+                }
+            },
+            cancellationToken);
         Swung(client, time);
         return new Reply("plot.harvested", new
         {

@@ -75,6 +75,13 @@ public:
 	FVector GroundAt(FIntPoint Tile) const;
 
 	const FFWMine* FindMine(FIntPoint Tile) const;
+	// A tree (of any kind) stands on the tile
+	bool IsTree(FIntPoint Tile) const { return TreeCodes.Contains(TileCode(Tile)); }
+	// How long felling a tree and breaking a rock take here (s), without a better tool or clothes
+	float GetChopSeconds() const { return ChopSeconds; }
+	float GetRockSeconds() const { return RockSeconds; }
+	// The tree or rock on the tile was gathered: the tile is free, and what stood there is gone from view
+	void ClearTile(FIntPoint Tile);
 	const FFWPlotObject* FindObjectAt(FIntPoint Tile) const;
 	bool IsPlaceable(const FString& Kind) const { return Placeable.Contains(Kind); }
 	const TMap<FString, FFWPlotObject>& GetObjects() const { return Objects; }
@@ -145,7 +152,7 @@ private:
 	UHierarchicalInstancedStaticMeshComponent* MakeArtInstances(UStaticMesh* Mesh, bool bCollide);
 	FTransform ArtTransform(UStaticMesh* Mesh, const FVector& Ground, float Yaw, float Size2D, float Height, float Sink,
 		const FVector& Normal = FVector::UpVector, float Tilt = 0.f) const;
-	void BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCodes);
+	void BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeTiles);
 	UHierarchicalInstancedStaticMeshComponent* MakeInstances(UStaticMesh* Mesh, const FLinearColor& Color, float Roughness, bool bCollide);
 	void DrawObject(FFWPlotObject& Object);
 	// The modelled version of an object, when the factory models are set up; false to draw a placeholder
@@ -178,6 +185,11 @@ private:
 	int32 Size = 0;
 	float TileSize = 400.f;
 	TArray<uint8> Tiles;
+	TSet<uint8> TreeCodes;
+	float ChopSeconds = 5.f;
+	float RockSeconds = 1.5f;
+	// What BuildTerrain set on the tiles (trees, rocks), to take one away when it is gathered
+	TArray<TWeakObjectPtr<UInstancedStaticMeshComponent>> TerrainInstances;
 	FIntPoint Spawn = FIntPoint::ZeroValue;
 	TSet<FString> Placeable;
 	TArray<FFWMine> Mines;

@@ -95,7 +95,9 @@ Bez tych plików gra działa dalej, z malowaną głową manekina.
 
 ## Dźwięki (nasze)
 
-Dźwięki gry, oprócz kroków, są syntezowane przez nasz skrypt `Tools/make_audio.py` (szum, filtry, drgania tłumione, modulacja częstotliwości).
+Dźwięki gry, oprócz kroków, są syntezowane przez nasz skrypt `Tools/make_audio.py` (szum, filtry, drgania tłumione, modulacja częstotliwości). Uderzenia siekierą w drzewo (`axe_chop_*`) też.
+
+Siekierę i kilof trzymane w ręku modeluje nasz skrypt `Tools/blender/make_tools.py`.
 
 ## Kroki: nagrania z OpenGameArt, licencja CC0
 

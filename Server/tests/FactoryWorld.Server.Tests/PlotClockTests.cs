@@ -131,10 +131,10 @@ public sealed class PlotClockTests(ServerFactory factory) : IClassFixture<Server
         using var back = await ComeBackAsync(token);
         await CheckAsync();
         Assert.Equal(stopped, await PlotTimeAsync(plot));
-        Assert.Equal("not_grown", (await back.SendAsync("plot.harvest", new { x = plot.X, y = plot.Y, tileX = tile.X, tileY = tile.Y })).ErrorCode());
+        Assert.Equal("not_grown", (await factory.StrikeAsync(back, "plot.harvest", new { x = plot.X, y = plot.Y, tileX = tile.X, tileY = tile.Y })).ErrorCode());
         factory.Time.Advance(TimeSpan.FromMinutes(11));
         await CheckAsync();
-        Assert.Equal("plot.harvested", (await back.SendAsync("plot.harvest", new { x = plot.X, y = plot.Y, tileX = tile.X, tileY = tile.Y })).Type());
+        Assert.Equal("plot.harvested", (await factory.StrikeAsync(back, "plot.harvest", new { x = plot.X, y = plot.Y, tileX = tile.X, tileY = tile.Y })).Type());
 
         // The report of the time away says the plot stood still.
         var report = (await back.SendAsync("report.away")).Payload();

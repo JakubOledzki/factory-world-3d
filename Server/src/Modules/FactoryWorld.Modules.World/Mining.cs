@@ -378,7 +378,7 @@ public sealed class BlastMineHandler(IServiceScopeFactory scopes, TimeProvider t
     }
 }
 
-public sealed class MineHandler(IServiceScopeFactory scopes, TimeProvider time) : IMessageHandler
+public sealed class MineHandler(IServiceScopeFactory scopes, TimeProvider time, OnlinePlayers online) : IMessageHandler
 {
     public string Type => "plot.mine";
 
@@ -386,8 +386,23 @@ public sealed class MineHandler(IServiceScopeFactory scopes, TimeProvider time) 
     {
         var request = Payload.Read<MineRequest>(payload);
         await using var scope = scopes.CreateAsyncScope();
+        // Each load is dug in StrikeRules.Count strikes of the pickaxe, the last one this request.
+        var target = new StrikeTarget(request.X, request.Y, -1, -1, request.Mine);
         var load = await scope.ServiceProvider.GetRequiredService<MineService>().MineAsync(
-            client.RequireAccount(), request.X, request.Y, request.Mine, work => HarvestHandler.CheckPace(client, time, work), cancellationToken);
+            client.RequireAccount(), request.X, request.Y, request.Mine,
+            work =>
+            {
+                // The server's own bots dig a load in one go, at the same pace.
+                if (online.IsBot(client.RequireAccount()))
+                {
+                    HarvestHandler.CheckPace(client, time, work);
+                }
+                else
+                {
+                    Strikes.CheckLast(client, time, target, work);
+                }
+            },
+            cancellationToken);
         HarvestHandler.Swung(client, time);
         return MinedReply(load, time, 0);
     }

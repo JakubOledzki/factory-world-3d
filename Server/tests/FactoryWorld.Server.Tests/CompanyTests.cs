@@ -278,7 +278,7 @@ public sealed class CompanyTests(ServerFactory factory) : IClassFixture<ServerFa
         }
 
         var tree = Array.IndexOf(tiles, (byte)TileObject.Tree);
-        Assert.Equal("not_owner", (await visitor.SendAsync("plot.harvest", new { x, y, tileX = tree % PlotLayout.Size, tileY = tree / PlotLayout.Size })).ErrorCode());
+        Assert.Equal("not_owner", (await factory.StrikeAsync(visitor.Client, "plot.harvest", new { x, y, tileX = tree % PlotLayout.Size, tileY = tree / PlotLayout.Size })).ErrorCode());
         Assert.Equal("not_owner", (await visitor.SendAsync("storage.get", new { x, y, id = chest })).ErrorCode());
         Assert.Equal("not_owner", (await visitor.SendAsync("storage.take", new { x, y, id = chest, item = Items.Wood, quantity = 1 })).ErrorCode());
         Assert.Equal("not_owner", (await visitor.SendAsync("plot.pickup", new { x, y, id = chest })).ErrorCode());
@@ -333,7 +333,7 @@ public sealed class CompanyTests(ServerFactory factory) : IClassFixture<ServerFa
             await scope.ServiceProvider.GetRequiredService<IEquipment>().GiveToolAsync(member.Client.AccountId, Items.Axe, CancellationToken.None);
         }
 
-        var chopped = await member.SendAsync("plot.harvest", new { x = forest.X, y = forest.Y, tileX = tree % PlotLayout.Size, tileY = tree / PlotLayout.Size });
+        var chopped = await factory.StrikeAsync(member.Client, "plot.harvest", new { x = forest.X, y = forest.Y, tileX = tree % PlotLayout.Size, tileY = tree / PlotLayout.Size });
         Assert.Equal("plot.harvested", chopped.Type());
         Assert.True((await member.Client.InventoryAsync())[Items.Wood] >= 1);
 

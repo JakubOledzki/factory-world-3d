@@ -187,7 +187,7 @@ void AFWPlot::Build(const TSharedPtr<FJsonObject>& Plot)
 	}
 
 	// Trees of other species have their own tile codes
-	TSet<uint8> TreeCodes = { FWCatalog::Tree };
+	TreeCodes = { FWCatalog::Tree };
 	const TArray<TSharedPtr<FJsonValue>>* TreeKinds = nullptr;
 	if (Plot->TryGetArrayField(TEXT("treeKinds"), TreeKinds))
 	{
@@ -208,6 +208,15 @@ void AFWPlot::Build(const TSharedPtr<FJsonObject>& Plot)
 
 	BuildGround(Biome);
 	GroundCoverMeshes = FWArt::Grass();
+	double Seconds = 0.0;
+	if (Plot->TryGetNumberField(TEXT("chopSeconds"), Seconds) && Seconds > 0.0)
+	{
+		ChopSeconds = float(Seconds);
+	}
+	if (Plot->TryGetNumberField(TEXT("rockSeconds"), Seconds) && Seconds > 0.0)
+	{
+		RockSeconds = float(Seconds);
+	}
 	BuildTerrain(Tiles, TreeCodes);
 
 	const TArray<TSharedPtr<FJsonValue>>* ObjectList = nullptr;
@@ -633,7 +642,7 @@ void AFWPlot::PlantDwarfPine(int32 Biome)
 		Count, Thickets.Num(), ForestTop / 100.f, BeltTop / 100.f, Nearest.X, Nearest.Y);
 }
 
-void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCodes)
+void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeTiles)
 {
 	const float T = TileSize / ShapeSize;
 	const TArray<UStaticMesh*> RockMeshes = FWArt::Rocks();
@@ -672,7 +681,7 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 			const FVector Center = TileCenter(FIntPoint(X, Y));
 			const FVector Jitter(Random.FRandRange(-0.2f, 0.2f) * TileSize, Random.FRandRange(-0.2f, 0.2f) * TileSize, 0.f);
 			const FRotator Spin(0.f, Random.FRandRange(0.f, 360.f), 0.f);
-			if (TreeCodes.Contains(Code))
+			if (TreeTiles.Contains(Code))
 			{
 				if (!TreeMeshes.IsEmpty())
 				{
@@ -755,6 +764,7 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 	Trunks->AddInstances(TrunkT, false);
 	Crowns->AddInstances(CrownT, false);
 	Rocks->AddInstances(RockT, false);
+	TerrainInstances = { Trunks, Crowns, Rocks };
 	Dunes->AddInstances(DuneT, false);
 	Bushes->AddInstances(BushT, false);
 	Rails->AddInstances(RailT, false);
@@ -771,7 +781,9 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 	}
 	for (TPair<UStaticMesh*, TArray<FTransform>>& Pair : ArtSolid)
 	{
-		MakeArtInstances(Pair.Key, true)->AddInstances(Pair.Value, false);
+		UHierarchicalInstancedStaticMeshComponent* Solid = MakeArtInstances(Pair.Key, true);
+		Solid->AddInstances(Pair.Value, false);
+		TerrainInstances.Add(Solid);
 	}
 	for (TPair<UStaticMesh*, TArray<FTransform>>& Pair : ArtSoft)
 	{
@@ -787,6 +799,44 @@ void AFWPlot::BuildTerrain(const TArray<uint8>& Codes, const TSet<uint8>& TreeCo
 		{
 			MakeMesh(CubeMesh, FLinearColor(0.3f, 0.2f, 0.1f),
 				FTransform(FRotator::ZeroRotator, Front + FVector(Side * TileSize, 4.f, 0.f), FVector(0.06f * T, 0.06f * T, 0.6f * T)), false);
+		}
+	}
+}
+
+void AFWPlot::ClearTile(FIntPoint Tile)
+{
+	if (!Contains(Tile))
+	{
+		return;
+	}
+	Tiles[Tile.Y * Size + Tile.X] = FWCatalog::Empty;
+	// Whatever was set on the tile, found by where it stands (in the plot's space), shrinks to nothing; the indices
+	// stay as they are, so the instances of other tiles keep theirs
+	const FTransform Plot = GetActorTransform();
+	for (const TWeakObjectPtr<UInstancedStaticMeshComponent>& Weak : TerrainInstances)
+	{
+		UInstancedStaticMeshComponent* Instances = Weak.Get();
+		if (!Instances)
+		{
+			continue;
+		}
+		bool bChanged = false;
+		for (int32 Index = 0; Index < Instances->GetInstanceCount(); ++Index)
+		{
+			FTransform Instance;
+			Instances->GetInstanceTransform(Index, Instance, true);
+			const FVector Local = Plot.InverseTransformPosition(Instance.GetLocation());
+			if (FMath::FloorToInt(Local.X / TileSize) == Tile.X && FMath::FloorToInt(Local.Y / TileSize) == Tile.Y && !Instance.GetScale3D().IsNearlyZero())
+			{
+				Instance.SetScale3D(FVector(0.001f));
+				Instance.AddToTranslation(FVector(0.f, 0.f, -10000.f));
+				Instances->UpdateInstanceTransform(Index, Instance, true, false, true);
+				bChanged = true;
+			}
+		}
+		if (bChanged)
+		{
+			Instances->MarkRenderStateDirty();
 		}
 	}
 }

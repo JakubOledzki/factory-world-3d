@@ -134,11 +134,13 @@ void AFWCharacter::CreateBody()
 	bArmsReady = true;
 	SetLook(FFWLook());
 
-	// The pickaxe (Tools/blender/make_tools.py): in the right hand while mining
-	if (UStaticMesh* Pickaxe = FWArt::Factory(TEXT("tool_pickaxe")))
+	// The pickaxe and the axe (Tools/blender/make_tools.py): in the right hand while striking
+	PickaxeMesh = FWArt::Factory(TEXT("tool_pickaxe"));
+	AxeMesh = FWArt::Factory(TEXT("tool_axe"));
+	if (PickaxeMesh)
 	{
 		Tool = NewObject<UStaticMeshComponent>(this);
-		Tool->SetStaticMesh(Pickaxe);
+		Tool->SetStaticMesh(PickaxeMesh);
 		Tool->SetupAttachment(Arms);
 		// Its grip in the palm, the head forward over the knuckles (the tool's +Z handle, +X head)
 		Tool->SetRelativeLocationAndRotation(FVector(-9.f, 1.5f, -3.f), FRotator(0.f, 0.f, 0.f));
@@ -256,7 +258,7 @@ void AFWCharacter::CurlFingers(int32 Side, float Amount)
 
 void AFWCharacter::Strike()
 {
-	FWAudio::Play2D(this, TEXT("mine_hit"), 0.6f, 3);
+	FWAudio::Play2D(this, bStrikeAxe ? TEXT("axe_chop") : TEXT("mine_hit"), 0.6f, 3);
 	ShakeTime = 0.18f;
 	// Where the pickaxe meets the rock: straight ahead of the eye
 	FHitResult Hit;
@@ -267,8 +269,11 @@ void AFWCharacter::Strike()
 		return;
 	}
 	// Chips of rock fly out of the strike and fall
+	// Chips of rock, or of pale wood from under the bark
 	const TArray<UStaticMesh*> Rocks = FWArt::Rocks();
-	UMaterialInterface* RockMaterial = Rocks.IsEmpty() ? nullptr : Rocks[0]->GetMaterial(0);
+	AFWPlot* Plot = GetPlot();
+	UMaterialInterface* RockMaterial = bStrikeAxe ? (Plot ? Plot->SurfaceMaterial(FLinearColor(0.62f, 0.45f, 0.26f), 0.85f) : nullptr)
+		: Rocks.IsEmpty() ? nullptr : Rocks[0]->GetMaterial(0);
 	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 	for (int32 i = 0; i < 10 && Cube; ++i)
 	{
@@ -282,7 +287,8 @@ void AFWCharacter::Strike()
 		UStaticMeshComponent* Piece = Chip->GetStaticMeshComponent();
 		Piece->SetMobility(EComponentMobility::Movable);
 		Piece->SetStaticMesh(Cube);
-		Piece->SetWorldScale3D(FVector(FMath::FRandRange(0.035f, 0.07f), FMath::FRandRange(0.03f, 0.06f), FMath::FRandRange(0.02f, 0.045f)));
+		Piece->SetWorldScale3D(bStrikeAxe ? FVector(FMath::FRandRange(0.04f, 0.08f), FMath::FRandRange(0.02f, 0.04f), FMath::FRandRange(0.006f, 0.012f))
+			: FVector(FMath::FRandRange(0.035f, 0.07f), FMath::FRandRange(0.03f, 0.06f), FMath::FRandRange(0.02f, 0.045f)));
 		if (RockMaterial)
 		{
 			Piece->SetMaterial(0, RockMaterial);
@@ -306,7 +312,7 @@ void AFWCharacter::Strike()
 			UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(DecalBase, this);
 			Material->SetTextureParameterValue(TEXT("Color"), Color);
 			Material->SetTextureParameterValue(TEXT("Opacity"), Mask);
-			Material->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.12f, 0.11f, 0.1f));
+			Material->SetVectorParameterValue(TEXT("Tint"), bStrikeAxe ? FLinearColor(0.5f, 0.36f, 0.2f) : FLinearColor(0.12f, 0.11f, 0.1f));
 			Material->SetScalarParameterValue(TEXT("Strength"), 0.9f);
 			const FRotator Facing = (-Hit.ImpactNormal).Rotation() + FRotator(0.f, 0.f, FMath::FRandRange(0.f, 360.f));
 			if (UDecalComponent* Decal = UGameplayStatics::SpawnDecalAttached(Material, FVector(8.f, 16.f, 16.f), Hit.GetComponent(), NAME_None, Hit.ImpactPoint, Facing, EAttachLocation::KeepWorldPosition, 12.f))
@@ -386,7 +392,7 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 	case EGesture::Place: Length = 0.35f; break;
 	case EGesture::Rotate: Length = 0.25f; break;
 	case EGesture::Pickup: Length = 0.45f; break;
-	case EGesture::Swing: Length = 0.6f; break;
+	case EGesture::Swing: Length = SwingLength; break;
 	default: break;
 	}
 	if (Gesture != EGesture::None)
@@ -422,6 +428,10 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 		{
 			bStruck = true;
 			Strike();
+			if (Hold == EHold::Strike)
+			{
+				OnImpact();
+			}
 		}
 		if (T >= 1.f)
 		{
@@ -465,8 +475,8 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 		Arms->SetBoneTransformByName(Sides[Side][1], Lower, EBoneSpaces::ComponentSpace);
 		Arms->SetBoneTransformByName(Sides[Side][2], End, EBoneSpaces::ComponentSpace);
 	}
-	// The pickaxe comes out for mining and goes away a moment after
-	const bool bMining = Hold == EHold::Mine || Gesture == EGesture::Swing;
+	// The axe or pickaxe comes out for striking and goes away a moment after
+	const bool bMining = Hold == EHold::Strike || Gesture == EGesture::Swing;
 	ToolShown = bMining ? 1.f : FMath::Max(0.f, ToolShown - DeltaSeconds * 1.5f);
 	if (Tool)
 	{
@@ -785,10 +795,7 @@ void AFWCharacter::InteractStart()
 	}
 	else if (const FFWMine* Mine = Plot->FindMine(TargetTile))
 	{
-		Hold = EHold::Mine;
-		HoldMine = Mine->Id;
-		HoldNeeded = FMath::Max(0.2f, Mine->Seconds);
-		HoldTime = 0.f;
+		BeginStrike(Mine->Id, TargetTile, Mine->Seconds, false);
 	}
 	else if (const FFWPlotObject* Farm = Plot->FindObjectAt(TargetTile); Farm && AFWPlayerController::IsFarm(Farm->Kind))
 	{
@@ -822,12 +829,101 @@ void AFWCharacter::InteractStart()
 	{
 		PC->OpenDevice(Device->Id, Device->Kind);
 	}
+	else if (!Plot->FindObjectAt(TargetTile) && Plot->IsTree(TargetTile))
+	{
+		BeginStrike(-1, TargetTile, Plot->GetChopSeconds(), true);
+	}
+	else if (!Plot->FindObjectAt(TargetTile) && Plot->TileCode(TargetTile) == FWCatalog::Rock)
+	{
+		BeginStrike(-1, TargetTile, Plot->GetRockSeconds(), false);
+	}
+}
+
+void AFWCharacter::BeginStrike(int32 MineId, FIntPoint Tile, float Seconds, bool bAxe)
+{
+	const float Now = GetWorld()->GetTimeSeconds();
+	// The same target struck again soon after goes on from the strikes it had (the server keeps them as long)
+	const bool bSame = MineId >= 0 ? HoldMine == MineId : HoldMine < 0 && StrikeTile == Tile;
+	if (!bSame || Now - LastImpact > 14.f)
+	{
+		StrikeHits = 0;
+	}
+	Hold = EHold::Strike;
+	HoldMine = MineId;
+	StrikeTile = Tile;
+	StrikeInterval = FMath::Max(0.25f, Seconds / StrikeCount);
+	SwingLength = FMath::Clamp(StrikeInterval, 0.42f, 0.85f);
+	bStrikeAxe = bAxe;
+	if (Tool)
+	{
+		UStaticMesh* InHand = bAxe && AxeMesh ? AxeMesh.Get() : PickaxeMesh.Get();
+		if (InHand && Tool->GetStaticMesh() != InHand)
+		{
+			Tool->SetStaticMesh(InHand);
+		}
+	}
+}
+
+void AFWCharacter::OnImpact()
+{
+	AFWPlayerController* PC = GetFWController();
+	if (!PC)
+	{
+		return;
+	}
+	LastImpact = GetWorld()->GetTimeSeconds();
+	++StrikeHits;
+	if (StrikeHits < StrikeCount)
+	{
+		PC->StrikeHit(HoldMine, StrikeTile);
+		return;
+	}
+	// The last strike gathers: a tree falls or a rock breaks (and that is the end of it), a mine gives a load (and
+	// digging goes on while E is held)
+	bWaiting = true;
+	TWeakObjectPtr<AFWCharacter> WeakThis(this);
+	auto Done = [WeakThis](bool bOk)
+	{
+		if (AFWCharacter* This = WeakThis.Get())
+		{
+			This->bWaiting = false;
+			This->StrikeHits = 0;
+			if (!bOk || !This->bInteractHeld || This->HoldMine < 0)
+			{
+				This->Hold = EHold::None;
+			}
+		}
+	};
+	if (HoldMine >= 0)
+	{
+		PC->Mine(HoldMine, Done);
+	}
+	else
+	{
+		PC->Harvest(StrikeTile, Done);
+	}
+}
+
+bool AFWCharacter::GetStrikes(int32& OutLeft, int32& OutTotal, float& OutSinceHit) const
+{
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	// While swinging, and for a moment after letting go of E with strikes landed, as long as the same target is looked at
+	const AFWPlot* Plot = GetPlot();
+	const bool bOnTarget = bHasTarget && Plot && (HoldMine >= 0 ? Plot->FindMine(TargetTile) && Plot->FindMine(TargetTile)->Id == HoldMine : TargetTile == StrikeTile);
+	if (!(Hold == EHold::Strike || (StrikeHits > 0 && Now - LastImpact < 3.f)) || !bOnTarget)
+	{
+		return false;
+	}
+	OutLeft = StrikeCount - StrikeHits;
+	OutTotal = StrikeCount;
+	OutSinceHit = Now - LastImpact;
+	return true;
 }
 
 void AFWCharacter::InteractStop()
 {
 	bInteractHeld = false;
-	if (Hold == EHold::Mine && !bWaiting)
+	if (Hold == EHold::Strike && !bWaiting)
 	{
 		Hold = EHold::None;
 	}
@@ -1057,63 +1153,39 @@ void AFWCharacter::UpdateHold(float DeltaSeconds)
 	{
 		return;
 	}
-	// Looking away cancels
-	if (Hold == EHold::Mine)
+	if (Hold == EHold::Strike)
 	{
-		const FFWMine* Mine = bHasTarget ? Plot->FindMine(TargetTile) : nullptr;
-		if (!Mine || Mine->Id != HoldMine)
+		// Looking away from what is struck stops it, and the strikes start over
+		const FFWMine* Mine = bHasTarget && HoldMine >= 0 ? Plot->FindMine(TargetTile) : nullptr;
+		const bool bOnTarget = bHasTarget && (HoldMine >= 0 ? Mine && Mine->Id == HoldMine : TargetTile == StrikeTile);
+		if (!bOnTarget)
 		{
 			Hold = EHold::None;
+			StrikeHits = 0;
 			return;
 		}
-	}
-	else if (Hold == EHold::Pickup)
-	{
-		const FFWPlotObject* Object = bHasTarget ? Plot->FindObjectAt(TargetTile) : nullptr;
-		if (!Object || Object->Id != HoldObject)
+		// The next swing so that it lands a strike's time after the last one (a swing lands 62% of the way through)
+		if (Gesture == EGesture::None && GetWorld()->GetTimeSeconds() - LastImpact >= StrikeInterval - 0.62f * SwingLength + 0.03f)
 		{
-			Hold = EHold::None;
-			return;
-		}
-	}
-
-	HoldTime += DeltaSeconds;
-	// The pickaxe strikes while digging
-	if (Hold == EHold::Mine)
-	{
-		MineSoundIn -= DeltaSeconds;
-		if (MineSoundIn <= 0.f)
-		{
-			MineSoundIn = FMath::FRandRange(0.55f, 0.75f);
 			PlayGesture(EGesture::Swing);
 		}
+		return;
 	}
+	// Looking away cancels picking up
+	const FFWPlotObject* Object = bHasTarget ? Plot->FindObjectAt(TargetTile) : nullptr;
+	if (!Object || Object->Id != HoldObject)
+	{
+		Hold = EHold::None;
+		return;
+	}
+	HoldTime += DeltaSeconds;
 	if (HoldTime < HoldNeeded)
 	{
 		return;
 	}
-	if (Hold == EHold::Pickup)
-	{
-		Hold = EHold::None;
-		PlayGesture(EGesture::Pickup);
-		PC->Pickup(HoldObject);
-		return;
-	}
-	bWaiting = true;
-	TWeakObjectPtr<AFWCharacter> WeakThis(this);
-	PC->Mine(HoldMine, [WeakThis](bool bOk)
-	{
-		if (AFWCharacter* This = WeakThis.Get())
-		{
-			This->bWaiting = false;
-			This->HoldTime = 0.f;
-			// Keep digging while E is held
-			if (!bOk || !This->bInteractHeld)
-			{
-				This->Hold = EHold::None;
-			}
-		}
-	});
+	Hold = EHold::None;
+	PlayGesture(EGesture::Pickup);
+	PC->Pickup(HoldObject);
 }
 
 void AFWCharacter::UpdateHeadBob(float DeltaSeconds)
@@ -1143,7 +1215,7 @@ void AFWCharacter::FWGroundCheck()
 
 float AFWCharacter::GetProgress() const
 {
-	if (Hold == EHold::None)
+	if (Hold != EHold::Pickup)
 	{
 		return -1.f;
 	}
@@ -1174,7 +1246,7 @@ FText AFWCharacter::GetTargetText() const
 	}
 	if (Plot->FindMine(TargetTile))
 	{
-		return LOCTEXT("Mine", "Kopalnia  [E] kop");
+		return LOCTEXT("Mine", "Kopalnia  [E] kop kilofem");
 	}
 	if (const FFWPlotObject* Object = Plot->FindObjectAt(TargetTile))
 	{
@@ -1184,13 +1256,13 @@ FText AFWCharacter::GetTargetText() const
 	}
 	switch (Plot->TileCode(TargetTile))
 	{
-	case FWCatalog::Rock: return LOCTEXT("Rock", "Skała");
+	case FWCatalog::Rock: return LOCTEXT("Rock", "Skała  [E] rozbijaj kilofem");
 	case FWCatalog::Dune: return LOCTEXT("Dune", "Wydma");
 	case FWCatalog::Bush: return LOCTEXT("Bush", "Krzak");
 	case FWCatalog::Rails: return LOCTEXT("Rails", "Tory");
 	case FWCatalog::Station: return LOCTEXT("Station", "Stacja");
 	case FWCatalog::Empty: return FText::GetEmpty();
-	default: return LOCTEXT("Tree", "Drzewo");
+	default: return Plot->IsTree(TargetTile) ? LOCTEXT("Tree", "Drzewo  [E] ścinaj siekierą") : FText::GetEmpty();
 	}
 }
 

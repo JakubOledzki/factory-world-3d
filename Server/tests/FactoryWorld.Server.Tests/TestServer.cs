@@ -4,6 +4,7 @@ using System.Text.Json;
 using FactoryWorld.Modules.Abstractions.Contracts;
 using FactoryWorld.Modules.Characters;
 using FactoryWorld.Modules.Companies;
+using FactoryWorld.Modules.World;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -85,6 +86,20 @@ public class ServerFactory : WebApplicationFactory<Program>
     {
         var socket = await Server.CreateWebSocketClient().ConnectAsync(new Uri(Server.BaseAddress, "ws"), CancellationToken.None);
         return new GameClient(socket);
+    }
+
+    /// <summary>Gathers as a player does, in StrikeRules.Count strikes: "plot.hit" for each but the last, the last the request
+    /// itself (e.g. "plot.harvest", "plot.mine"), the clock moved on by <paramref name="strike"/> (a second) before each.</summary>
+    public async Task<JsonElement> StrikeAsync(GameClient client, string type, object payload, TimeSpan? strike = null)
+    {
+        for (var i = 0; i < StrikeRules.Count - 1; i++)
+        {
+            Time.Advance(strike ?? TimeSpan.FromSeconds(1));
+            Assert.Equal("plot.hit", (await client.SendAsync("plot.hit", payload)).Type());
+        }
+
+        Time.Advance(strike ?? TimeSpan.FromSeconds(1));
+        return await client.SendAsync(type, payload);
     }
 
     /// <summary>Gives the account's character enough XP to bring plots into a company.</summary>

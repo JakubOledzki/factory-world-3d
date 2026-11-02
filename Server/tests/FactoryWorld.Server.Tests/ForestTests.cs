@@ -227,9 +227,9 @@ public sealed class ForestTests(ServerFactory factory) : IClassFixture<ServerFac
 
         // The oak takes 22.5 minutes in a forest, three times as long as a pine, and gives oak wood.
         factory.Time.Advance(TimeSpan.FromMinutes(22));
-        Assert.Equal("not_grown", (await client.SendAsync("plot.harvest", new { x = plot.X, y = plot.Y, tileX = free[0].X, tileY = free[0].Y })).ErrorCode());
+        Assert.Equal("not_grown", (await factory.StrikeAsync(client, "plot.harvest", new { x = plot.X, y = plot.Y, tileX = free[0].X, tileY = free[0].Y })).ErrorCode());
         factory.Time.Advance(TimeSpan.FromMinutes(1));
-        var cut = await client.SendAsync("plot.harvest", new { x = plot.X, y = plot.Y, tileX = free[0].X, tileY = free[0].Y });
+        var cut = await factory.StrikeAsync(client, "plot.harvest", new { x = plot.X, y = plot.Y, tileX = free[0].X, tileY = free[0].Y });
         Assert.Equal("plot.harvested", cut.Type());
         Assert.Contains(cut.Payload().GetProperty("items").EnumerateArray(), i => i.GetProperty("id").GetString() == Items.OakWood);
 
@@ -265,14 +265,14 @@ public sealed class ForestTests(ServerFactory factory) : IClassFixture<ServerFac
         Assert.True(at >= 0);
         var (tx, ty) = (at % PlotLayout.Size, at / PlotLayout.Size);
 
-        var picked = await client.SendAsync("plot.harvest", new { x = plot.X, y = plot.Y, tileX = tx, tileY = ty });
+        var picked = await factory.StrikeAsync(client, "plot.harvest", new { x = plot.X, y = plot.Y, tileX = tx, tileY = ty });
         Assert.Equal("plot.harvested", picked.Type());
         Assert.Contains(picked.Payload().GetProperty("items").EnumerateArray(), i => i.GetProperty("id").GetString() == Items.Mushrooms);
         Assert.Equal((byte)TileObject.None, (await EnterAsync(client, plot)).Tiles[at]);
 
         factory.Time.Advance(Forestry.MushroomRegrow + TimeSpan.FromMinutes(1));
         Assert.Equal((byte)TileObject.Mushrooms, (await EnterAsync(client, plot)).Tiles[at]);
-        Assert.Equal("plot.harvested", (await client.SendAsync("plot.harvest", new { x = plot.X, y = plot.Y, tileX = tx, tileY = ty })).Type());
+        Assert.Equal("plot.harvested", (await factory.StrikeAsync(client, "plot.harvest", new { x = plot.X, y = plot.Y, tileX = tx, tileY = ty })).Type());
     }
 
     [Fact]
@@ -299,7 +299,7 @@ public sealed class ForestTests(ServerFactory factory) : IClassFixture<ServerFac
         if (infested.Count > 0)
         {
             var (ix, iy) = infested[0];
-            var cut = (await client.SendAsync("plot.harvest", new { x = plot.X, y = plot.Y, tileX = ix, tileY = iy })).Payload();
+            var cut = (await factory.StrikeAsync(client, "plot.harvest", new { x = plot.X, y = plot.Y, tileX = ix, tileY = iy })).Payload();
             Assert.Equal([Items.Wood], cut.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetString()));
         }
 
