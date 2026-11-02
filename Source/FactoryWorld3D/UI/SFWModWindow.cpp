@@ -20,7 +20,7 @@ namespace
 	// Rows of items shown at once; the search narrows the rest down
 	constexpr int32 MaxItemRows = 80;
 
-	TSharedRef<SWidget> Section(const FText& Title, const FText& About, TSharedRef<SWidget> Body)
+	TSharedRef<SWidget> ModSection(const FText& Title, const FText& About, TSharedRef<SWidget> Body)
 	{
 		return SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 4)[FWUi::Heading(Title)]
@@ -82,7 +82,7 @@ TSharedRef<SWidget> SFWModWindow::MoneySection()
 		[
 			FWUi::SmallButton(LOCTEXT("Add", "Dodaj"), [this]() { GiveMoney(Form->Cents(TEXT("money"))); }, true)
 		];
-	return Section(LOCTEXT("Money", "Pieniądze"), LOCTEXT("MoneyAbout", "Prosto do portfela."),
+	return ModSection(LOCTEXT("Money", "Pieniądze"), LOCTEXT("MoneyAbout", "Prosto do portfela."),
 		SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 10)[Quick]
 		+ SVerticalBox::Slot().AutoHeight()[Own]);
@@ -99,7 +99,7 @@ TSharedRef<SWidget> SFWModWindow::ToolSection()
 			FWUi::SmallButton(FText::FromString(FWUi::Str(Tool, TEXT("name"))), [this, Id]() { GiveTool(Id); })
 		];
 	}
-	return Section(LOCTEXT("Tools", "Narzędzia"), LOCTEXT("ToolsAbout", "Prosto do paska narzędzi (na pierwsze wolne miejsce)."), Tools);
+	return ModSection(LOCTEXT("Tools", "Narzędzia"), LOCTEXT("ToolsAbout", "Prosto do paska narzędzi (na pierwsze wolne miejsce)."), Tools);
 }
 
 TSharedRef<SWidget> SFWModWindow::PlotSection()
@@ -118,12 +118,12 @@ TSharedRef<SWidget> SFWModWindow::PlotSection()
 		[
 			FWUi::SmallButton(LOCTEXT("BuyPlot", "Kup działkę"), [this]() { BuyPlot(Form->Get(TEXT("biome"))); }, true)
 		];
-	return Section(LOCTEXT("Plot", "Działka"), LOCTEXT("PlotAbout", "Najbliższa wolna działka tego terenu przy działce startowej, opłacona. Wejdziesz na nią z mapy (N)."), Row);
+	return ModSection(LOCTEXT("Plot", "Działka"), LOCTEXT("PlotAbout", "Najbliższa wolna działka tego terenu przy działce startowej, opłacona. Wejdziesz na nią z mapy (N)."), Row);
 }
 
 TSharedRef<SWidget> SFWModWindow::WorldSection()
 {
-	return Section(LOCTEXT("World", "Świat testowy"),
+	return ModSection(LOCTEXT("World", "Świat testowy"),
 		LOCTEXT("WorldAbout", "1 000 000 $, największy plecak, kilof i siekiera w pasku, działki: łąka, las i góry, maszyny testowe na łące. Przenosi na łąkę."),
 		SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().AutoWidth()
