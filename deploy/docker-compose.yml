@@ -1,0 +1,59 @@
+# Production: the 3D game's server, its database, and Caddy in front of it (HTTPS, so the game connects with wss://).
+# How to set it up, back it up and update it: deploy/README.md. Secrets come from deploy/.env (made from .env.example,
+# never in git).
+#   docker compose up -d --build        (in deploy/)
+name: factoryworld3d
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: factoryworld3d
+      POSTGRES_USER: factory
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U factory -d factoryworld3d"]
+      interval: 5s
+      retries: 10
+    # Not published: only the server reaches it, inside the compose network
+
+  server:
+    build: ../Server
+    restart: unless-stopped
+    environment:
+      # Production: no developer commands, no bots (both are off unless turned on)
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Game: "Host=db;Port=5432;Database=factoryworld3d;Username=factory;Password=${POSTGRES_PASSWORD}"
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "5081"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - server
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

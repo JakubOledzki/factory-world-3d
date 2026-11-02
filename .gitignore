@@ -41,3 +41,7 @@ Content/MetaHumans/
 # The 3D game's server: build output
 Server/**/bin/
 Server/**/obj/
+
+# Production secrets and database copies (deploy/README.md): only on the server
+deploy/.env
+deploy/backups/
