@@ -178,7 +178,7 @@ public:
 	// The company (K) and the banks (Z, as B builds in 3D), as in the 2D game
 	void OpenCompany();
 	void OpenBank();
-	// The mod menu (F8) of a local test account (dev.access said yes at login; the server checks each command again)
+	// The mod menu (F8) of a test or mod account (dev.access said yes at login; the server checks each command again)
 	void OpenModMenu();
 	bool HasModMenu() const { return ModAccess.IsValid(); }
 

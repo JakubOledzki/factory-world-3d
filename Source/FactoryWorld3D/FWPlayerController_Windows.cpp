@@ -193,7 +193,7 @@ void AFWPlayerController::OpenModMenu()
 {
 	if (!ModAccess.IsValid())
 	{
-		Toast(LOCTEXT("NoModMenu", "Mod menu jest tylko dla konta testowego na serwerze deweloperskim."), true);
+		Toast(LOCTEXT("NoModMenu", "Mod menu jest tylko dla konta testowego."), true);
 		return;
 	}
 	SAssignNew(ModWindow, SFWModWindow).Controller(this).Access(ModAccess);

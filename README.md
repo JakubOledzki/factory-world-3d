@@ -318,7 +318,7 @@ Konto testowe (`test@gmail.com`) ma w grze **mod menu**: klawisz **F8** albo prz
 - **Działka**: kupuje (opłaconą) najbliższą wolną działkę wybranego terenu.
 - **Świat testowy**: to samo co `FWDevWorld`.
 
-Menu działa tylko na serwerze deweloperskim (Development z `Dev:Commands`), dla połączeń z tego komputera i dla kont z `Dev:Accounts`. Serwer sprawdza to przy każdej komendzie (`dev.access`, `dev.give`, `dev.tool`, `dev.plot`, `dev.world`), więc inne konto nie dostanie pieniędzy, nawet gdyby wysłało komendę samo. Serwer publiczny (Production) tych komend w ogóle nie ma. Do testów: `FWModMenu`, `FWModMoney <dolary>`, `FWModFilter <tekst>`.
+Menu działa tylko na serwerze deweloperskim (Development z `Dev:Commands`), dla połączeń z tego komputera i dla kont z `Dev:Accounts`. Serwer sprawdza to przy każdej komendzie (`dev.access`, `dev.give`, `dev.tool`, `dev.plot`, `dev.world`), więc inne konto nie dostanie pieniędzy, nawet gdyby wysłało komendę samo. Serwer publiczny (Production) ma je tylko dla konta z `MOD_ACCOUNT` w `deploy/.env` (np. test@gmail.com w grze z launchera), z dowolnego komputera; bez tego ustawienia nie zna ich wcale (deploy/README.md, „Mod menu na serwerze”). Do testów: `FWModMenu`, `FWModMoney <dolary>`, `FWModFilter <tekst>`.
 
 ## Transport: stacja, kursy, trasy i eksport
 

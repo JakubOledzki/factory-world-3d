@@ -11,10 +11,11 @@ class SVerticalBox;
 struct FFWNetReply;
 
 /**
- * The mod menu (F8) of the local test account: money into the wallet, any item into the backpack, a tool into the
+ * The mod menu (F8) of a test account: money into the wallet, any item into the backpack, a tool into the
  * tool bar, a plot of a chosen biome, or the whole test world at once. It is built on the server's developer commands
- * (Server/src/FactoryWorld.Server/DevCommands.cs), which work only on a development server, from this computer, for
- * the accounts listed in Dev:Accounts; "dev.access" said this player is one and what there is to give.
+ * (Server/src/FactoryWorld.Server/DevCommands.cs), which work only for the local test accounts of a development server
+ * (Dev:Accounts) and the mod accounts of any server (Mod:Accounts); "dev.access" said this player is one and what
+ * there is to give.
  */
 class SFWModWindow : public SCompoundWidget
 {
