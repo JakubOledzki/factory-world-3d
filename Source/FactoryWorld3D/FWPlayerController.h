@@ -171,6 +171,9 @@ public:
 	// The company (K) and the banks (Z, as B builds in 3D), as in the 2D game
 	void OpenCompany();
 	void OpenBank();
+	// The mod menu (F8) of a local test account (dev.access said yes at login; the server checks each command again)
+	void OpenModMenu();
+	bool HasModMenu() const { return ModAccess.IsValid(); }
 
 	void SelectSlot(int32 Slot);
 	// The chat in the corner (Enter opens it to write) and achievements, rankings and rivalry (O), as in the 2D game
@@ -212,6 +215,13 @@ public:
 	// world (money, backpack, axe and pickaxe, three plots, test machines), and money or an item
 	UFUNCTION(Exec)
 	void FWDevWorld();
+	// The mod menu (F8), and its actions for tests: money (dollars), an item, a search in the item list
+	UFUNCTION(Exec)
+	void FWModMenu() { OpenModMenu(); }
+	UFUNCTION(Exec)
+	void FWModMoney(float Dollars);
+	UFUNCTION(Exec)
+	void FWModFilter(const FString& Text);
 	UFUNCTION(Exec)
 	void FWDevGive(const FString& Item, int32 Quantity = 1, float Dollars = 0.f);
 	UFUNCTION(Exec)
@@ -478,6 +488,10 @@ private:
 	TSharedPtr<SFWPromptWidget> Prompt;
 	TSharedPtr<SFWCompanyWindow> Company;
 	TSharedPtr<SFWBankWindow> Bank;
+	TSharedPtr<class SFWModWindow> ModWindow;
+	// The "dev.access" reply when this account may use the mod menu, else null
+	TSharedPtr<FJsonObject> ModAccess;
+	void CheckModMenu();
 	TSharedPtr<SWidget> ShownWidget;
 	TSharedPtr<SFWAdventuresWindow> Adventures;
 	TSharedPtr<SFWHud> Hud;

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FactoryWorld.Modules.Abstractions;
 using FactoryWorld.Modules.Abstractions.Contracts;
+using FactoryWorld.Modules.Accounts;
 using FactoryWorld.Modules.Characters;
 using FactoryWorld.Modules.World;
 
@@ -10,7 +11,8 @@ namespace FactoryWorld.Server;
 /// Commands for developing and testing the game on one's own computer: money, items and tools, a plot of a chosen
 /// biome, test machines on it, or all of it at once ("dev.world"). They exist only on a server started in Development
 /// with <c>Dev:Commands</c> set (appsettings.Development.json), and each also refuses a connection that is not from
-/// this computer. A public server (Production) has none of them.
+/// this computer and an account whose e-mail is not in <c>Dev:Accounts</c> (the local test accounts). A public server
+/// (Production) has none of them. The game's mod menu is built on them and asks "dev.access" whether to show itself.
 /// </summary>
 public static class DevCommands
 {
@@ -22,6 +24,8 @@ public static class DevCommands
 
     public static void Register(IServiceCollection services)
     {
+        services.AddSingleton<DevAccess>();
+        services.AddSingleton<IMessageHandler, DevAccessHandler>();
         services.AddSingleton<IMessageHandler, DevGiveHandler>();
         services.AddSingleton<IMessageHandler, DevToolHandler>();
         services.AddSingleton<IMessageHandler, DevPlotHandler>();
@@ -30,7 +34,7 @@ public static class DevCommands
     }
 
     /// <summary>The player sending a developer command; refused unless the server is a development one and the
-    /// connection comes from this computer.</summary>
+    /// connection comes from this computer. <see cref="DevAccess"/> also checks the account.</summary>
     public static Guid Require(ClientContext client, IHostEnvironment environment)
     {
         if (!environment.IsDevelopment() || !client.IsLocal)
@@ -73,6 +77,10 @@ public static class DevCommands
 
         throw new GameException("no_plot", $"No free plot of {biome} near {x}:{y}.");
     }
+
+    /// <summary>The biomes the mod menu offers a plot in: those with plots to buy.</summary>
+    public static readonly Biome[] Biomes = [Biome.Grassland, Biome.Forest, Biome.Farmland, Biome.Mountains, Biome.Desert,
+        Biome.Tundra, Biome.Coast, Biome.Lakeshore];
 
     /// <summary>The kinds of machine "dev.machines" puts on a plot, so their windows can be opened and tested.</summary>
     public static readonly string[] Machines = [Items.Workbench, Items.Furnace, Items.Sawmill, Items.Assembler, Items.Computer, Items.Shop];
@@ -134,18 +142,80 @@ public static class DevCommands
     }
 }
 
+/// <summary>
+/// Who may use the developer commands (and so the mod menu): a development server, a connection from this computer and
+/// an account whose e-mail is listed in <c>Dev:Accounts</c>. Checked on every command, so the game showing or hiding
+/// its menu is only for looks.
+/// </summary>
+public sealed class DevAccess(IHostEnvironment environment, IConfiguration configuration)
+{
+    /// <summary>The listed e-mails, as accounts keep them (lower-cased, trimmed).</summary>
+    public IReadOnlySet<string> Accounts { get; } = (configuration.GetSection("Dev:Accounts").Get<string[]>() ?? [])
+        .Where(e => !string.IsNullOrWhiteSpace(e))
+        .Select(AccountRules.NormalizeEmail)
+        .ToHashSet();
+
+    public async Task<bool> AllowedAsync(ClientContext client, IServiceProvider services, CancellationToken cancellationToken)
+    {
+        if (!environment.IsDevelopment() || !client.IsLocal || client.AccountId is not { } player)
+        {
+            return false;
+        }
+
+        var email = await services.GetRequiredService<AccountService>().EmailAsync(player, cancellationToken);
+        return email is not null && Accounts.Contains(email);
+    }
+
+    /// <summary>The player sending a developer command; "not_allowed" off a local development server, and
+    /// "not_test_account" for an account not in the list.</summary>
+    public async Task<Guid> RequireAsync(ClientContext client, IServiceProvider services, CancellationToken cancellationToken)
+    {
+        var player = DevCommands.Require(client, environment);
+        if (!await AllowedAsync(client, services, cancellationToken))
+        {
+            throw new GameException("not_test_account", "Developer commands are only for the test accounts in Dev:Accounts.");
+        }
+
+        return player;
+    }
+}
+
+/// <summary>"dev.access": whether this player may use the mod menu and, if so, what it offers: every item (id and
+/// name), the tools for the tool bar and the biomes a plot can be bought in. Never an error for a player who may
+/// not; a server without developer commands answers "unknown_type", which the game takes as a no too.</summary>
+public sealed class DevAccessHandler(IServiceScopeFactory scopes, DevAccess access) : IMessageHandler
+{
+    public string Type => "dev.access";
+
+    public async Task<Reply> HandleAsync(JsonElement? payload, ClientContext client, CancellationToken cancellationToken)
+    {
+        client.RequireAccount();
+        await using var scope = scopes.CreateAsyncScope();
+        if (!await access.AllowedAsync(client, scope.ServiceProvider, cancellationToken))
+        {
+            return new Reply("dev.access", new { allowed = false });
+        }
+
+        var items = Items.Names.OrderBy(i => i.Value, StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("pl-PL"), false))
+            .Select(i => new { id = i.Key, name = i.Value });
+        var tools = Items.Names.Keys.Where(Items.IsTool).Select(id => new { id, name = Items.Names[id] });
+        var biomes = DevCommands.Biomes.Select(b => new { id = b.ToString(), biome = (int)b });
+        return new Reply("dev.access", new { allowed = true, items, tools, biomes });
+    }
+}
+
 public sealed record DevGiveRequest(long Cents = 0, string? Item = null, long Quantity = 1);
 
 /// <summary>"dev.give": money (cents) and/or an item.</summary>
-public sealed class DevGiveHandler(IServiceScopeFactory scopes, IHostEnvironment environment) : IMessageHandler
+public sealed class DevGiveHandler(IServiceScopeFactory scopes, DevAccess access) : IMessageHandler
 {
     public string Type => "dev.give";
 
     public async Task<Reply> HandleAsync(JsonElement? payload, ClientContext client, CancellationToken cancellationToken)
     {
-        var player = DevCommands.Require(client, environment);
-        var request = Payload.Read<DevGiveRequest>(payload);
         await using var scope = scopes.CreateAsyncScope();
+        var player = await access.RequireAsync(client, scope.ServiceProvider, cancellationToken);
+        var request = Payload.Read<DevGiveRequest>(payload);
         if (request.Cents > 0)
         {
             await scope.ServiceProvider.GetRequiredService<IWallet>().CreditAsync(player, request.Cents, "dev give", cancellationToken);
@@ -168,20 +238,20 @@ public sealed class DevGiveHandler(IServiceScopeFactory scopes, IHostEnvironment
 public sealed record DevToolRequest(string? Tool, int? Slot = null);
 
 /// <summary>"dev.tool": a tool straight into the tool bar (a slot, or the first free one).</summary>
-public sealed class DevToolHandler(IServiceScopeFactory scopes, IHostEnvironment environment) : IMessageHandler
+public sealed class DevToolHandler(IServiceScopeFactory scopes, DevAccess access) : IMessageHandler
 {
     public string Type => "dev.tool";
 
     public async Task<Reply> HandleAsync(JsonElement? payload, ClientContext client, CancellationToken cancellationToken)
     {
-        var player = DevCommands.Require(client, environment);
+        await using var scope = scopes.CreateAsyncScope();
+        var player = await access.RequireAsync(client, scope.ServiceProvider, cancellationToken);
         var request = Payload.Read<DevToolRequest>(payload);
         if (request.Tool is null || !Items.Names.ContainsKey(request.Tool))
         {
             throw new GameException("unknown_item", $"There is no item '{request.Tool}'.");
         }
 
-        await using var scope = scopes.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<IInventory>().AddAsync(player, request.Tool, 1, cancellationToken);
         await scope.ServiceProvider.GetRequiredService<Equipment>().EquipAsync(player, request.Tool, request.Slot, cancellationToken);
         return new Reply("dev.done", new { tools = await scope.ServiceProvider.GetRequiredService<IEquipment>().ToolsAsync(player, cancellationToken) });
@@ -191,20 +261,20 @@ public sealed class DevToolHandler(IServiceScopeFactory scopes, IHostEnvironment
 public sealed record DevPlotRequest(string? Biome, int? X = null, int? Y = null);
 
 /// <summary>"dev.plot": buys the free plot of a biome ("Forest", "Grassland", "Mountains"…) nearest a place, paid for.</summary>
-public sealed class DevPlotHandler(IServiceScopeFactory scopes, IHostEnvironment environment) : IMessageHandler
+public sealed class DevPlotHandler(IServiceScopeFactory scopes, DevAccess access) : IMessageHandler
 {
     public string Type => "dev.plot";
 
     public async Task<Reply> HandleAsync(JsonElement? payload, ClientContext client, CancellationToken cancellationToken)
     {
-        var player = DevCommands.Require(client, environment);
+        await using var scope = scopes.CreateAsyncScope();
+        var player = await access.RequireAsync(client, scope.ServiceProvider, cancellationToken);
         var request = Payload.Read<DevPlotRequest>(payload);
         if (!Enum.TryParse<Biome>(request.Biome, true, out var biome))
         {
             throw new GameException("bad_biome", $"No biome '{request.Biome}'; one of {string.Join(", ", Enum.GetNames<Biome>())}.");
         }
 
-        await using var scope = scopes.CreateAsyncScope();
         var (x, y) = await DevCommands.PlotAsync(scope.ServiceProvider, player, biome,
             request.X ?? DevCommands.Around.X, request.Y ?? DevCommands.Around.Y, cancellationToken);
         return new Reply("dev.done", new { x, y, biome = biome.ToString() });
@@ -214,15 +284,15 @@ public sealed class DevPlotHandler(IServiceScopeFactory scopes, IHostEnvironment
 public sealed record DevMachinesRequest(int X, int Y);
 
 /// <summary>"dev.machines": one of each test machine (workbench, furnace, sawmill, assembler, computer, shop) on a plot of the player's.</summary>
-public sealed class DevMachinesHandler(IServiceScopeFactory scopes, IHostEnvironment environment) : IMessageHandler
+public sealed class DevMachinesHandler(IServiceScopeFactory scopes, DevAccess access) : IMessageHandler
 {
     public string Type => "dev.machines";
 
     public async Task<Reply> HandleAsync(JsonElement? payload, ClientContext client, CancellationToken cancellationToken)
     {
-        var player = DevCommands.Require(client, environment);
-        var request = Payload.Read<DevMachinesRequest>(payload);
         await using var scope = scopes.CreateAsyncScope();
+        var player = await access.RequireAsync(client, scope.ServiceProvider, cancellationToken);
+        var request = Payload.Read<DevMachinesRequest>(payload);
         var (placed, failed) = await DevCommands.MachinesAsync(scope.ServiceProvider, player, request.X, request.Y, cancellationToken);
         return new Reply("dev.done", new { placed, failed });
     }
@@ -230,14 +300,14 @@ public sealed class DevMachinesHandler(IServiceScopeFactory scopes, IHostEnviron
 
 /// <summary>"dev.world": a test world in one go: 1 000 000 $, the largest backpack with the pickaxe and the axe in the
 /// tool bar, a forest, a grassland and a mountain plot, and the test machines on the grassland.</summary>
-public sealed class DevWorldHandler(IServiceScopeFactory scopes, IHostEnvironment environment) : IMessageHandler
+public sealed class DevWorldHandler(IServiceScopeFactory scopes, DevAccess access) : IMessageHandler
 {
     public string Type => "dev.world";
 
     public async Task<Reply> HandleAsync(JsonElement? payload, ClientContext client, CancellationToken cancellationToken)
     {
-        var player = DevCommands.Require(client, environment);
         await using var scope = scopes.CreateAsyncScope();
+        var player = await access.RequireAsync(client, scope.ServiceProvider, cancellationToken);
         var services = scope.ServiceProvider;
         var inventory = services.GetRequiredService<IInventory>();
         var equipment = services.GetRequiredService<Equipment>();

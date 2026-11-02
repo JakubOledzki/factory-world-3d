@@ -584,6 +584,7 @@ void AFWCharacter::CreateInput()
 	Mapping->MapKey(Actions[TEXT("Inventory")], EKeys::I);
 	Mapping->MapKey(MakeAction(TEXT("Menu"), EInputActionValueType::Boolean), EKeys::Escape);
 	Mapping->MapKey(MakeAction(TEXT("Map"), EInputActionValueType::Boolean), EKeys::N);
+	Mapping->MapKey(MakeAction(TEXT("ModMenu"), EInputActionValueType::Boolean), EKeys::F8);
 	// The mouse wheel steps through the hotbar
 	Mapping->MapKey(MakeAction(TEXT("Scroll"), EInputActionValueType::Axis1D), EKeys::MouseWheelAxis);
 	const FKey SlotKeys[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five };
@@ -729,6 +730,14 @@ void AFWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		if (AFWPlayerController* PC = GetFWController())
 		{
 			PC->OpenWorldMap();
+		}
+	});
+	Input->BindActionValueLambda(Actions[TEXT("ModMenu")], ETriggerEvent::Started, [this](const FInputActionValue&)
+	{
+		// Nothing at all for a player without the menu: F8 is just a key
+		if (AFWPlayerController* PC = GetFWController(); PC && PC->HasModMenu())
+		{
+			PC->OpenModMenu();
 		}
 	});
 	for (int32 Slot = 0; Slot < 5; ++Slot)

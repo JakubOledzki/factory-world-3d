@@ -128,6 +128,23 @@ void SFWSettingsWindow::Construct(const FArguments& InArgs)
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 8)
 					[
+						// Only for the local test account (F8 opens it too)
+						SNew(SButton).ButtonStyle(&FWStyle::SecondaryButton()).HAlign(HAlign_Center)
+						.Visibility_Lambda([this]() { return Controller.IsValid() && Controller->HasModMenu() ? EVisibility::Visible : EVisibility::Collapsed; })
+						.OnClicked_Lambda([this]()
+						{
+							if (AFWPlayerController* PC = Controller.Get())
+							{
+								PC->OpenModMenu();
+							}
+							return FReply::Handled();
+						})
+						[
+							SNew(STextBlock).Text(LOCTEXT("ModMenu", "Mod menu  [F8]")).Font(FWStyle::Font(13)).ColorAndOpacity(FWStyle::Accent)
+						]
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 8)
+					[
 						SNew(SButton).ButtonStyle(&FWStyle::PrimaryButton()).HAlign(HAlign_Center)
 						.OnClicked_Lambda([this]()
 						{

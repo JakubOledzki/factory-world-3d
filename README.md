@@ -305,6 +305,20 @@ Katalog `Saved/` nie trafia do gita, więc hasła nie ma w repozytorium. Plik je
 
 Konto bez działki i bez pieniędzy dostaje propozycję kupna działki i przycisk „Rozejrzyj się (bez działki)”, więc gra nie utyka.
 
+Komendy deweloperskie (świat testowy `FWDevWorld`, mod menu) działają tylko dla kont testowych z listy `Dev:Accounts` w `Server/src/FactoryWorld.Server/appsettings.Development.json` (domyślnie `test@gmail.com` i `explore3d@example.test`). Jeśli `DevLogin.ini` loguje innym kontem, dopisz je do tej listy.
+
+## Mod menu (tylko konto testowe)
+
+Konto testowe (`test@gmail.com`) ma w grze **mod menu**: klawisz **F8** albo przycisk „Mod menu” w menu pod Esc. W nim:
+
+- **Pieniądze**: +1 000 $, +10 000 $, +100 000 $, +1 000 000 $ albo dowolna kwota, prosto do portfela.
+- **Przedmioty**: lista wszystkich przedmiotów z wyszukiwarką; +1, +10 albo +100 do plecaka.
+- **Narzędzia**: siekiera, kilofy, łopata i reszta prosto do paska narzędzi.
+- **Działka**: kupuje (opłaconą) najbliższą wolną działkę wybranego terenu.
+- **Świat testowy**: to samo co `FWDevWorld`.
+
+Menu działa tylko na serwerze deweloperskim (Development z `Dev:Commands`), dla połączeń z tego komputera i dla kont z `Dev:Accounts`. Serwer sprawdza to przy każdej komendzie (`dev.access`, `dev.give`, `dev.tool`, `dev.plot`, `dev.world`), więc inne konto nie dostanie pieniędzy, nawet gdyby wysłało komendę samo. Serwer publiczny (Production) tych komend w ogóle nie ma. Do testów: `FWModMenu`, `FWModMoney <dolary>`, `FWModFilter <tekst>`.
+
 ## Transport: stacja, kursy, trasy i eksport
 
 Jak w grze 2D:
