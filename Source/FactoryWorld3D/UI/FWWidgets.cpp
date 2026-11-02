@@ -10,13 +10,68 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Notifications/SProgressBar.h"
 #include "Widgets/SBoxPanel.h"
+#include "Widgets/SCompoundWidget.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
 
 #define LOCTEXT_NAMESPACE "FWUi"
 
+namespace
+{
+	// Fades its content in and lets it grow from a little smaller, easing out, over its first moment on screen
+	class SFWAppear : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SFWAppear) {}
+			SLATE_DEFAULT_SLOT(FArguments, Content)
+			SLATE_ARGUMENT(float, Seconds)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			Seconds = FMath::Max(InArgs._Seconds, 0.01f);
+			Start = FPlatformTime::Seconds();
+			SetRenderOpacity(0.f);
+			SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+			ChildSlot[InArgs._Content.Widget];
+		}
+
+		virtual void Tick(const FGeometry& Geometry, const double CurrentTime, const float DeltaTime) override
+		{
+			SCompoundWidget::Tick(Geometry, CurrentTime, DeltaTime);
+			if (bDone)
+			{
+				return;
+			}
+			const float T = FMath::Clamp(float((FPlatformTime::Seconds() - Start) / Seconds), 0.f, 1.f);
+			const float Eased = 1.f - FMath::Pow(1.f - T, 3.f);
+			SetRenderOpacity(Eased);
+			SetRenderTransform(FSlateRenderTransform(FScale2f(FMath::Lerp(0.965f, 1.f, Eased)), FVector2f(0.f, 10.f * (1.f - Eased))));
+			bDone = T >= 1.f;
+		}
+
+	private:
+		float Seconds = 0.18f;
+		double Start = 0.0;
+		bool bDone = false;
+	};
+}
+
 namespace FWUi
 {
+	TSharedRef<SWidget> Appear(TSharedRef<SWidget> Content, float Seconds)
+	{
+		return SNew(SFWAppear).Seconds(Seconds)[Content];
+	}
+
+	TSharedRef<SWidget> Key(const FText& Text)
+	{
+		return SNew(SBorder).BorderImage(FWStyle::KeyCap()).Padding(FMargin(7.f, 1.f))
+			[
+				SNew(STextBlock).Text(Text).Font(FWStyle::Font(11, TEXT("SemiBold"))).ColorAndOpacity(FWStyle::Text)
+			];
+	}
+
 	FText Money(double Cents)
 	{
 		FNumberFormattingOptions Options;
@@ -124,58 +179,68 @@ namespace FWUi
 	TSharedRef<SWidget> Frame(const FText& Title, TSharedRef<SWidget> Right, TSharedPtr<SWidget> Tabs, TSharedRef<SWidget> Content, float Width, float Height)
 	{
 		return SNew(SOverlay)
-			+ SOverlay::Slot()[SNew(SBackgroundBlur).BlurStrength(4.f)]
+			+ SOverlay::Slot()[SNew(SBackgroundBlur).BlurStrength(6.f)]
 			+ SOverlay::Slot()[SNew(SBorder).BorderImage(FWStyle::SideShade())]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 			[
-				SNew(SBorder).BorderImage(FWStyle::Panel()).Padding(24.f)
+				Appear(
+				SNew(SBorder).BorderImage(FWStyle::Panel()).Padding(FMargin(28.f, 22.f, 28.f, 24.f))
 				[
 					SNew(SBox).WidthOverride(Width).HeightOverride(Height)
 					[
 						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 14)
+						// Title: tall condensed capitals after an amber bar, and what goes on the right (e.g. the balance)
+						+ SVerticalBox::Slot().AutoHeight()
 						[
 							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 12, 0)
+							[
+								SNew(SBox).WidthOverride(4.f).HeightOverride(26.f)[SNew(SImage).Image(FWStyle::Swatch()).ColorAndOpacity(FWStyle::Accent)]
+							]
 							+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 							[
-								SNew(STextBlock).Text(Title).Font(FWStyle::Font(24, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)
+								SNew(STextBlock).Text(Title.ToUpper()).Font(FWStyle::Display(30)).ColorAndOpacity(FWStyle::Text)
 							]
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Right]
 						]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, Tabs.IsValid() ? 12.f : 0.f)
+						// A hairline under the title
+						+ SVerticalBox::Slot().AutoHeight().Padding(0, 12, 0, 14)
+						[
+							SNew(SBox).HeightOverride(1.f)[SNew(SImage).Image(FWStyle::Swatch()).ColorAndOpacity(FLinearColor(1.f, 1.f, 1.f, 0.08f))]
+						]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, Tabs.IsValid() ? 14.f : 0.f)
 						[
 							Tabs.IsValid() ? Tabs.ToSharedRef() : SNullWidget::NullWidget
 						]
 						+ SVerticalBox::Slot().FillHeight(1.f)[Content]
 					]
-				]
+				])
 			]
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 32.f)
+			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 30.f)
 			[
-				SNew(STextBlock).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Muted).Text(LOCTEXT("Close", "Esc zamyka"))
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 8, 0)[Key(LOCTEXT("EscKey", "Esc"))]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					SNew(STextBlock).Font(FWStyle::Font(12)).ColorAndOpacity(FWStyle::Muted).Text(LOCTEXT("Close", "zamknij"))
+				]
 			];
 	}
 
 	TSharedRef<SWidget> TabButton(const FText& Text, TFunction<bool()> IsActive, TFunction<void()> OnClick)
 	{
-		// The chosen one in amber, underlined
-		return SNew(SButton)
-			.ButtonStyle(&FWStyle::SecondaryButton())
-			.OnClicked_Lambda([OnClick]() { OnClick(); return FReply::Handled(); })
+		// The chosen one sits on an amber-lit pill with amber text; the others light up under the mouse
+		return SNew(SBorder)
+			.Padding(0)
+			.BorderImage_Lambda([IsActive]() { return IsActive() ? &FWStyle::TabButton(true).Normal : FStyleDefaults::GetNoBrush(); })
 			[
-				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().AutoHeight()
+				SNew(SButton)
+				.ButtonStyle(&FWStyle::TabButton(false))
+				.ContentPadding(FMargin(6.f, 2.f))
+				.OnClicked_Lambda([OnClick]() { OnClick(); return FReply::Handled(); })
 				[
-					SNew(STextBlock).Text(Text).Font(FWStyle::Font(12, TEXT("Bold")))
+					SNew(STextBlock).Text(Text).Font(FWStyle::Font(13, TEXT("SemiBold")))
 					.ColorAndOpacity_Lambda([IsActive]() { return FSlateColor(IsActive() ? FWStyle::Accent : FWStyle::Text); })
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0, 3, 0, 0)
-				[
-					SNew(SBox).HeightOverride(2.f)
-					[
-						SNew(SImage).Image(FWStyle::Swatch()).ColorAndOpacity(FWStyle::Accent)
-						.Visibility_Lambda([IsActive]() { return IsActive() ? EVisibility::HitTestInvisible : EVisibility::Hidden; })
-					]
 				]
 			];
 	}
@@ -189,13 +254,22 @@ namespace FWUi
 			.IsEnabled(bEnabled)
 			.OnClicked_Lambda([OnClick]() { OnClick(); return FReply::Handled(); })
 			[
-				SNew(STextBlock).Text(Text).Font(FWStyle::Font(11, bPrimary ? TEXT("Bold") : TEXT("Regular"))).ColorAndOpacity(bPrimary ? FLinearColor::White : FWStyle::Text)
+				SNew(STextBlock).Text(Text).Font(FWStyle::Font(12, bPrimary ? TEXT("Bold") : TEXT("Medium"))).ColorAndOpacity(bPrimary ? FLinearColor::White : FWStyle::Text)
 			];
 	}
 
 	TSharedRef<SWidget> Heading(const FText& Text)
 	{
-		return SNew(STextBlock).Text(Text).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent);
+		// A short amber bar before an uppercase heading
+		return SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 8, 0)
+			[
+				SNew(SBox).WidthOverride(3.f).HeightOverride(14.f)[SNew(SImage).Image(FWStyle::Swatch()).ColorAndOpacity(FWStyle::Accent)]
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+			[
+				SNew(STextBlock).Text(Text.ToUpper()).Font(FWStyle::Display(16, TEXT("SemiBold"))).ColorAndOpacity(FWStyle::Accent)
+			];
 	}
 
 	TSharedRef<SWidget> Note(const FText& Text, const FLinearColor& Color)

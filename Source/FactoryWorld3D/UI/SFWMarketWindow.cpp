@@ -3,6 +3,7 @@
 #include "FWPlayerController.h"
 #include "Net/FWNetSubsystem.h"
 #include "UI/FWStyle.h"
+#include "UI/FWWidgets.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -74,68 +75,25 @@ void SFWMarketWindow::Construct(const FArguments& InArgs)
 	Controller = InArgs._Controller;
 	auto TabButton = [this](int32 Index, const FText& Text)
 	{
-		return SNew(SButton)
-			.ButtonStyle(&FWStyle::SecondaryButton())
-			.ButtonColorAndOpacity_Lambda([this, Index]() { return Tab == Index ? FLinearColor(4.f, 2.2f, 0.5f, 1.f) : FLinearColor::White; })
-			.OnClicked_Lambda([this, Index]() { ShowTab(Index); return FReply::Handled(); })
-			[
-				SNew(STextBlock).Text(Text).Font(FWStyle::Font(12, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)
-			];
+		return FWUi::TabButton(Text, [this, Index]() { return Tab == Index; }, [this, Index]() { ShowTab(Index); });
 	};
 	ChildSlot
 	[
-		SNew(SOverlay)
-		+ SOverlay::Slot()[SNew(SBackgroundBlur).BlurStrength(4.f)]
-		+ SOverlay::Slot()[SNew(SBorder).BorderImage(FWStyle::SideShade())]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
-		[
-			SNew(SBorder)
-			.BorderImage(FWStyle::Panel())
-			.Padding(24.f)
+		FWUi::Frame(LOCTEXT("Title", "Rynek"),
+			SNew(STextBlock).Font(FWStyle::Font(18, TEXT("Bold"))).ColorAndOpacity(FWStyle::Good)
+			.Text_Lambda([this]() { return Controller.IsValid() ? Money(double(Controller->GetBalanceCents())) : FText::GetEmpty(); }),
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth()[TabButton(0, LOCTEXT("Trader", "Handlarz"))]
+			+ SHorizontalBox::Slot().AutoWidth()[TabButton(1, LOCTEXT("Exchange", "Giełda graczy"))]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 18, 0)[TabButton(2, LOCTEXT("Mine", "Moje oferty"))]
+			+ SHorizontalBox::Slot().FillWidth(1.f)
 			[
-				SNew(SBox)
-				.WidthOverride(880.f)
-				.HeightOverride(720.f)
-				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 14)
-					[
-						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
-						[
-							SNew(STextBlock).Text(LOCTEXT("Title", "Rynek")).Font(FWStyle::Font(24, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)
-						]
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-						[
-							SNew(STextBlock).Font(FWStyle::Font(16, TEXT("Bold"))).ColorAndOpacity(FWStyle::Good)
-							.Text_Lambda([this]() { return Controller.IsValid() ? Money(double(Controller->GetBalanceCents())) : FText::GetEmpty(); })
-						]
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 12)
-					[
-						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 6, 0)[TabButton(0, LOCTEXT("Trader", "Handlarz"))]
-						+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 6, 0)[TabButton(1, LOCTEXT("Exchange", "Giełda graczy"))]
-						+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 18, 0)[TabButton(2, LOCTEXT("Mine", "Moje oferty"))]
-						+ SHorizontalBox::Slot().FillWidth(1.f)
-						[
-							SAssignNew(Search, SEditableTextBox)
-							.Style(&FWStyle::TextBox())
-							.HintText(LOCTEXT("Search", "Szukaj przedmiotu…"))
-							.OnTextChanged_Lambda([this](const FText& Text) { Filter = Text.ToString(); Rebuild(); })
-						]
-					]
-					+ SVerticalBox::Slot().FillHeight(1.f)
-					[
-						SAssignNew(Content, SBox)
-					]
-				]
-			]
-		]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 32.f)
-		[
-			SNew(STextBlock).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Muted).Text(LOCTEXT("Close", "Esc zamyka"))
-		]
+				SAssignNew(Search, SEditableTextBox)
+				.Style(&FWStyle::TextBox())
+				.HintText(LOCTEXT("Search", "Szukaj przedmiotu…"))
+				.OnTextChanged_Lambda([this](const FText& Text) { Filter = Text.ToString(); Rebuild(); })
+			],
+			SAssignNew(Content, SBox), 880.f, 700.f)
 	];
 	Load();
 }

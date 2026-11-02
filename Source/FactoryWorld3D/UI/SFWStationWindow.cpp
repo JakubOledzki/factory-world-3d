@@ -291,7 +291,7 @@ TSharedRef<SWidget> SFWStationWindow::MakeCrafting(const FJsonObject& State)
 		+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 14)
 		[
 			SNew(STextBlock).Text_Lambda([PC]() { return PC.IsValid() ? FText::FromString(PC->GetStationName()) : FText::GetEmpty(); })
-			.Font(FWStyle::Font(22, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)
+			.Font(FWStyle::Display(28)).ColorAndOpacity(FWStyle::Text)
 		]
 		+ SVerticalBox::Slot().FillHeight(1.f)
 		[
@@ -362,7 +362,7 @@ TSharedRef<SWidget> SFWStationWindow::MakeFurnace(const FJsonObject& State)
 		+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 14)
 		[
 			SNew(STextBlock).Text(FText::Format(LOCTEXT("FurnaceTitle", "{0}  ·  poziom {1}"), FText::FromString(Str(State, TEXT("name"))), int32(Num(State, TEXT("level"), 1))))
-			.Font(FWStyle::Font(22, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)
+			.Font(FWStyle::Display(28)).ColorAndOpacity(FWStyle::Text)
 		]
 		+ SVerticalBox::Slot().AutoHeight()
 		[
@@ -515,7 +515,7 @@ TSharedRef<SWidget> SFWStationWindow::MakeMachine(const FJsonObject& State)
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 14)
 		[
-			SNew(STextBlock).Text(FText::FromString(Str(State, TEXT("name")))).Font(FWStyle::Font(22, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)
+			SNew(STextBlock).Text(FText::FromString(Str(State, TEXT("name")))).Font(FWStyle::Display(28)).ColorAndOpacity(FWStyle::Text)
 		]
 		+ SVerticalBox::Slot().AutoHeight()
 		[

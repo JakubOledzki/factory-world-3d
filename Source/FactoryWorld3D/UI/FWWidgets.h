@@ -28,7 +28,7 @@ namespace FWUi
 	TArray<FString> Strings(const TSharedPtr<FJsonObject>& Object, const TCHAR* Field);
 
 	// A window in the middle of the blurred screen: title, something on the right of it (e.g. the balance), a row of
-	// tabs (may be null) and the content; "Esc zamyka" under it
+	// tabs (may be null) and the content; "[Esc] zamknij" under it. It fades and grows in when it opens.
 	TSharedRef<SWidget> Frame(const FText& Title, TSharedRef<SWidget> Right, TSharedPtr<SWidget> Tabs, TSharedRef<SWidget> Content,
 		float Width, float Height);
 	// A tab lit while IsActive says so
@@ -36,6 +36,10 @@ namespace FWUi
 	TSharedRef<SWidget> SmallButton(const FText& Text, TFunction<void()> OnClick, bool bPrimary = false, bool bEnabled = true);
 	TSharedRef<SWidget> Heading(const FText& Text);
 	TSharedRef<SWidget> Note(const FText& Text, const FLinearColor& Color);
+	// Fades and grows Content in over a moment from when it is made (window and menu openings)
+	TSharedRef<SWidget> Appear(TSharedRef<SWidget> Content, float Seconds = 0.18f);
+	// A key as drawn in hints, e.g. "Esc"
+	TSharedRef<SWidget> Key(const FText& Text);
 	// The item's icon (rendered from its model), or nothing
 	TSharedRef<SWidget> Icon(AFWPlayerController* Controller, const FString& Item, float Size);
 	// A thin bar filled to Fraction (0-1)
