@@ -62,6 +62,37 @@ def land(first, second, peak):
     return out / np.abs(out).max() * peak
 
 
+def room(samples, seed):
+    """A small bare room (the garage): a few early reflections off the floor and walls, then a short diffuse tail."""
+    rng = np.random.default_rng(seed)
+    length = int(0.4 * RATE)
+    t = np.arange(length) / RATE
+    tail = lowpass(rng.standard_normal(length) * np.exp(-t / 0.08), 4000)
+    tail[:int(0.012 * RATE)] = 0
+    tail /= np.sqrt((tail ** 2).sum())
+    out = np.zeros(len(samples) + length - 1)
+    out[:len(samples)] += samples
+    for delay, gain in ((0.007, 0.3), (0.013, 0.22), (0.021, 0.15)):
+        i = int(delay * RATE)
+        out[i:i + len(samples)] += lowpass(samples, 5000) * gain
+    out += np.convolve(samples, tail) * 0.22
+    fade = int(0.1 * RATE)
+    out[-fade:] *= np.linspace(1, 0, fade)
+    return out
+
+
+def concrete(heel, sole, peak, seed):
+    """A shoe on the garage's concrete: the hard heel (the recordings on concrete) with the weight of the step under it
+    (a stone step with its grit filtered off, dying away quickly) and the room's echo. The heel alone, a tenth of a
+    second long, sounded like tapping."""
+    body = lowpass(sole, 300) * np.exp(-np.arange(len(sole)) / RATE / 0.05)
+    out = np.zeros(max(len(heel), len(body)))
+    out[:len(heel)] += heel / np.abs(heel).max()
+    out[:len(body)] += body / np.abs(body).max() * 0.35
+    out = room(out, seed)
+    return out / np.abs(out).max() * peak
+
+
 def save(name, samples):
     pcm = (np.clip(samples, -1, 1) * 32767).astype("<i2").tobytes()
     with open(os.path.join(OUT, f"{name}.wav"), "wb") as f:
@@ -70,9 +101,17 @@ def save(name, samples):
 
 
 os.makedirs(OUT, exist_ok=True)
+made = {}
 for surface, (files, peak) in SURFACES.items():
     steps = [step(load(path), peak) for path in files[:VARIANTS]]
+    made[surface] = steps
     for i, samples in enumerate(steps):
         save(f"step_{surface}_{i + 1}", samples)
     save(f"land_{surface}", land(steps[0], steps[1], min(1.0, peak * 1.25)))
+# The garage's floor: made from the metal (heel) and rock (weight) recordings
+CONCRETE_PEAK = 0.6
+steps = [concrete(heel, sole, CONCRETE_PEAK, i) for i, (heel, sole) in enumerate(zip(made["metal"], made["rock"]))]
+for i, samples in enumerate(steps):
+    save(f"step_concrete_{i + 1}", samples)
+save("land_concrete", land(steps[0], steps[1], min(1.0, CONCRETE_PEAK * 1.25)))
 print("FW footsteps done")

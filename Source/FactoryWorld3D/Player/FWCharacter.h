@@ -112,10 +112,11 @@ private:
 	void BeginStrike(int32 MineId, FIntPoint Tile, float Seconds, bool bAxe);
 	// A strike landed: counted by the server, the last one gathering
 	void OnImpact();
-	// Footsteps by the surface underfoot: "grass", "rock" or "metal" (anything built)
+	// Footsteps by the surface underfoot: "grass", "rock", "snow", "concrete" (the garage) or "metal" (anything built),
+	// in time with the head bob
 	void UpdateFootsteps(float DeltaSeconds);
 	FString SurfaceUnder(const FHitResult* Hit = nullptr) const;
-	float StepDistance = 0.f;
+	int32 LastStep = 0;
 	float MouseSensitivity = 1.f;
 
 	UPROPERTY()

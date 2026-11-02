@@ -1063,10 +1063,11 @@ FString AFWCharacter::SurfaceUnder(const FHitResult* Hit) const
 		// ground material draws them); grass and earth elsewhere
 		return Hit->ImpactNormal.Z < 0.86f ? TEXT("rock") : Plot && Plot->IsSnowAt(Hit->ImpactPoint.Z) ? TEXT("snow") : TEXT("grass");
 	}
-	// The garage's floor is smooth concrete or boards, not scree: the recordings on concrete (the "metal" set)
+	// The garage's floor is smooth concrete, not scree: its own set (Tools/make_footsteps.py), a heel on concrete with
+	// the weight of the step and the room's short echo
 	if (Name.StartsWith(TEXT("garage_")))
 	{
-		return TEXT("metal");
+		return TEXT("concrete");
 	}
 	// Belts, machines, rails and the like ring as metal (by their model); boulders, trunks, foundations, floors and
 	// the rest are stone and concrete
@@ -1084,24 +1085,21 @@ FString AFWCharacter::SurfaceUnder(const FHitResult* Hit) const
 void AFWCharacter::UpdateFootsteps(float DeltaSeconds)
 {
 	const UCharacterMovementComponent* Movement = GetCharacterMovement();
-	if (!Movement || !Movement->IsMovingOnGround())
-	{
-		return;
-	}
+	// One step each time the head bob comes down (BobPhase crosses a multiple of pi), so what is heard keeps time with
+	// what is seen: about two steps a second at walking speed. A step every 75 cm, as before, was six a second, which
+	// on the garage's hard floor sounded like someone tapping their feet fast
+	const int32 Step = FMath::FloorToInt(BobPhase / PI);
+	const bool bNewStep = Step != LastStep;
+	LastStep = Step;
 	const float Speed = GetVelocity().Size2D();
-	if (Speed < 40.f)
+	if (!bNewStep || Speed < 40.f || !Movement || !Movement->IsMovingOnGround())
 	{
-		StepDistance = 0.f;
 		return;
 	}
-	StepDistance += Speed * DeltaSeconds;
-	// Longer strides when running
-	const float Stride = Speed > 500.f ? 105.f : 75.f;
-	if (StepDistance >= Stride)
-	{
-		StepDistance -= Stride;
-		FWAudio::Play2D(this, FString::Printf(TEXT("step_%s"), *SurfaceUnder()), (Speed > 500.f ? 0.55f : 0.4f) * FMath::FRandRange(0.85f, 1.1f), 6);
-	}
+	const FString Surface = SurfaceUnder();
+	// Indoors (the garage's concrete) a step is quieter than out on the land
+	const float Volume = (Speed > 500.f ? 0.55f : 0.4f) * (Surface == TEXT("concrete") ? 0.8f : 1.f);
+	FWAudio::Play2D(this, FString::Printf(TEXT("step_%s"), *Surface), Volume * FMath::FRandRange(0.85f, 1.1f), 6);
 }
 
 void AFWCharacter::OnJumped_Implementation()
@@ -1114,7 +1112,6 @@ void AFWCharacter::Landed(const FHitResult& Hit)
 {
 	Super::Landed(Hit);
 	FWAudio::Play2D(this, FString::Printf(TEXT("land_%s"), *SurfaceUnder(&Hit)), 0.6f);
-	StepDistance = 0.f;
 }
 
 void AFWCharacter::UpdateTarget()

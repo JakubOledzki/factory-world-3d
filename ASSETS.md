@@ -107,7 +107,7 @@ Kroki i lądowania to nagrania na licencji [CC0 1.0](https://creativecommons.org
 | --- | --- | --- |
 | Fantozzi's Footsteps (Grass/Sand & Stone) | https://opengameart.org/content/fantozzis-footsteps-grasssand-stone | trawa i ziemia (Sand), kamień, skała, beton (Stone) |
 | 42 Snow and Gravel Footsteps (Corsica_S) | https://opengameart.org/content/42-snow-and-gravel-footsteps | śnieg |
-| Metal footsteps on concrete | https://opengameart.org/content/metal-footsteps-on-concrete | metal: taśmy, maszyny, tory |
+| Metal footsteps on concrete | https://opengameart.org/content/metal-footsteps-on-concrete | metal: taśmy, maszyny, tory; z kamieniem (Stone) i echem pomieszczenia beton w garażu (`step_concrete_<n>`) |
 
 ## Segregacja śmieci w garażu (nasze)
 
