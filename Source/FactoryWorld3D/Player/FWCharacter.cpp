@@ -81,7 +81,6 @@ AFWCharacter::AFWCharacter()
 	Ghost->SetUsingAbsoluteRotation(true);
 	Ghost->SetUsingAbsoluteScale(true);
 	Ghost->SetStaticMesh(Cube.Object);
-	GhostCube = Cube.Object;
 	Ghost->SetMaterial(0, GhostBase.Object);
 	Ghost->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Ghost->SetCastShadow(false);
@@ -170,7 +169,8 @@ void AFWCharacter::CreateBody()
 void AFWCharacter::UpdateHeld(float DeltaSeconds)
 {
 	const AFWPlayerController* PC = GetFWController();
-	const FString Selected = PC ? PC->GetSelectedItem() : FString();
+	// In the garage the hands hold the furniture carried, not the hotbar's item
+	const FString Selected = !GaragePlacing.IsEmpty() ? GaragePlacing : PC ? PC->GetSelectedItem() : FString();
 	// A new slot: down with the old item, then up with the new one
 	if (Selected != HeldItem && EquipTime < 0.f)
 	{
@@ -1266,19 +1266,16 @@ bool AFWCharacter::UpdateGarageGhost()
 		Ghost->SetVisibility(false);
 		return true;
 	}
-	// The piece's own model, see-through, green where it fits and red where something stands
-	UStaticMesh* PieceMesh = Room->MeshOf(GaragePlacing);
-	if (Ghost->GetStaticMesh() != PieceMesh)
-	{
-		Ghost->SetStaticMesh(PieceMesh);
-		for (int32 Slot = 0; Slot < Ghost->GetNumMaterials(); ++Slot)
-		{
-			Ghost->SetMaterial(Slot, GhostMaterial);
-		}
-	}
-	Where.AddToTranslation(FVector(0.f, 0.f, 1.f));
-	Ghost->SetWorldTransform(Where);
+	// A see-through box the size of the piece, green where it fits and red where something stands, as on a plot (the
+	// piece's own model with the ghost's material hardly showed in the dim garage)
+	const UStaticMesh* PieceMesh = Room->MeshOf(GaragePlacing);
+	const float Height = FMath::Clamp(PieceMesh ? PieceMesh->GetBounds().BoxExtent.Z * 2.f : 80.f, 20.f, 250.f);
+	const FIntPoint Size = Room->FootprintOf(GaragePlacing, BuildRotation & 3);
+	Ghost->SetWorldLocationAndRotation(Where.GetLocation() + FVector(0.f, 0.f, Height * 0.5f + 1.f), Room->GetActorRotation());
+	// The cube is 1 m; the footprint's cells are 50 cm, a little smaller so neighbours show apart
+	Ghost->SetWorldScale3D(FVector(Size.X * 0.5f - 0.04f, Size.Y * 0.5f - 0.04f, Height / 100.f));
 	GhostMaterial->SetVectorParameterValue(TEXT("Color"), bFits ? FLinearColor(0.2f, 1.f, 0.4f) : FLinearColor(1.f, 0.15f, 0.1f));
+	GhostMaterial->SetScalarParameterValue(TEXT("Opacity"), 0.5f);
 	Ghost->SetVisibility(true);
 	return true;
 }
@@ -1289,12 +1286,7 @@ void AFWCharacter::UpdateGhost()
 	{
 		return;
 	}
-	// Back on a plot the ghost is the cube again
-	if (Ghost->GetStaticMesh() != GhostCube)
-	{
-		Ghost->SetStaticMesh(GhostCube);
-		Ghost->SetMaterial(0, GhostMaterial);
-	}
+	GhostMaterial->SetScalarParameterValue(TEXT("Opacity"), 0.4f);
 	const AFWPlot* Plot = GetPlot();
 	const AFWPlayerController* PC = GetFWController();
 	const FString Kind = PC ? PC->GetSelectedItem() : FString();

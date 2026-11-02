@@ -44,6 +44,8 @@ public:
 
 	// Whether this kind can stand in the garage (garage.get lists it among the furniture)
 	bool IsFurniture(const FString& Kind) const;
+	// Cells a piece of this kind takes (along x and y) turned by Rotation quarter turns
+	FIntPoint FootprintOf(const FString& Kind, int32 Rotation) const { return Footprint(Kind, Rotation); }
 	// The model a piece of this kind is drawn with
 	UStaticMesh* MeshOf(const FString& Kind) const;
 	// Where a piece of this kind, turned by Rotation quarter turns, would stand with its middle where a line from the eye

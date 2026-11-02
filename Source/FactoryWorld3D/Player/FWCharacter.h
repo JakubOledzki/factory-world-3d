@@ -203,10 +203,8 @@ private:
 
 	bool bBuildMode = false;
 	int32 BuildRotation = 0;
-	// The garage's furniture being placed (SetGaragePlacing), and the cube the ghost is on a plot
+	// The garage's furniture being placed (SetGaragePlacing)
 	FString GaragePlacing;
-	UPROPERTY()
-	TObjectPtr<UStaticMesh> GhostCube;
 	bool UpdateGarageGhost();
 	bool GaragePlacement(FIntPoint& OutCell, FTransform& OutTransform, bool& bOutFits) const;
 	bool bHasTarget = false;

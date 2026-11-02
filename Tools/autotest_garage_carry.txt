@@ -1,6 +1,6 @@
 # Moving the garage's furniture in the room: Tools\dev\autotest.ps1 -Script Tools\autotest_garage_carry.txt -Tag garage_carry
 # Each line: seconds after the previous command, then a console command.
-14 FWClose
+35 FWClose
 1 FWGarageRoom
 5 FWGarageLook furniture_gas_cylinder 170
 2 FWShot c0_cylinder
