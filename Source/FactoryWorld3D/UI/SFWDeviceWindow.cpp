@@ -120,7 +120,7 @@ void SFWDeviceWindow::Construct(const FArguments& InArgs)
 	}
 	const FString Known = PC ? PC->ItemName(Kind) : FString();
 	const FText Title = FText::FromString(Known.IsEmpty() || Known == Kind ? FWDeviceText::Name(Kind) : Known);
-	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Font(16, TEXT("Bold"))).ColorAndOpacity(FWStyle::Good)
+	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Display(22)).ColorAndOpacity(FWStyle::Good)
 		.Text_Lambda([this]() { return Controller.IsValid() ? FWUi::Money(double(Controller->GetBalanceCents())) : FText::GetEmpty(); });
 	ChildSlot
 	[
@@ -333,7 +333,7 @@ TSharedRef<SWidget> SFWDeviceWindow::MakeGenerator()
 		const TCHAR* Source = bSolar ? TEXT("Słońce daje") : bWind ? TEXT("Wiatr daje") : bFree ? TEXT("Woda daje") : TEXT("Daje");
 		OutputText = FString::Printf(TEXT("%s %s z %s"), Source, *Kw(Output), *Kw(Capacity));
 	}
-	Add(SNew(STextBlock).Font(FWStyle::Font(18, TEXT("Bold"))).AutoWrapText(true).ColorAndOpacity(Output > 0.0 ? FWStyle::Accent : FWStyle::Muted)
+	Add(SNew(STextBlock).Font(FWStyle::Display(24)).AutoWrapText(true).ColorAndOpacity(Output > 0.0 ? FWStyle::Accent : FWStyle::Muted)
 		.Text(FText::FromString(OutputText)), 14.f);
 	if (!bHeater)
 	{
@@ -393,7 +393,7 @@ TSharedRef<SWidget> SFWDeviceWindow::MakeGenerator()
 				Color = FWStyle::Error;
 			}
 		}
-		Add(SNew(SBorder).BorderImage(FWStyle::Panel()).Padding(12.f)
+		Add(SNew(SFWCard).Padding(12.f)
 			[
 				SNew(STextBlock).Font(FWStyle::Font(12)).AutoWrapText(true).ColorAndOpacity(Color).Text(FText::FromString(Text))
 			], 14.f);
@@ -538,7 +538,7 @@ TSharedRef<SWidget> SFWDeviceWindow::MakeDrill()
 	const double Speed = FWUi::Num(State, TEXT("speed"));
 	const int32 Stored = int32(FWUi::Num(State, TEXT("stored"))), Capacity = int32(FWUi::Num(State, TEXT("capacity")));
 
-	Add(SNew(STextBlock).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent)
+	Add(SNew(STextBlock).Font(FWStyle::Display(18, TEXT("SemiBold"))).ColorAndOpacity(FWStyle::Accent)
 		.Text(FText::FromString(FString::Printf(TEXT("%s · poziom %d z 2 · kopalnia poziomu %d"), *FWUi::Str(State, TEXT("name")),
 			int32(FWUi::Num(State, TEXT("level"))), int32(FWUi::Num(State, TEXT("mineLevel")))))), 0.f);
 	FString Pace = FString::Printf(TEXT("Jeden urobek na %s s (z pełnym prądem)."), *Number(FWUi::Num(State, TEXT("seconds"))));
@@ -557,7 +557,7 @@ TSharedRef<SWidget> SFWDeviceWindow::MakeDrill()
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 8, 0)[FWUi::Icon(PC, TEXT("iron_ore"), 36.f)]
 		+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 		[
-			SNew(STextBlock).Font(FWStyle::Font(18, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)
+			SNew(STextBlock).Font(FWStyle::Display(24)).ColorAndOpacity(FWStyle::Text)
 			.Text(FText::FromString(FString::Printf(TEXT("Urobek: %d / %d"), Stored, Capacity)))
 		]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
@@ -634,7 +634,7 @@ TSharedRef<SWidget> SFWDeviceWindow::MakeWell()
 	const int32 Stored = int32(FWUi::Num(State, TEXT("stored"))), Capacity = int32(FWUi::Num(State, TEXT("capacity")));
 	const int32 Left = int32(FWUi::Num(State, TEXT("left")));
 
-	Add(SNew(STextBlock).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent)
+	Add(SNew(STextBlock).Font(FWStyle::Display(18, TEXT("SemiBold"))).ColorAndOpacity(FWStyle::Accent)
 		.Text(FText::FromString(FString::Printf(TEXT("%s · złoże %s (%s)"), *FWUi::Str(State, TEXT("name")),
 			Deposits[FMath::Clamp(int32(FWUi::Num(State, TEXT("size"))), 0, 3)], *Product.ToLower()))), 0.f);
 	FString Pace = FString::Printf(TEXT("Jedna jednostka na %s s%s."), *Number(FWUi::Num(State, TEXT("seconds"))), FWUi::Bool(State, TEXT("powered")) ? TEXT(" (z pełnym prądem)") : TEXT(""));
@@ -657,7 +657,7 @@ TSharedRef<SWidget> SFWDeviceWindow::MakeWell()
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 8, 0)[FWUi::Icon(PC, FWUi::Str(State, TEXT("product")), 36.f)]
 		+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 		[
-			SNew(STextBlock).Font(FWStyle::Font(18, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)
+			SNew(STextBlock).Font(FWStyle::Display(24)).ColorAndOpacity(FWStyle::Text)
 			.Text(FText::FromString(FString::Printf(TEXT("%s: %d / %d"), *Product, Stored, Capacity)))
 		]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
@@ -844,7 +844,7 @@ TSharedRef<SWidget> SFWDeviceWindow::MakeTie()
 				})
 			]
 		];
-		Add(SNew(SBorder).BorderImage(FWStyle::Panel()).Padding(10.f)[Row], 6.f);
+		Add(SNew(SFWCard).Padding(10.f)[Row], 6.f);
 	}
 
 	// A new cable to this plot

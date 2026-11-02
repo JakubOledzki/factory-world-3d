@@ -357,7 +357,7 @@ TSharedRef<SWidget> SFWAchievementsWindow::MakeRanking(const TSharedPtr<FJsonObj
 	Page->AddSlot().AutoHeight().Padding(0, 14, 0, 0)
 	[
 		Me.IsValid()
-			? SNew(STextBlock).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent)
+			? SNew(STextBlock).Font(FWStyle::Display(18, TEXT("SemiBold"))).ColorAndOpacity(FWStyle::Accent)
 				.Text(FText::Format(LOCTEXT("Mine", "Twoje miejsce: {0}.  {1}"), int32(FWUi::Num(Me, TEXT("place"))), FText::FromString(FWUi::Str(Me, TEXT("text")))))
 			: FWUi::Note(LOCTEXT("NotIn", "Nie ma cię jeszcze w tym rankingu."), FWStyle::Muted)
 	];

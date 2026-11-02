@@ -80,7 +80,7 @@ void SFWMarketWindow::Construct(const FArguments& InArgs)
 	ChildSlot
 	[
 		FWUi::Frame(LOCTEXT("Title", "Rynek"),
-			SNew(STextBlock).Font(FWStyle::Font(18, TEXT("Bold"))).ColorAndOpacity(FWStyle::Good)
+			SNew(STextBlock).Font(FWStyle::Display(24)).ColorAndOpacity(FWStyle::Good)
 			.Text_Lambda([this]() { return Controller.IsValid() ? Money(double(Controller->GetBalanceCents())) : FText::GetEmpty(); }),
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth()[TabButton(0, LOCTEXT("Trader", "Handlarz"))]
@@ -363,7 +363,7 @@ TSharedRef<SWidget> SFWMarketWindow::MakeExchange()
 	else
 	{
 		const FString Name = Board.IsValid() ? JsonStr(*Board, TEXT("name")) : BoardItem;
-		BoardBox->AddSlot().AutoHeight().Padding(0, 0, 0, 10)[SNew(STextBlock).Text(FText::FromString(Name)).Font(FWStyle::Font(18, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)];
+		BoardBox->AddSlot().AutoHeight().Padding(0, 0, 0, 10)[SNew(STextBlock).Text(FText::FromString(Name)).Font(FWStyle::Display(24)).ColorAndOpacity(FWStyle::Text)];
 		auto Offers = [this](const TCHAR* Field, bool bListings)
 		{
 			TSharedRef<SVerticalBox> Box = SNew(SVerticalBox);

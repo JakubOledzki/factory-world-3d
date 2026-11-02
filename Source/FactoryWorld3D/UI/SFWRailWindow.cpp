@@ -113,7 +113,7 @@ void SFWRailWindow::Construct(const FArguments& InArgs)
 			FWUi::TabButton(FText::FromString(FWRailText::Tabs[i]), [this, i]() { return Tab == i; }, [this, i]() { ShowTab(i); })
 		];
 	}
-	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Font(16, TEXT("Bold"))).ColorAndOpacity(FWStyle::Good)
+	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Display(22)).ColorAndOpacity(FWStyle::Good)
 		.Text_Lambda([this]() { return Controller.IsValid() ? FWUi::Money(double(Controller->GetBalanceCents())) : FText::GetEmpty(); });
 	ChildSlot
 	[

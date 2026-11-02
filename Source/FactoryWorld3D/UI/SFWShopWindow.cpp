@@ -49,7 +49,7 @@ void SFWShopWindow::Construct(const FArguments& InArgs)
 	Mode = ModeOf(Kind);
 	Form = MakeShared<FFWForm>();
 	AFWPlayerController* PC = Controller.Get();
-	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Font(16, TEXT("Bold"))).ColorAndOpacity(FWStyle::Good)
+	TSharedRef<SWidget> Right = SNew(STextBlock).Font(FWStyle::Display(22)).ColorAndOpacity(FWStyle::Good)
 		.Text_Lambda([this]() { return Controller.IsValid() ? FWUi::Money(double(Controller->GetBalanceCents())) : FText::GetEmpty(); });
 	ChildSlot
 	[
@@ -241,7 +241,7 @@ TSharedRef<SWidget> SFWShopWindow::MakeShop()
 	TSharedRef<SVerticalBox> Page = SNew(SVerticalBox);
 	auto Add = [&Page](TSharedRef<SWidget> Widget, float Top = 6.f) { Page->AddSlot().AutoHeight().Padding(0, Top, 0, 0)[Widget]; };
 	const int32 Tax = int32(FWUi::Num(State, TEXT("taxPercent")));
-	Add(SNew(STextBlock).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent).AutoWrapText(true)
+	Add(SNew(STextBlock).Font(FWStyle::Display(18, TEXT("SemiBold"))).ColorAndOpacity(FWStyle::Accent).AutoWrapText(true)
 		.Text(FText::FromString(FString::Printf(TEXT("%s · około %s klientów na godzinę. Sprzedano %d szt. za %s.%s"), *FWUi::Str(State, TEXT("town")),
 			*FString::SanitizeFloat(FWUi::Num(State, TEXT("customersPerHour"))).Replace(TEXT("."), TEXT(",")), int32(FWUi::Num(State, TEXT("soldItems"))),
 			*FWUi::Money(FWUi::Num(State, TEXT("soldCents"))).ToString(), Tax > 0 ? *FString::Printf(TEXT(" Burmistrz bierze %d%% podatku."), Tax) : TEXT("")))), 0.f);
@@ -259,7 +259,7 @@ TSharedRef<SWidget> SFWShopWindow::MakeShop()
 		const int32 Quantity = int32(FWUi::Num(Item, TEXT("quantity")));
 		double TraderCents = 0.0;
 		const bool bTrader = Item->TryGetNumberField(TEXT("traderCents"), TraderCents);
-		Add(SNew(SBorder).BorderImage(FWStyle::Panel()).Padding(10.f)
+		Add(SNew(SFWCard).Padding(10.f)
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 10, 0)[FWUi::Icon(PC, Id, 34.f)]
