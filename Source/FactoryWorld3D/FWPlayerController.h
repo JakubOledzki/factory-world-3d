@@ -144,7 +144,8 @@ public:
 	void Send(const TCHAR* Type, TSharedPtr<FJsonObject> Payload, TFunction<void(const FFWNetReply&)> OnReply);
 	void SetBalanceCents(int64 Cents) { BalanceCents = Cents; }
 	void PlayUiSound(const TCHAR* Sound);
-	void RefreshInventory();
+	// Asks the server for the inventory again; OnDone runs once the reply is applied (or the request failed)
+	void RefreshInventory(TFunction<void()> OnDone = nullptr);
 	// A work place's window (workbench, furnace, machine): its state as the server last sent it
 	void OpenStation(const FString& ObjectId, const FString& Kind);
 	TSharedPtr<FJsonObject> GetStationState() const { return StationState; }

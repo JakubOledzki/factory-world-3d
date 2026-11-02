@@ -662,17 +662,25 @@ void AFWPlayerController::FWPolice(int32 Tab)
 	Police->ShowTab(Tab);
 }
 
-void AFWPlayerController::RefreshInventory()
+void AFWPlayerController::RefreshInventory(TFunction<void()> OnDone)
 {
 	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
-	Net()->Request(TEXT("inventory.get"), nullptr, [WeakThis](const FFWNetReply& Reply)
+	Net()->Request(TEXT("inventory.get"), nullptr, [WeakThis, OnDone = MoveTemp(OnDone)](const FFWNetReply& Reply)
 	{
 		AFWPlayerController* This = WeakThis.Get();
 		if (!This || Reply.Type != TEXT("inventory"))
 		{
+			if (This && OnDone)
+			{
+				OnDone();
+			}
 			return;
 		}
 		This->ApplyInventory(Reply.Payload);
+		if (OnDone)
+		{
+			OnDone();
+		}
 		This->Net()->Request(TEXT("hotbar.get"), nullptr, [WeakThis](const FFWNetReply& Bar)
 		{
 			if (AFWPlayerController* Inner = WeakThis.Get())

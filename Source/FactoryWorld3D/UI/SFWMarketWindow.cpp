@@ -91,7 +91,7 @@ void SFWMarketWindow::Construct(const FArguments& InArgs)
 				SAssignNew(Search, SEditableTextBox)
 				.Style(&FWStyle::TextBox())
 				.HintText(LOCTEXT("Search", "Szukaj przedmiotu…"))
-				.OnTextChanged_Lambda([this](const FText& Text) { Filter = Text.ToString(); Rebuild(); })
+				.OnTextChanged_Lambda([this](const FText& Text) { Filter = Text.ToString(); ListTab = -1; Rebuild(); })
 			],
 			SAssignNew(Content, SBox), 880.f, 700.f)
 	];
@@ -126,7 +126,14 @@ void SFWMarketWindow::Load()
 		P->SetStringField(TEXT("item"), BoardItem);
 		PC->Send(TEXT("market.item"), P, Keep(&SFWMarketWindow::Board, TEXT("market.item")));
 	}
-	PC->RefreshInventory();
+	// The counts on the rows come from the inventory: built again once it is here
+	PC->RefreshInventory([WeakThis]()
+	{
+		if (TSharedPtr<SFWMarketWindow> This = WeakThis.Pin())
+		{
+			This->Rebuild();
+		}
+	});
 	Rebuild();
 }
 
@@ -148,6 +155,20 @@ void SFWMarketWindow::OpenItem(const FString& Item)
 bool SFWMarketWindow::Matches(const FString& Name) const
 {
 	return Filter.IsEmpty() || Name.Contains(Filter, ESearchCase::IgnoreCase);
+}
+
+int32 SFWMarketWindow::Have(const FString& Item) const
+{
+	const FFWStack* Stack = Controller.IsValid() ? Controller->FindStack(Item) : nullptr;
+	int32 Count = Stack ? Stack->Quantity : 0;
+	for (const FPendingSale& Sale : PendingSales)
+	{
+		if (Sale.Item == Item)
+		{
+			Count -= Sale.Quantity;
+		}
+	}
+	return FMath::Max(0, Count);
 }
 
 void SFWMarketWindow::Send(const TCHAR* Type, TSharedPtr<FJsonObject> Payload)
@@ -196,14 +217,53 @@ void SFWMarketWindow::PutOffer(bool bSell, int32 Quantity, double PriceCents)
 
 void SFWMarketWindow::Trade(bool bBuy, const FString& Item, int32 Quantity)
 {
-	if (Quantity <= 0)
+	AFWPlayerController* PC = Controller.Get();
+	if (!PC || Quantity <= 0)
 	{
 		return;
+	}
+	// A trade with the trader changes only the money and the inventory: no need to load the whole market again
+	const int32 Seq = ++TradeSeq;
+	if (!bBuy)
+	{
+		PendingSales.Add({ Seq, Item, Quantity });
 	}
 	TSharedPtr<FJsonObject> P = MakeShared<FJsonObject>();
 	P->SetStringField(TEXT("item"), Item);
 	P->SetNumberField(TEXT("quantity"), Quantity);
-	Send(bBuy ? TEXT("market.buy") : TEXT("market.sell"), P);
+	TWeakPtr<SFWMarketWindow> WeakThis = SharedThis(this);
+	PC->Send(bBuy ? TEXT("market.buy") : TEXT("market.sell"), P, [WeakThis, Seq](const FFWNetReply& Reply)
+	{
+		TSharedPtr<SFWMarketWindow> This = WeakThis.Pin();
+		AFWPlayerController* Inner = This ? This->Controller.Get() : nullptr;
+		if (!Inner)
+		{
+			return;
+		}
+		if (Reply.IsError())
+		{
+			This->PendingSales.RemoveAll([Seq](const FPendingSale& Sale) { return Sale.Seq == Seq; });
+			This->Rebuild();
+			Inner->ToastError(Reply);
+			return;
+		}
+		double Balance = 0.0;
+		if (Reply.Payload.IsValid() && Reply.Payload->TryGetNumberField(TEXT("balanceCents"), Balance))
+		{
+			Inner->SetBalanceCents(int64(Balance));
+		}
+		Inner->PlayUiSound(TEXT("build_pickup"));
+	});
+	// Asked right behind the trade: the server answers one request at a time, in order, so this inventory has the trade in it
+	PC->RefreshInventory([WeakThis, Seq]()
+	{
+		if (TSharedPtr<SFWMarketWindow> This = WeakThis.Pin())
+		{
+			This->PendingSales.RemoveAll([Seq](const FPendingSale& Sale) { return Sale.Seq <= Seq; });
+			This->Rebuild();
+		}
+	});
+	Rebuild();
 }
 
 void SFWMarketWindow::Rebuild()
@@ -212,7 +272,15 @@ void SFWMarketWindow::Rebuild()
 	{
 		return;
 	}
+	// Built anew on every answer: the list stays where it was scrolled to, unless the tab changed
+	const float Offset = List.IsValid() && ListTab == Tab ? List->GetScrollOffset() : 0.f;
+	List.Reset();
 	Content->SetContent(Tab == 0 ? MakeTrader() : Tab == 1 ? MakeExchange() : MakeMine());
+	ListTab = Tab;
+	if (List.IsValid() && Offset > 0.f)
+	{
+		List->SetScrollOffset(Offset);
+	}
 }
 
 TSharedRef<SWidget> SFWMarketWindow::SmallButton(const FText& Text, TFunction<void()> OnClick, bool bPrimary, bool bEnabled)
@@ -230,7 +298,7 @@ TSharedRef<SWidget> SFWMarketWindow::SmallButton(const FText& Text, TFunction<vo
 TSharedRef<SWidget> SFWMarketWindow::ItemRow(const FString& Item, const FString& Name, TSharedRef<SWidget> Right)
 {
 	const FSlateBrush* Icon = Controller.IsValid() ? Controller->GetIconBrush(Item) : nullptr;
-	const FFWStack* Stack = Controller.IsValid() ? Controller->FindStack(Item) : nullptr;
+	const int32 Count = Have(Item);
 	return SNew(SFWCard).Padding(FMargin(8.f, 5.f))
 		[
 			SNew(SHorizontalBox)
@@ -245,7 +313,7 @@ TSharedRef<SWidget> SFWMarketWindow::ItemRow(const FString& Item, const FString&
 				+ SVerticalBox::Slot().AutoHeight()
 				[
 					SNew(STextBlock).Font(FWStyle::Font(9)).ColorAndOpacity(FWStyle::Muted)
-					.Text(Stack && Stack->Quantity > 0 ? FText::Format(LOCTEXT("Have", "masz {0}"), Stack->Quantity) : FText::GetEmpty())
+					.Text(Count > 0 ? FText::Format(LOCTEXT("Have", "masz {0}"), Count) : FText::GetEmpty())
 				]
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Right]
@@ -254,12 +322,13 @@ TSharedRef<SWidget> SFWMarketWindow::ItemRow(const FString& Item, const FString&
 
 TSharedRef<SWidget> SFWMarketWindow::MakeTrader()
 {
-	TSharedRef<SScrollBox> List = SNew(SScrollBox);
+	TSharedRef<SScrollBox> Rows = SNew(SScrollBox);
+	List = Rows;
 	if (Prices.IsValid())
 	{
 		if (const TSharedPtr<FJsonObject>* Event = nullptr; Prices->TryGetObjectField(TEXT("event"), Event) && Event && Event->IsValid())
 		{
-			List->AddSlot().Padding(0, 0, 0, 8)
+			Rows->AddSlot().Padding(0, 0, 0, 8)
 			[
 				SNew(SBorder).BorderImage(FWStyle::Panel()).Padding(10.f)
 				[
@@ -279,8 +348,7 @@ TSharedRef<SWidget> SFWMarketWindow::MakeTrader()
 			double Buy = 0.0, Sell = 0.0;
 			const bool bBuys = Num(*Item, TEXT("buyCents"), Buy);
 			const bool bSells = Num(*Item, TEXT("sellCents"), Sell);
-			const FFWStack* Stack = Controller.IsValid() ? Controller->FindStack(Id) : nullptr;
-			const int32 Have = Stack ? Stack->Quantity : 0;
+			const int32 Count = Have(Id);
 			const int64 Balance = Controller.IsValid() ? Controller->GetBalanceCents() : 0;
 			TSharedRef<SHorizontalBox> Right = SNew(SHorizontalBox);
 			// Buying from the trader
@@ -313,18 +381,19 @@ TSharedRef<SWidget> SFWMarketWindow::MakeTrader()
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(4, 0, 0, 0)[Change(*Item, TEXT("sellChange"), true)]
 				]
 			];
-			Right->AddSlot().AutoWidth().Padding(2, 0)[SmallButton(LOCTEXT("Sell1", "1"), [this, Id]() { Trade(false, Id, 1); }, false, bSells && Have >= 1)];
-			Right->AddSlot().AutoWidth().Padding(2, 0)[SmallButton(LOCTEXT("SellAll", "wszystko"), [this, Id, Have]() { Trade(false, Id, Have); }, true, bSells && Have >= 1)];
-			List->AddSlot().Padding(0, 0, 8, 4)[ItemRow(Id, Name, Right)];
+			Right->AddSlot().AutoWidth().Padding(2, 0)[SmallButton(LOCTEXT("Sell1", "1"), [this, Id]() { Trade(false, Id, 1); }, false, bSells && Count >= 1)];
+			Right->AddSlot().AutoWidth().Padding(2, 0)[SmallButton(LOCTEXT("SellAll", "wszystko"), [this, Id]() { Trade(false, Id, Have(Id)); }, true, bSells && Count >= 1)];
+			Rows->AddSlot().Padding(0, 0, 8, 4)[ItemRow(Id, Name, Right)];
 		}
 	}
-	return List;
+	return Rows;
 }
 
 TSharedRef<SWidget> SFWMarketWindow::MakeExchange()
 {
 	// The items, left; the chosen one's board of offers, right
 	TSharedRef<SScrollBox> Items = SNew(SScrollBox);
+	List = Items;
 	for (const TSharedPtr<FJsonObject>& Item : Objects(Overview, TEXT("items")))
 	{
 		const FString Id = JsonStr(*Item, TEXT("id"));
@@ -445,8 +514,9 @@ TSharedRef<SWidget> SFWMarketWindow::MakeExchange()
 
 TSharedRef<SWidget> SFWMarketWindow::MakeMine()
 {
-	TSharedRef<SScrollBox> List = SNew(SScrollBox);
-	auto Add = [this, &List](const TCHAR* Field, bool bListing)
+	TSharedRef<SScrollBox> Rows = SNew(SScrollBox);
+	List = Rows;
+	auto Add = [this, &Rows](const TCHAR* Field, bool bListing)
 	{
 		for (const TSharedPtr<FJsonObject>& Offer : Objects(Mine, Field))
 		{
@@ -459,7 +529,7 @@ TSharedRef<SWidget> SFWMarketWindow::MakeMine()
 			Num(*Offer, TEXT("priceCents"), Price);
 			const int64 OfferId = int64(Id);
 			const FString Item = JsonStr(*Offer, TEXT("item"));
-			List->AddSlot().Padding(0, 0, 8, 4)
+			Rows->AddSlot().Padding(0, 0, 8, 4)
 			[
 				ItemRow(Item, JsonStr(*Offer, TEXT("name")),
 					SNew(SHorizontalBox)
@@ -485,9 +555,9 @@ TSharedRef<SWidget> SFWMarketWindow::MakeMine()
 	Add(TEXT("orders"), false);
 	if (Objects(Mine, TEXT("listings")).IsEmpty() && Objects(Mine, TEXT("orders")).IsEmpty())
 	{
-		List->AddSlot()[SNew(STextBlock).Text(LOCTEXT("NoneMine", "Nie masz żadnych ofert.")).Font(FWStyle::Font(12)).ColorAndOpacity(FWStyle::Muted)];
+		Rows->AddSlot()[SNew(STextBlock).Text(LOCTEXT("NoneMine", "Nie masz żadnych ofert.")).Font(FWStyle::Font(12)).ColorAndOpacity(FWStyle::Muted)];
 	}
-	return List;
+	return Rows;
 }
 
 FReply SFWMarketWindow::OnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event)
