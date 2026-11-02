@@ -36,6 +36,9 @@ $Shots = Join-Path $Root "Saved\Screenshots"
 $Log = Join-Path $Out "game.log"
 New-Item -ItemType Directory -Force $Out | Out-Null
 if (Test-Path $Shots) { Get-ChildItem $Shots -Filter *.png | Remove-Item }
+# The last run's log would end this one at once; a remembered login would skip the script's own
+$Token = Join-Path $Root "Saved\Auth\session.token"
+Remove-Item $Log, $Token -ErrorAction SilentlyContinue
 
 # The last screenshot of the script tells when it is done
 $last = (Get-Content $ScriptPath | Where-Object { $_ -match "FWShot\s+(\S+)" } | Select-Object -Last 1) -replace ".*FWShot\s+(\S+).*", '$1'
@@ -54,6 +57,7 @@ while ((Get-Date) -lt $deadline -and -not $game.HasExited) {
     Start-Sleep -Seconds 3
 }
 if (-not $game.HasExited) { Stop-Process -Id $game.Id -Force }
+Remove-Item $Token -ErrorAction SilentlyContinue
 
 # Screenshots as JPEG
 $codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq "image/jpeg" }
