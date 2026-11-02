@@ -361,7 +361,16 @@ void AFWCharacter::UpdateTarget()
 	const FVector End = Start + Camera->GetForwardVector() * Plot->GetTileSize() * ReachTiles;
 	FHitResult Hit;
 	FCollisionQueryParams Params(TEXT("FWTarget"), false, this);
-	if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+	const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params);
+	// A rock or a mine the view passes through before what the trace hit: the scanned boulders collide by a much
+	// simpler shape than they are drawn with, so a trace often went past (or stopped short of) the boulder looked at,
+	// and the player had to aim beside it
+	if (!bBuildMode && RockAlong(*Plot, Start, bHit ? Hit.ImpactPoint : End, TargetTile))
+	{
+		bHasTarget = true;
+		return;
+	}
+	if (!bHit)
 	{
 		return;
 	}
@@ -372,6 +381,42 @@ void AFWCharacter::UpdateTarget()
 		bHasTarget = true;
 		TargetTile = Tile;
 	}
+}
+
+bool AFWCharacter::RockAlong(const AFWPlot& Plot, const FVector& From, const FVector& To, FIntPoint& OutTile) const
+{
+	// Each rock tile stands for a column about the size of its boulder, each mine tile for one the height of the heap
+	const float Tile = Plot.GetTileSize();
+	const FTransform& Space = Plot.GetActorTransform();
+	const FVector A = Space.InverseTransformPosition(From);
+	const FVector B = Space.InverseTransformPosition(To);
+	const float Length = FVector::Dist(A, B);
+	const int32 Steps = FMath::Clamp(FMath::CeilToInt(Length / (Tile * 0.05f)), 1, 2000);
+	for (int32 Step = 0; Step <= Steps; ++Step)
+	{
+		const FVector P = FMath::Lerp(A, B, float(Step) / Steps);
+		const FIntPoint At(FMath::FloorToInt(P.X / Tile), FMath::FloorToInt(P.Y / Tile));
+		if (!Plot.Contains(At) || P.Z < -0.2f * Tile)
+		{
+			continue;
+		}
+		const uint8 Code = Plot.TileCode(At);
+		if (Code == FWCatalog::Rock)
+		{
+			const FVector2D Off(P.X - (At.X + 0.5f) * Tile, P.Y - (At.Y + 0.5f) * Tile);
+			if (P.Z < 0.5f * Tile && Off.Size() < 0.42f * Tile)
+			{
+				OutTile = At;
+				return true;
+			}
+		}
+		else if (Code == FWCatalog::Mine && P.Z < 1.1f * Tile && Plot.FindMine(At))
+		{
+			OutTile = At;
+			return true;
+		}
+	}
+	return false;
 }
 
 void AFWCharacter::SetGaragePlacing(const FString& Kind)
