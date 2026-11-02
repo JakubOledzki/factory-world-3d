@@ -369,11 +369,11 @@ bool AFWGarageRoom::Placement(const FString& Kind, int32 Rotation, const FVector
 	{
 		return false;
 	}
-	const FVector Floor = A + (B - A) * (A.Z / (A.Z - B.Z));
+	const FVector FloorHit = A + (B - A) * (A.Z / (A.Z - B.Z));
 	// The piece's middle there, its corner on whole cells, kept inside the walls when the line ends at one
 	const FIntPoint Size = Footprint(Kind, Rotation);
-	const float CentreX = (Floor.X + FWGarageLayout::Width / 2) / FWGarageLayout::Cell;
-	const float CentreY = (Floor.Y + FWGarageLayout::Depth / 2) / FWGarageLayout::Cell;
+	const float CentreX = (FloorHit.X + FWGarageLayout::Width / 2) / FWGarageLayout::Cell;
+	const float CentreY = (FloorHit.Y + FWGarageLayout::Depth / 2) / FWGarageLayout::Cell;
 	OutCell = FIntPoint(FMath::Clamp(FMath::RoundToInt(CentreX - Size.X / 2.f), 0, FMath::Max(0, FWGarageLayout::Columns - Size.X)),
 		FMath::Clamp(FMath::RoundToInt(CentreY - Size.Y / 2.f), 0, FMath::Max(0, FWGarageLayout::Rows - Size.Y)));
 	const FIntRect Here(OutCell, OutCell + Size);

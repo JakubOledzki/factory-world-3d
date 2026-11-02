@@ -1267,10 +1267,10 @@ bool AFWCharacter::UpdateGarageGhost()
 		return true;
 	}
 	// The piece's own model, see-through, green where it fits and red where something stands
-	UStaticMesh* Mesh = Room->MeshOf(GaragePlacing);
-	if (Ghost->GetStaticMesh() != Mesh)
+	UStaticMesh* PieceMesh = Room->MeshOf(GaragePlacing);
+	if (Ghost->GetStaticMesh() != PieceMesh)
 	{
-		Ghost->SetStaticMesh(Mesh);
+		Ghost->SetStaticMesh(PieceMesh);
 		for (int32 Slot = 0; Slot < Ghost->GetNumMaterials(); ++Slot)
 		{
 			Ghost->SetMaterial(Slot, GhostMaterial);
