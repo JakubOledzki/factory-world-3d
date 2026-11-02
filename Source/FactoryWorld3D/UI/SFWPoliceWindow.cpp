@@ -78,7 +78,7 @@ namespace FWPoliceText
 
 	TSharedRef<SWidget> Line(const FText& Text, const FLinearColor& Color, TSharedPtr<SWidget> Right = nullptr)
 	{
-		return SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(10.f, 5.f))
+		return SNew(SFWCard).Padding(FMargin(10.f, 5.f))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[SNew(STextBlock).Text(Text).Font(FWStyle::Font(11)).ColorAndOpacity(Color).AutoWrapText(true)]
@@ -824,7 +824,7 @@ TSharedRef<SWidget> SFWPoliceWindow::MakeFence()
 		double Trader = 0.0;
 		const bool bTrader = Item->TryGetNumberField(TEXT("traderCents"), Trader);
 		const FString Key = TEXT("fence:") + Id;
-		Add(SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(10.f, 5.f))
+		Add(SNew(SFWCard).Padding(FMargin(10.f, 5.f))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 8, 0)[FWUi::Icon(Controller.Get(), Id, 28.f)]

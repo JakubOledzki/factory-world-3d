@@ -307,7 +307,7 @@ TSharedRef<SWidget> SFWExportWindow::MakeChest()
 				})
 			];
 		}
-		return SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(10.f, 5.f))
+		return SNew(SFWCard).Padding(FMargin(10.f, 5.f))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 8, 0)[FWUi::Icon(Controller.Get(), Item, 28.f)]
@@ -371,7 +371,7 @@ TSharedRef<SWidget> SFWExportWindow::MakeChest()
 	for (const TSharedPtr<FJsonObject>& Trip : Shipments)
 	{
 		const double Arrives = FWUi::Num(Trip, TEXT("arrivesAt"));
-		Add(SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(10.f, 5.f))
+		Add(SNew(SFWCard).Padding(FMargin(10.f, 5.f))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 8, 0)[FWUi::Icon(Controller.Get(), FWUi::Str(Trip, TEXT("item")), 26.f)]

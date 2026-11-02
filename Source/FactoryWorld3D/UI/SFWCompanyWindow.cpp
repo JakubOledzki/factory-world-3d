@@ -423,7 +423,7 @@ TSharedRef<SWidget> SFWCompanyWindow::ItemPicker(const FString& Key, bool bTrade
 
 TSharedRef<SWidget> SFWCompanyWindow::ItemLine(const FString& Item, const FText& Text, TSharedPtr<SWidget> Right)
 {
-	return SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(8.f, 4.f))
+	return SNew(SFWCard).Padding(FMargin(8.f, 4.f))
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 8, 0)[FWUi::Icon(Controller.Get(), Item, 26.f)]
@@ -434,7 +434,7 @@ TSharedRef<SWidget> SFWCompanyWindow::ItemLine(const FString& Item, const FText&
 
 TSharedRef<SWidget> SFWCompanyWindow::TextLine(const FText& Text, const FLinearColor& Color, TSharedPtr<SWidget> Right)
 {
-	return SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(10.f, 5.f))
+	return SNew(SFWCard).Padding(FMargin(10.f, 5.f))
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[SNew(STextBlock).Text(Text).Font(FWStyle::Font(11)).ColorAndOpacity(Color).AutoWrapText(true)]

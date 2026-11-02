@@ -190,7 +190,7 @@ void SFWBankWindow::Rebuild()
 		}
 		bAny = true;
 		const FString Id = FWUi::Str(Each, TEXT("id"));
-		Add(SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(10.f, 5.f))
+		Add(SNew(SFWCard).Padding(FMargin(10.f, 5.f))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(FWUi::Str(Each, TEXT("name")))).Font(FWStyle::Font(12)).ColorAndOpacity(FWStyle::Text)]
@@ -389,7 +389,7 @@ void SFWBankWindow::Rebuild()
 				: FText::Format(LOCTEXT("Out", "Przelew do {0} · {1} → {2}"), FText::FromString(FWUi::Str(Transfer, TEXT("to"))), Money, FText::FromString(FWUi::Str(Transfer, TEXT("toBank"))));
 		}
 		const double Arrives = FWUi::Num(Transfer, TEXT("arrivesAt"));
-		Add(SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(10.f, 5.f))
+		Add(SNew(SFWCard).Padding(FMargin(10.f, 5.f))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(1.f)[SNew(STextBlock).Text(Text).Font(FWStyle::Font(11)).ColorAndOpacity(bIncoming ? FWStyle::Good : FWStyle::Text)]

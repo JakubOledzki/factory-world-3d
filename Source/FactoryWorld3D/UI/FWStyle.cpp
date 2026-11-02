@@ -3,6 +3,7 @@
 #include "Brushes/SlateColorBrush.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "Fonts/CompositeFont.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Misc/Paths.h"
 #include "Sound/SoundBase.h"
 #include "Styling/CoreStyle.h"
@@ -69,8 +70,8 @@ namespace FWStyle
 
 	const FSlateBrush* Card(bool bHovered)
 	{
-		static const FSlateRoundedBoxBrush Quiet(FLinearColor(1.f, 1.f, 1.f, 0.035f), 8.f, FLinearColor(1.f, 1.f, 1.f, 0.06f), 1.f);
-		static const FSlateRoundedBoxBrush Lit(FLinearColor(1.f, 1.f, 1.f, 0.07f), 8.f, FLinearColor(1.f, 0.58f, 0.16f, 0.45f), 1.f);
+		static const FSlateRoundedBoxBrush Quiet(FLinearColor(0.55f, 0.6f, 0.68f, 0.09f), 8.f, FLinearColor(1.f, 1.f, 1.f, 0.1f), 1.f);
+		static const FSlateRoundedBoxBrush Lit(FLinearColor(0.7f, 0.72f, 0.78f, 0.14f), 8.f, FLinearColor(1.f, 0.58f, 0.16f, 0.6f), 1.f);
 		return bHovered ? &Lit : &Quiet;
 	}
 
@@ -111,6 +112,24 @@ namespace FWStyle
 			}
 			return Sound;
 		}
+	}
+
+	void PlayUi(const TCHAR* Name)
+	{
+		static TMap<FString, FSlateSound> Sounds;
+		const FSlateSound* Sound = Sounds.Find(Name);
+		if (!Sound)
+		{
+			Sound = &Sounds.Add(Name, UiSound(Name));
+		}
+		if (Sound->GetResourceObject() && FSlateApplication::IsInitialized())
+		{
+			FSlateApplication::Get().PlaySound(*Sound);
+		}
+	}
+
+	namespace
+	{
 
 		FButtonStyle MakeButton(const FLinearColor& Normal, const FLinearColor& Hovered, const FLinearColor& Pressed, const FLinearColor& Edge,
 			const FLinearColor& HoveredEdge)

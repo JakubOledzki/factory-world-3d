@@ -231,7 +231,7 @@ TSharedRef<SWidget> SFWMarketWindow::ItemRow(const FString& Item, const FString&
 {
 	const FSlateBrush* Icon = Controller.IsValid() ? Controller->GetIconBrush(Item) : nullptr;
 	const FFWStack* Stack = Controller.IsValid() ? Controller->FindStack(Item) : nullptr;
-	return SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(8.f, 5.f))
+	return SNew(SFWCard).Padding(FMargin(8.f, 5.f))
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 8, 0)

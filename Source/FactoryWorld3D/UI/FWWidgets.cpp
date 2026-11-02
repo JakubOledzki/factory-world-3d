@@ -57,6 +57,29 @@ namespace
 	};
 }
 
+void SFWCard::Construct(const FArguments& InArgs)
+{
+	ChildSlot
+	[
+		SAssignNew(Border, SBorder).BorderImage(FWStyle::Card(false)).Padding(InArgs._Padding)
+		[
+			InArgs._Content.Widget
+		]
+	];
+}
+
+void SFWCard::OnMouseEnter(const FGeometry& Geometry, const FPointerEvent& Event)
+{
+	SCompoundWidget::OnMouseEnter(Geometry, Event);
+	Border->SetBorderImage(FWStyle::Card(true));
+}
+
+void SFWCard::OnMouseLeave(const FPointerEvent& Event)
+{
+	SCompoundWidget::OnMouseLeave(Event);
+	Border->SetBorderImage(FWStyle::Card(false));
+}
+
 namespace FWUi
 {
 	TSharedRef<SWidget> Appear(TSharedRef<SWidget> Content, float Seconds)
@@ -178,6 +201,7 @@ namespace FWUi
 
 	TSharedRef<SWidget> Frame(const FText& Title, TSharedRef<SWidget> Right, TSharedPtr<SWidget> Tabs, TSharedRef<SWidget> Content, float Width, float Height)
 	{
+		FWStyle::PlayUi(TEXT("ui_open"));
 		return SNew(SOverlay)
 			+ SOverlay::Slot()[SNew(SBackgroundBlur).BlurStrength(6.f)]
 			+ SOverlay::Slot()[SNew(SBorder).BorderImage(FWStyle::SideShade())]

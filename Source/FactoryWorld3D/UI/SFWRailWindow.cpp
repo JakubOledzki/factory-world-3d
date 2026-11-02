@@ -76,7 +76,7 @@ namespace FWRailText
 
 	TSharedRef<SWidget> Line(AFWPlayerController* PC, const FString& Item, const FText& Text, const FLinearColor& Color, TSharedPtr<SWidget> Right = nullptr)
 	{
-		return SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(10.f, 5.f))
+		return SNew(SFWCard).Padding(FMargin(10.f, 5.f))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, Item.IsEmpty() ? 0.f : 8.f, 0)[Item.IsEmpty() ? SNullWidget::NullWidget : FWUi::Icon(PC, Item, 26.f)]

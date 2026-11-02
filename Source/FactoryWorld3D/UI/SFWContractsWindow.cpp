@@ -191,7 +191,7 @@ TSharedRef<SWidget> SFWContractsWindow::Card(const TSharedPtr<FJsonObject>& Cont
 	const double Deadline = FWUi::Num(Contract, TEXT("deadline"));
 	const int32 Xp = int32(FWUi::Num(Contract, TEXT("xp")));
 	TWeakPtr<SFWContractsWindow> WeakThis = SharedThis(this);
-	return SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(10.f, 8.f))
+	return SNew(SFWCard).Padding(FMargin(10.f, 8.f))
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 10, 0)[FWUi::Icon(Controller.Get(), FWUi::Str(Contract, TEXT("item")), 42.f)]

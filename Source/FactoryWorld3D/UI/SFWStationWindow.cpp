@@ -228,7 +228,7 @@ TSharedRef<SWidget> SFWStationWindow::MakeCrafting(const FJsonObject& State)
 		const int32 Makes = int32(Num(*Recipe, TEXT("quantity"), 1));
 		Recipes->AddSlot().Padding(0, 0, 8, 8)
 		[
-			SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(10.f)
+			SNew(SFWCard).Padding(10.f)
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(1.f)
@@ -350,7 +350,7 @@ TSharedRef<SWidget> SFWStationWindow::MakeFurnace(const FJsonObject& State)
 			+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)[Heading(Label)]
 			+ SVerticalBox::Slot().AutoHeight()
 			[
-				SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(10.f)
+				SNew(SFWCard).Padding(10.f)
 				[
 					Item.IsEmpty() || Count <= 0
 						? StaticCastSharedRef<SWidget>(SNew(SBox).HeightOverride(40.f).VAlign(VAlign_Center)[SNew(STextBlock).Text(LOCTEXT("None", "pusto")).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Muted)])
