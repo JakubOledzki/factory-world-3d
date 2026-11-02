@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The game's launcher for players: keeps the packaged game up to date from the server and starts it.
+    Build:  dotnet publish Launcher -c Release   (one self-contained .exe in Launcher/bin/Release/net10.0-windows/win-x64/publish)
+    Where it downloads from and which game server the game connects to are set here (or with -p:LauncherBaseUrl=...).
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>FactoryWorld3D-Launcher</AssemblyName>
+    <RootNamespace>FactoryWorld.Launcher</RootNamespace>
+    <Version>1.0.0</Version>
+    <Product>Factory World 3D</Product>
+    <ApplicationIcon></ApplicationIcon>
+
+    <!-- One .exe that needs nothing installed (WinForms cannot be trimmed: compressed instead) -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>none</DebugType>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+
+    <LauncherBaseUrl Condition="'$(LauncherBaseUrl)' == ''">https://2-31-169-64.sslip.io/download/</LauncherBaseUrl>
+    <GameServerUrl Condition="'$(GameServerUrl)' == ''">wss://2-31-169-64.sslip.io/ws</GameServerUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="LauncherBaseUrl" Value="$(LauncherBaseUrl)" />
+    <AssemblyMetadata Include="GameServerUrl" Value="$(GameServerUrl)" />
+  </ItemGroup>
+
+</Project>

@@ -45,3 +45,4 @@ Server/**/obj/
 # Production secrets and database copies (deploy/README.md): only on the server
 deploy/.env
 deploy/backups/
+deploy/download/
