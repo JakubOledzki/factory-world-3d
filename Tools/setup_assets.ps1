@@ -108,7 +108,7 @@ foreach ($Pack in $Footsteps.Keys) {
         & "$env:SystemRoot\System32\tar.exe" -xf "RawAssets\footsteps\$Pack.7z" -C $Folder
     }
 }
-if (-not (Test-Path RawAssets\processed\audio\step_snow_1.wav)) {
+if (-not (Test-Path RawAssets\processed\audio\step_concrete_1.wav)) {
     & $Blender --background --factory-startup --python Tools\make_footsteps.py
 }
 
