@@ -9,7 +9,9 @@
 #   garage_gas_cylinder, garage_sorting_machine, garage_wardrobe, garage_trophy_case, and plain stand-ins for the
 #   workshop's workbench, anvil, furnace and research table when their factory models are not there
 # Material slots as in make_factory.py, plus flat paints bound by Tools/import_external.py:
-#   FW_PaintBlue, FW_PaintRed, FW_PaintWhite, FW_PaintGreen
+#   FW_PaintBlue, FW_PaintRed, FW_PaintWhite, FW_PaintGreen (painted steel), FW_PlasticBlue, FW_PlasticRed,
+#   FW_PlasticGreen (moulded plastic bins); furniture is of planed table wood (FW_TableWood), crates and pallets of
+#   weathered planks (FW_Wood)
 # Run headless:
 #   blender --background --factory-startup --python Tools/blender/make_garage.py
 import math
@@ -181,7 +183,7 @@ def radiator():
 
 def board():
     reset()
-    box((1.3, 0.04, 0.9), (0, 0, 1.55), "FW_Wood", 0.01)
+    box((1.3, 0.04, 0.9), (0, 0, 1.55), "FW_TableWood", 0.01)
     box((1.18, 0.02, 0.78), (0, 0.02, 1.55), "FW_PaintRed", 0.002)
     # Plans and price lists pinned up
     for x, z, w, h in ((-0.35, 1.7, 0.3, 0.4), (0.05, 1.62, 0.3, 0.22), (0.38, 1.72, 0.26, 0.34), (-0.05, 1.33, 0.42, 0.2), (0.36, 1.33, 0.2, 0.26)):
@@ -194,8 +196,8 @@ def board():
 
 def trash_bin():
     reset()
-    box((0.78, 0.68, 0.95), (0, 0, 0.55), "FW_PaintGreen", 0.03)
-    box((0.84, 0.74, 0.06), (0, -0.02, 1.05), "FW_PaintGreen", 0.02)
+    box((0.78, 0.68, 0.95), (0, 0, 0.55), "FW_PlasticGreen", 0.03)
+    box((0.84, 0.74, 0.06), (0, -0.02, 1.05), "FW_PlasticGreen", 0.02)
     box((0.7, 0.04, 0.04), (0, -0.38, 0.98), "FW_Steel", 0.01)
     for x in (-0.3, 0.3):
         cylinder(0.08, 0.06, (x, -0.3, 0.08), "FW_Rubber", rotation=(0, math.pi / 2, 0), vertices=20)
@@ -271,7 +273,7 @@ def sorting_machine():
     box((0.5, 0.36, 0.06), (0.4, 0.45, 0.82), "FW_Rubber", 0.01)
     box((0.3, 0.06, 0.4), (0.45, 0.47, 1.0), "FW_Worn", 0.01)
     # Bins for what comes out, the control panel with its lamps
-    for i, mat in enumerate(("FW_PaintBlue", "FW_PaintRed", "FW_PaintGreen")):
+    for i, mat in enumerate(("FW_PlasticBlue", "FW_PlasticRed", "FW_PlasticGreen")):
         box((0.3, 0.3, 0.32), (-0.5 + i * 0.32, 0.62, 0.16), mat, 0.02)
     box((0.3, 0.04, 0.24), (0.45, -0.47, 1.0), "FW_Steel", 0.01)
     for i, mat in enumerate(("FW_PaintGreen", "FW_PaintRed")):
@@ -281,21 +283,21 @@ def sorting_machine():
 
 def wardrobe():
     reset()
-    box((1.4, 0.48, 1.95), (0, 0, 0.99), "FW_Wood", 0.012)
-    box((0.68, 0.02, 1.8), (-0.35, 0.25, 1.02), "FW_Wood", 0.006)
-    box((0.68, 0.02, 1.8), (0.35, 0.25, 1.02), "FW_Wood", 0.006)
+    box((1.4, 0.48, 1.95), (0, 0, 0.99), "FW_TableWood", 0.012)
+    box((0.68, 0.02, 1.8), (-0.35, 0.25, 1.02), "FW_TableWood", 0.006)
+    box((0.68, 0.02, 1.8), (0.35, 0.25, 1.02), "FW_TableWood", 0.006)
     for x in (-0.05, 0.05):
         box((0.02, 0.03, 0.18), (x, 0.27, 1.1), "FW_Steel", 0.005)
-    box((1.46, 0.52, 0.05), (0, 0, 1.98), "FW_Wood", 0.01)
+    box((1.46, 0.52, 0.05), (0, 0, 1.98), "FW_TableWood", 0.01)
     export("garage_wardrobe")
 
 
 def trophy_case():
     reset()
-    box((1.4, 0.45, 0.8), (0, 0, 0.4), "FW_Wood", 0.012)
+    box((1.4, 0.45, 0.8), (0, 0, 0.4), "FW_TableWood", 0.012)
     for x in (-0.69, 0.69):
-        box((0.03, 0.45, 1.0), (x, 0, 1.3), "FW_Wood", 0.005)
-    box((1.4, 0.45, 0.04), (0, 0, 1.82), "FW_Wood", 0.008)
+        box((0.03, 0.45, 1.0), (x, 0, 1.3), "FW_TableWood", 0.005)
+    box((1.4, 0.45, 0.04), (0, 0, 1.82), "FW_TableWood", 0.008)
     box((1.34, 0.02, 0.98), (0, 0.21, 1.3), "FW_Glass", 0.0)
     box((1.36, 0.4, 0.02), (0, 0, 1.3), "FW_Glass", 0.0)
     # Cups and medals behind the glass
@@ -310,7 +312,7 @@ def trophy_case():
 
 def workbench():
     reset()
-    box((2.3, 0.85, 0.06), (0, 0, 0.9), "FW_Wood", 0.01)
+    box((2.3, 0.85, 0.06), (0, 0, 0.9), "FW_TableWood", 0.01)
     for x in (-1.05, 1.05):
         for y in (-0.35, 0.35):
             box((0.07, 0.07, 0.87), (x, y, 0.435), "FW_Steel", 0.004)
@@ -341,10 +343,10 @@ def furnace():
 
 def research_table():
     reset()
-    box((1.4, 0.9, 0.05), (0, 0, 0.82), "FW_Wood", 0.01)
+    box((1.4, 0.9, 0.05), (0, 0, 0.82), "FW_TableWood", 0.01)
     for x in (-0.65, 0.65):
         for y in (-0.4, 0.4):
-            box((0.05, 0.05, 0.8), (x, y, 0.4), "FW_Wood", 0.004)
+            box((0.05, 0.05, 0.8), (x, y, 0.4), "FW_TableWood", 0.004)
     # Papers, a lamp and a microscope-like instrument
     box((0.5, 0.35, 0.01), (-0.3, 0.1, 0.85), "FW_PaintWhite", 0.0)
     cylinder(0.08, 0.04, (0.4, -0.2, 0.86), "FW_PaintGreen", vertices=20)
