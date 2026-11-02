@@ -17,7 +17,10 @@
 2 FWShot c4_left_in_backpack
 1 FWBuildMode
 2 FWShot c5_b_carries
-1 FWClick
+1 FWGarageLook furniture_trash_bin 150
+2 FWShot c5_red_over_bin
+1 FWGarageStand 150 -150 60 -30
+2 FWClick
 3 FWShot c6_placed_again
 1 FWGarage 4 0
 3 FWShot c7_window

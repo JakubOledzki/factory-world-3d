@@ -169,8 +169,8 @@ void AFWCharacter::CreateBody()
 void AFWCharacter::UpdateHeld(float DeltaSeconds)
 {
 	const AFWPlayerController* PC = GetFWController();
-	// In the garage the hands hold the furniture carried, not the hotbar's item
-	const FString Selected = !GaragePlacing.IsEmpty() ? GaragePlacing : PC ? PC->GetSelectedItem() : FString();
+	// Carrying a piece of the garage's furniture the hands are free (the piece shows as its ghost on the floor)
+	const FString Selected = !GaragePlacing.IsEmpty() ? FString() : PC ? PC->GetSelectedItem() : FString();
 	// A new slot: down with the old item, then up with the new one
 	if (Selected != HeldItem && EquipTime < 0.f)
 	{
@@ -1274,8 +1274,10 @@ bool AFWCharacter::UpdateGarageGhost()
 	Ghost->SetWorldLocationAndRotation(Where.GetLocation() + FVector(0.f, 0.f, Height * 0.5f + 1.f), Room->GetActorRotation());
 	// The cube is 1 m; the footprint's cells are 50 cm, a little smaller so neighbours show apart
 	Ghost->SetWorldScale3D(FVector(Size.X * 0.5f - 0.04f, Size.Y * 0.5f - 0.04f, Height / 100.f));
-	GhostMaterial->SetVectorParameterValue(TEXT("Color"), bFits ? FLinearColor(0.2f, 1.f, 0.4f) : FLinearColor(1.f, 0.15f, 0.1f));
-	GhostMaterial->SetScalarParameterValue(TEXT("Opacity"), 0.5f);
+	// The ghost's colour is light of its own: the game's exposure is set for daylight (EV100 12.5 at the least,
+	// FWEnvironment), at which a colour of 1 is next to black, so it glows as bright as a lit wall
+	GhostMaterial->SetVectorParameterValue(TEXT("Color"), (bFits ? FLinearColor(0.2f, 1.f, 0.4f) : FLinearColor(1.f, 0.15f, 0.1f)) * GarageGhostGlow);
+	GhostMaterial->SetScalarParameterValue(TEXT("Opacity"), 0.45f);
 	Ghost->SetVisibility(true);
 	return true;
 }

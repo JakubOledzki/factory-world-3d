@@ -58,6 +58,9 @@ public:
 	void FWRotate() { Rotate(); }
 	UFUNCTION(Exec)
 	void FWRightClick() { PickupStart(); PickupStop(); }
+	// Console: how strongly the garage's ghost glows, for tuning it
+	UFUNCTION(Exec)
+	void FWGhostGlow(float Glow) { GarageGhostGlow = Glow; }
 	// Console: logs the movement mode and how far the feet are above the ground
 	UFUNCTION(Exec)
 	void FWGroundCheck();
@@ -203,8 +206,9 @@ private:
 
 	bool bBuildMode = false;
 	int32 BuildRotation = 0;
-	// The garage's furniture being placed (SetGaragePlacing)
+	// The garage's furniture being placed (SetGaragePlacing), and how strongly its ghost glows (UpdateGarageGhost)
 	FString GaragePlacing;
+	float GarageGhostGlow = 3000.f;
 	bool UpdateGarageGhost();
 	bool GaragePlacement(FIntPoint& OutCell, FTransform& OutTransform, bool& bOutFits) const;
 	bool bHasTarget = false;
