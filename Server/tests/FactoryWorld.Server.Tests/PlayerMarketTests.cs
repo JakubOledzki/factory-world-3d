@@ -37,6 +37,37 @@ public sealed class PlayerMarketTests(ServerFactory factory) : IClassFixture<Ser
     private static long Count(Dictionary<string, long> inventory, string item) => inventory.GetValueOrDefault(item);
 
     [Fact]
+    public void Every_item_is_in_one_of_the_markets_groups()
+    {
+        Assert.All(Items.Names.Keys, item => Assert.Contains(ItemCategories.Of(item), ItemCategories.All));
+        Assert.Equal(ItemCategories.Raw, ItemCategories.Of(Items.IronOre));
+        Assert.Equal(ItemCategories.Materials, ItemCategories.Of(Items.IronIngot));
+        Assert.Equal(ItemCategories.Food, ItemCategories.Of(Items.Bread));
+        Assert.Equal(ItemCategories.Food, ItemCategories.Of(Items.SaplingOak));
+        Assert.Equal(ItemCategories.Fuel, ItemCategories.Of(Items.Diesel));
+        Assert.Equal(ItemCategories.Machines, ItemCategories.Of(Items.Furnace));
+        Assert.Equal(ItemCategories.Logistics, ItemCategories.Of(Items.Belt));
+        Assert.Equal(ItemCategories.Logistics, ItemCategories.Of(Items.WoodenChest));
+        Assert.Equal(ItemCategories.Power, ItemCategories.Of(Items.Generator));
+        Assert.Equal(ItemCategories.Equipment, ItemCategories.Of(Items.Axe));
+        Assert.Equal(ItemCategories.Equipment, ItemCategories.Of(Items.HikingBackpack));
+        Assert.Equal(ItemCategories.Other, ItemCategories.Of(Items.WastePaper));
+    }
+
+    [Fact]
+    public async Task The_trader_and_the_exchange_tell_each_items_group()
+    {
+        using var client = await PlayerAsync();
+
+        var prices = (await client.SendAsync("market.prices")).Payload().GetProperty("items").EnumerateArray().ToList();
+        var overview = (await client.SendAsync("market.overview")).Payload().GetProperty("items").EnumerateArray().ToList();
+
+        Assert.Equal(ItemCategories.Raw, prices.Single(x => x.GetProperty("id").GetString() == Items.Wood).GetProperty("category").GetString());
+        Assert.Equal(ItemCategories.Raw, overview.Single(x => x.GetProperty("id").GetString() == Items.Wood).GetProperty("category").GetString());
+        Assert.All(prices.Concat(overview), x => Assert.Contains(x.GetProperty("category").GetString(), ItemCategories.All));
+    }
+
+    [Fact]
     public async Task Listed_items_leave_the_inventory_and_another_player_buys_them()
     {
         using var seller = await PlayerAsync(item: Items.Wood, quantity: 30);

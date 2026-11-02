@@ -366,6 +366,9 @@ public:
 	void FWMarketTab(int32 Tab);
 	UFUNCTION(Exec)
 	void FWMarketItem(const FString& Item);
+	// The market's group of items: raw, materials, food, ... ("mine" what the player has, "all" everything)
+	UFUNCTION(Exec)
+	void FWMarketCategory(const FString& Category);
 	UFUNCTION(Exec)
 	void FWTrade(int32 Buy, const FString& Item, int32 Quantity);
 	// Walks to the nearest device of a kind (power_generator, furniture_drill, ...) and opens its window, for tests

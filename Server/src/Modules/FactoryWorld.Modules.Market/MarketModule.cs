@@ -667,6 +667,7 @@ public sealed class PricesHandler(TraderMarket trader, IServiceScopeFactory scop
                 {
                     id,
                     name = Items.Names[id],
+                    category = ItemCategories.Of(id),
                     buyCents = Sold(id) ? prices.Sells[id] : (long?)null,
                     buyChange = Sold(id) ? TraderPrices.Change(prices.Sells[id], NpcPrices.Sells[id]) : (int?)null,
                     sellCents = prices.Buys.TryGetValue(id, out var sell) ? sell : (long?)null,
