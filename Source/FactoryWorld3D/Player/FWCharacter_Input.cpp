@@ -26,6 +26,7 @@
 #include "InputModifiers.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
+#include "World/FWGarageRoom.h"
 #include "World/FWPlot.h"
 
 #define LOCTEXT_NAMESPACE "FWCharacter"
@@ -272,8 +273,33 @@ void AFWCharacter::SprintStop()
 
 void AFWCharacter::ToggleBuild()
 {
-	bBuildMode = !bBuildMode;
 	AFWPlayerController* PC = GetFWController();
+	// In the garage B carries a piece of furniture from the backpack (the one on the hotbar first), or stops
+	if (PC && PC->IsInGarage())
+	{
+		const AFWGarageRoom* Room = PC->GetGarageRoom();
+		if (!GaragePlacing.IsEmpty() || !Room)
+		{
+			SetGaragePlacing(FString());
+			return;
+		}
+		FString Kind = Room->IsFurniture(PC->GetSelectedItem()) ? PC->GetSelectedItem() : FString();
+		for (const FFWStack& Stack : PC->GetInventory())
+		{
+			if (Kind.IsEmpty() && Stack.Quantity > 0 && Room->IsFurniture(Stack.Id))
+			{
+				Kind = Stack.Id;
+			}
+		}
+		if (Kind.IsEmpty())
+		{
+			PC->Toast(LOCTEXT("NoGarageFurniture", "W plecaku nie ma mebli do garażu."), true);
+			return;
+		}
+		SetGaragePlacing(Kind);
+		return;
+	}
+	bBuildMode = !bBuildMode;
 	const AFWPlot* Plot = GetPlot();
 	if (bBuildMode && PC && Plot && !Plot->IsPlaceable(PC->GetSelectedItem()))
 	{
@@ -292,7 +318,7 @@ void AFWCharacter::ToggleBuild()
 void AFWCharacter::Rotate()
 {
 	BuildRotation = (BuildRotation + 1) & 3;
-	if (bBuildMode)
+	if (bBuildMode || !GaragePlacing.IsEmpty())
 	{
 		FWAudio::Play2D(this, TEXT("build_rotate"), 0.5f);
 		PlayGesture(EGesture::Rotate);
@@ -304,6 +330,13 @@ void AFWCharacter::SelectSlot(int32 Slot)
 	if (AFWPlayerController* PC = GetFWController())
 	{
 		PC->SelectSlot(Slot);
+		// In the garage a piece of furniture on the hotbar is taken to be placed
+		if (PC->IsInGarage())
+		{
+			const AFWGarageRoom* Room = PC->GetGarageRoom();
+			SetGaragePlacing(Room && Room->IsFurniture(PC->GetSelectedItem()) && PC->FindStack(PC->GetSelectedItem()) ? PC->GetSelectedItem() : FString());
+			return;
+		}
 		const AFWPlot* Plot = GetPlot();
 		bBuildMode = Plot && Plot->IsPlaceable(PC->GetSelectedItem());
 	}

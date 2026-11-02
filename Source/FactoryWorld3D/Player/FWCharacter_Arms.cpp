@@ -35,7 +35,8 @@
 void AFWCharacter::UpdateHeld(float DeltaSeconds)
 {
 	const AFWPlayerController* PC = GetFWController();
-	const FString Selected = PC ? PC->GetSelectedItem() : FString();
+	// Carrying a piece of the garage's furniture the hands are free (the piece shows as its ghost on the floor)
+	const FString Selected = !GaragePlacing.IsEmpty() ? FString() : PC ? PC->GetSelectedItem() : FString();
 	// A new slot: down with the old item, then up with the new one
 	if (Selected != HeldItem && EquipTime < 0.f)
 	{

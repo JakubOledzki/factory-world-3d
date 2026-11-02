@@ -203,6 +203,15 @@ void AFWPlayerController::FWGarageLook(const FString& Kind, float Distance)
 	SetControlRotation((Centre - Eye).Rotation());
 }
 
+void AFWPlayerController::FWGarageTake(const FString& Kind)
+{
+	const FString Id = bInGarage && GarageRoom ? GarageRoom->IdOf(Kind) : FString();
+	if (!Id.IsEmpty())
+	{
+		GaragePickup(Id);
+	}
+}
+
 void AFWPlayerController::FWChestNearest()
 {
 	if (!Plot || !GetPawn())

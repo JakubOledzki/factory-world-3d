@@ -23,7 +23,8 @@ struct FSlateBrush;
  *     bonus for good (upgrades_window.gd; garage.upgrades / upgrade)
  *   Garderoba: the wardrobe's clothes and saved outfits (wardrobe_window.gd; wardrobe.get / put / take / save / wear /
  *     forget)
- *   Meble: the room from above with its furniture, putting furniture from the backpack in and taking it out
+ *   Meble: the room from above with its furniture, putting furniture from the backpack in (on the plan, or carried in
+ *     the room with its ghost: AFWCharacter::SetGaragePlacing) and taking it out
  *     (garage.place / pickup)
  */
 class SFWGarageWindow : public SCompoundWidget

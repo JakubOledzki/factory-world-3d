@@ -120,8 +120,14 @@ public:
 	void OpenGarage(bool bAtBin = true);
 	// The garage's furniture the crosshair points at (kind and id, or "door" / "board"), false for nothing
 	bool GetGarageTarget(FString& OutKind, FString& OutId) const { return GarageTarget(OutKind, OutId); }
-	// Puts a piece of the garage's furniture away into the backpack (held right button)
+	// Puts a piece of the garage's furniture away into the backpack (held right button); it is then carried to be placed
+	// again, which the right button cancels
 	void GaragePickup(const FString& Id);
+	// Puts a piece of furniture from the backpack on the garage's floor, its front-left corner on Cell
+	void GaragePlace(const FString& Kind, FIntPoint Cell, int32 Rotation);
+	// Carries a piece of furniture from the backpack in the garage, its ghost at the crosshair (closes the window)
+	void CarryToGarage(const FString& Kind);
+	AFWGarageRoom* GetGarageRoom() const { return GarageRoom; }
 	// Lays the garage room out again from a garage reply (e.g. after a piece was placed), when the player is in it
 	void RefreshGarageRoom(const TSharedPtr<FJsonObject>& Garage);
 	void RefreshLook();
@@ -279,6 +285,9 @@ public:
 	// Stands in front of the garage's first piece of this kind, looking at it (then FWStrike 1 presses E)
 	UFUNCTION(Exec)
 	void FWGarageLook(const FString& Kind, float Distance = 160.f);
+	// Takes the garage's first piece of this kind into the backpack, as holding the right button on it does
+	UFUNCTION(Exec)
+	void FWGarageTake(const FString& Kind);
 	UFUNCTION(Exec)
 	void FWStoreAt(int32 TileX, int32 TileY);
 	// A train for tests: arrives at the platform in Seconds with Quantity goods (a wagon per 400)

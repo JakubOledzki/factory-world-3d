@@ -82,9 +82,10 @@ void AFWPlayerController::GaragePickup(const FString& Id)
 {
 	TSharedPtr<FJsonObject> P = MakeShared<FJsonObject>();
 	P->SetStringField(TEXT("id"), Id);
-	const FString Name = GarageRoom ? GarageRoom->NameOf(GarageRoom->KindOf(Id)) : FString();
+	const FString Kind = GarageRoom ? GarageRoom->KindOf(Id) : FString();
+	const FString Name = GarageRoom ? GarageRoom->NameOf(Kind) : FString();
 	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
-	Send(TEXT("garage.pickup"), P, [WeakThis, Name](const FFWNetReply& Reply)
+	Send(TEXT("garage.pickup"), P, [WeakThis, Kind, Name](const FFWNetReply& Reply)
 	{
 		AFWPlayerController* This = WeakThis.Get();
 		if (!This)
@@ -101,9 +102,65 @@ void AFWPlayerController::GaragePickup(const FString& Id)
 			This->GarageRoom->Build(Reply.Payload);
 		}
 		This->PlayUiSound(TEXT("build_pickup"));
-		This->Toast(FText::Format(LOCTEXT("PutAway", "{0} w plecaku. Postawisz to z powrotem w oknie garażu, zakładka Meble."), FText::FromString(Name)));
+		This->RefreshInventory();
+		// Taken up to be put somewhere else: carried with its ghost at the crosshair
+		AFWCharacter* Walker = Cast<AFWCharacter>(This->GetPawn());
+		if (Walker && This->bInGarage && !Kind.IsEmpty())
+		{
+			Walker->SetGaragePlacing(Kind);
+			This->Toast(FText::Format(LOCTEXT("Carrying", "Niesiesz: {0}. [LPM] postaw w innym miejscu, [R] obróć, [PPM] zostaw w plecaku."), FText::FromString(Name)));
+		}
+		else
+		{
+			This->Toast(FText::Format(LOCTEXT("PutAway", "{0} w plecaku. Postawisz to z powrotem klawiszem B albo w oknie garażu, zakładka Meble."), FText::FromString(Name)));
+		}
+	});
+}
+
+void AFWPlayerController::GaragePlace(const FString& Kind, FIntPoint Cell, int32 Rotation)
+{
+	TSharedPtr<FJsonObject> P = MakeShared<FJsonObject>();
+	P->SetStringField(TEXT("kind"), Kind);
+	P->SetNumberField(TEXT("x"), Cell.X);
+	P->SetNumberField(TEXT("y"), Cell.Y);
+	P->SetNumberField(TEXT("rotation"), Rotation & 3);
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Send(TEXT("garage.place"), P, [WeakThis, Kind](const FFWNetReply& Reply)
+	{
+		AFWPlayerController* This = WeakThis.Get();
+		if (!This)
+		{
+			return;
+		}
+		if (Reply.Type != TEXT("garage"))
+		{
+			// Still carried, for another try
+			This->ToastError(Reply);
+			return;
+		}
+		if (This->GarageRoom)
+		{
+			This->GarageRoom->Build(Reply.Payload);
+		}
+		AFWCharacter* Walker = Cast<AFWCharacter>(This->GetPawn());
+		if (Walker && Walker->GetGaragePlacing() == Kind)
+		{
+			Walker->SetGaragePlacing(FString());
+		}
+		This->PlayUiSound(TEXT("build_place"));
 		This->RefreshInventory();
 	});
+}
+
+void AFWPlayerController::CarryToGarage(const FString& Kind)
+{
+	AFWCharacter* Walker = Cast<AFWCharacter>(GetPawn());
+	if (!bInGarage || !Walker)
+	{
+		return;
+	}
+	CloseWindow();
+	Walker->SetGaragePlacing(Kind);
 }
 
 void AFWPlayerController::ToggleGarageRoom()
@@ -199,15 +256,15 @@ FText AFWPlayerController::GarageHint() const
 	const FText Name = FText::FromString(GarageRoom->NameOf(Kind));
 	if (Kind == TEXT("furniture_pallet"))
 	{
-		return FText::Format(LOCTEXT("HintPallet", "{0}  [E] rynek: kupuj i sprzedawaj   [PPM] schowaj"), Name);
+		return FText::Format(LOCTEXT("HintPallet", "{0}  [E] rynek: kupuj i sprzedawaj   [PPM] przenieś"), Name);
 	}
 	static const TMap<FString, FText> Uses = {
 		{ TEXT("furniture_trash_bin"), LOCTEXT("UseBin", "segreguj śmieci") }, { TEXT("furniture_sorting_machine"), LOCTEXT("UseSorter", "sortownia") },
 		{ TEXT("furniture_wardrobe"), LOCTEXT("UseWardrobe", "garderoba") }, { TEXT("furniture_workbench"), LOCTEXT("UseBench", "wytwarzaj") },
 		{ TEXT("furniture_anvil"), LOCTEXT("UseAnvil", "wytwarzaj") }, { TEXT("furniture_furnace"), LOCTEXT("UseFurnace", "wytapiaj") } };
 	const FText* Use = Uses.Find(Kind);
-	return Use ? FText::Format(LOCTEXT("HintUse", "{0}  [E] {1}   [PPM] schowaj"), Name, *Use)
-		: FText::Format(LOCTEXT("HintFurniture", "{0}  [E] meble garażu   [PPM] schowaj"), Name);
+	return Use ? FText::Format(LOCTEXT("HintUse", "{0}  [E] {1}   [PPM] przenieś"), Name, *Use)
+		: FText::Format(LOCTEXT("HintFurniture", "{0}  [E] meble garażu   [PPM] przenieś"), Name);
 }
 
 void AFWPlayerController::GarageInteract()

@@ -43,9 +43,24 @@ public:
 	static constexpr int32 StrikeCount = 5;
 	FText GetTargetText() const;
 
+	// In the garage: a piece of furniture from the backpack carried to its place, its ghost at the crosshair on the floor
+	// (left button puts it down, R turns it, right button leaves it in the backpack); empty Kind stops
+	void SetGaragePlacing(const FString& Kind);
+	const FString& GetGaragePlacing() const { return GaragePlacing; }
+
 	// Console: switches build mode as B does
 	UFUNCTION(Exec)
 	void FWBuildMode() { ToggleBuild(); }
+	// Console: the left button, R, and a short press of the right button
+	UFUNCTION(Exec)
+	void FWClick() { Primary(); }
+	UFUNCTION(Exec)
+	void FWRotate() { Rotate(); }
+	UFUNCTION(Exec)
+	void FWRightClick() { PickupStart(); PickupStop(); }
+	// Console: how strongly the garage's ghost glows, for tuning it
+	UFUNCTION(Exec)
+	void FWGhostGlow(float Glow) { GarageGhostGlow = Glow; }
 	// Console: logs the movement mode and how far the feet are above the ground
 	UFUNCTION(Exec)
 	void FWGroundCheck();
@@ -191,6 +206,11 @@ private:
 
 	bool bBuildMode = false;
 	int32 BuildRotation = 0;
+	// The garage's furniture being placed (SetGaragePlacing), and how strongly its ghost glows (UpdateGarageGhost)
+	FString GaragePlacing;
+	float GarageGhostGlow = 3000.f;
+	bool UpdateGarageGhost();
+	bool GaragePlacement(FIntPoint& OutCell, FTransform& OutTransform, bool& bOutFits) const;
 	bool bHasTarget = false;
 	FIntPoint TargetTile = FIntPoint::ZeroValue;
 
