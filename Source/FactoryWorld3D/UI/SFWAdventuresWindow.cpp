@@ -58,7 +58,7 @@ namespace FWAdventureText
 
 	TSharedRef<SWidget> Line(const FText& Text, const FLinearColor& Color, TSharedPtr<SWidget> Right = nullptr, AFWPlayerController* PC = nullptr, const FString& Item = FString(), float IconSize = 30.f)
 	{
-		return SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(10.f, 6.f))
+		return SNew(SFWCard).Padding(FMargin(10.f, 6.f))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, Item.IsEmpty() ? 0.f : 10.f, 0)[Item.IsEmpty() ? SNullWidget::NullWidget : FWUi::Icon(PC, Item, IconSize)]
@@ -538,7 +538,7 @@ TSharedRef<SWidget> SFWAdventuresWindow::MakeAlbum()
 				SNew(SBox).WidthOverride(96.f).ToolTipText(FText::FromString(FWUi::Str(Item, TEXT("name")) + (bFound ? FString::Printf(TEXT("\nZnalezione %s"), *FWAdventureText::Date(FWUi::Num(Item, TEXT("foundAt"))).ToString())
 					: FString(TEXT("\nJeszcze nie znalezione")))))
 				[
-					SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(6.f)
+					SNew(SFWCard).Padding(6.f)
 					[
 						SNew(SVerticalBox)
 						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
@@ -590,7 +590,7 @@ TSharedRef<SWidget> SFWAdventuresWindow::MakeExpeditions()
 			const double Id = FWUi::Num(Trip, TEXT("id"));
 			const double Returns = FWUi::Num(Trip, TEXT("returnsAt"));
 			const FString Name = FWUi::Str(Trip, TEXT("name"));
-			Add(SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(10.f, 6.f))
+			Add(SNew(SFWCard).Padding(FMargin(10.f, 6.f))
 				[
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
@@ -653,7 +653,7 @@ TSharedRef<SWidget> SFWAdventuresWindow::MakeExpeditions()
 		}
 		const FString Text = FString::Printf(TEXT("%s\nZapasy: %s\nPrzywozi: %s. Pamiątka: %s"), *FWUi::Str(Region, TEXT("description")), *FString::Join(Supplies, TEXT(", ")),
 			*FString::Join(Finds, TEXT(", ")), *FWUi::Str(FWUi::Obj(Region, TEXT("souvenir")), TEXT("name")));
-		Add(SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(12.f, 8.f))
+		Add(SNew(SFWCard).Padding(FMargin(12.f, 8.f))
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
@@ -994,7 +994,7 @@ TSharedRef<SWidget> SFWAdventuresWindow::MakeShowcase()
 		}
 		Grid->AddSlot(Index % 2, Index / 2)
 		[
-			SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(8.f, 6.f))
+			SNew(SFWCard).Padding(FMargin(8.f, 6.f))
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(FWUi::Str(Honour, TEXT("name")))).Font(FWStyle::Font(12, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent)]

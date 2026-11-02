@@ -373,7 +373,7 @@ void SFWStatsWindow::Rebuild()
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0, 4, 0, 14)
 			[
-				SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(10.f)
+				SNew(SFWCard).Padding(10.f)
 				[
 					SNew(FWStatsChart::SBars)
 					.Made(Chosen.IsValid() ? FWStatsChart::Numbers(Chosen, TEXT("producedBars")) : Empty)

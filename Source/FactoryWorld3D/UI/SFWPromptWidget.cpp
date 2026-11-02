@@ -90,6 +90,7 @@ void SFWPromptWidget::Construct(const FArguments& InArgs)
 	}
 
 	// A glass panel over the softened, darkened world, fading in
+	FWStyle::PlayUi(TEXT("ui_open"));
 	ChildSlot
 	[
 		SNew(SOverlay)

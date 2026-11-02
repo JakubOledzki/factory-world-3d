@@ -316,6 +316,30 @@ def invalid():
     return normalize(lowpass(tone, 1800), 0.5)
 
 
+def ui_open():
+    """A window opening: a short soft rush of air rising in pitch, with a light tick as it settles."""
+    k = 0.32
+    n = int(k * RATE)
+    t = np.arange(n) / RATE
+    air = band(white(n), 900, 6000) * env(n, 0.06, 0.18, 4) * (0.4 + 0.6 * np.clip(t / 0.12, 0, 1))
+    tick = np.zeros(n)
+    s = int(0.11 * RATE)
+    tick[s:] = modes(k - 0.11, [2400, 3900], [0.02, 0.012], [1, 0.4])[:n - s]
+    return normalize(normalize(air) * 0.6 + normalize(tick) * 0.35, 0.35)
+
+
+def ui_error():
+    """Something refused: two short, soft, low tones, the second lower."""
+    out = np.zeros(int(0.32 * RATE))
+    for start, f in ((0.0, 330.0), (0.12, 247.0)):
+        s = int(start * RATE)
+        m = int(0.16 * RATE)
+        tt = np.arange(m) / RATE
+        tone = (np.sin(2 * np.pi * f * tt) + 0.3 * np.sin(4 * np.pi * f * tt)) * env(m, 0.004, 0.12, 4)
+        out[s:s + m] += tone[:len(out) - s]
+    return normalize(lowpass(out, 2500), 0.4)
+
+
 def confirm():
     k = 0.6
     t = t_axis(k)
@@ -433,6 +457,8 @@ save("pole_hum_loop", pole_hum())
 save("turbine_loop", turbine_loop())
 save("ui_click", click())
 save("ui_hover", hover())
+save("ui_open", ui_open())
+save("ui_error", ui_error())
 save("build_place", place())
 save("build_rotate", rotate())
 save("build_pickup", pickup())

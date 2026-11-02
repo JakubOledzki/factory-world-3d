@@ -44,4 +44,6 @@ namespace FWStyle
 	const FButtonStyle& TabButton(bool bActive);
 	const FEditableTextBoxStyle& TextBox();
 	const FScrollBarStyle& ScrollBar();
+	// Plays an interface sound from Tools/make_audio.py ("ui_open", "ui_error"…), when it is set up
+	void PlayUi(const TCHAR* Name);
 }

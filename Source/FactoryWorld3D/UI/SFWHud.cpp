@@ -394,6 +394,14 @@ void SFWHud::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime,
 	{
 		return;
 	}
+	// A new error is heard as well as seen
+	for (const FFWToast& Toast : Controller->GetToasts())
+	{
+		if (Toast.ShownAt == Newest && Newest > LastToastAt && Toast.bError)
+		{
+			FWStyle::PlayUi(TEXT("ui_error"));
+		}
+	}
 	ShownToasts = Visible;
 	LastToastAt = Newest;
 	ToastBox->ClearChildren();

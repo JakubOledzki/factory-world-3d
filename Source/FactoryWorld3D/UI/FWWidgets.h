@@ -2,9 +2,28 @@
 
 #include "CoreMinimal.h"
 #include "Dom/JsonObject.h"
+#include "Widgets/SCompoundWidget.h"
 #include "Widgets/SWidget.h"
 
 class AFWPlayerController;
+class SBorder;
+
+/** A row or card inside a window: a shade lighter than the window, rounded, lit with an amber edge under the mouse. */
+class SFWCard : public SCompoundWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SFWCard) : _Padding(FMargin(12.f, 7.f)) {}
+		SLATE_DEFAULT_SLOT(FArguments, Content)
+		SLATE_ATTRIBUTE(FMargin, Padding)
+	SLATE_END_ARGS()
+
+	void Construct(const FArguments& InArgs);
+	virtual void OnMouseEnter(const FGeometry& Geometry, const FPointerEvent& Event) override;
+	virtual void OnMouseLeave(const FPointerEvent& Event) override;
+
+private:
+	TSharedPtr<SBorder> Border;
+};
 
 /**
  * Pieces the game's windows share, in the look of FWStyle: the window frame with its title and tabs, buttons,

@@ -279,7 +279,7 @@ TSharedRef<SWidget> SFWAchievementsWindow::MakeBadges(const TSharedPtr<FJsonObje
 			}
 			Grid->AddSlot(i % 2, i / 2)
 			[
-				SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(8.f, 6.f))
+				SNew(SFWCard).Padding(FMargin(8.f, 6.f))
 				[
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 10, 0)[Medal(bWon)]
@@ -480,7 +480,7 @@ TSharedRef<SWidget> SFWAchievementsWindow::MakeRivalry(const TSharedPtr<FJsonObj
 		const bool bMine = FWUi::Bool(First, TEXT("mine"));
 		Grid->AddSlot(i % 2, i / 2)
 		[
-			SNew(SBorder).BorderImage(FWStyle::SideShade()).Padding(FMargin(8.f, 6.f))
+			SNew(SFWCard).Padding(FMargin(8.f, 6.f))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 10, 0)[Medal(!Owner.IsEmpty())]
