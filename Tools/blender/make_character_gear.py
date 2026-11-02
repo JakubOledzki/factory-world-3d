@@ -18,7 +18,7 @@ import os
 import bmesh
 import bpy
 
-from mathutils import Vector, noise
+from mathutils import Matrix, Vector, noise
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 SOURCE = os.path.join(ROOT, "RawAssets", "mannequin", "SKM_Manny_Simple.fbx")
@@ -440,3 +440,94 @@ for name, inside, offset, thickness, slot in (("pants", pants, 0.9, 0.3, "FW_Den
     piece = cut(armature, body, name, inside, offset, thickness, slot)
     bpy.data.objects.remove(body, do_unlink=True)
     export(armature, piece, name)
+
+# Hair for the MetaHuman heads (Tools/export_metahuman_heads.py -> RawAssets/metahuman/FW_Face<n>_Face.fbx): each
+# hairstyle grown on each head's own scalp, as hair_<style>_face<n> on that head's skeleton, so the game hangs it on
+# the head itself (FWGear) instead of fitting the mannequin's hair over a skull of another shape. The head is first
+# moved and stretched so its skull matches the mannequin's (the styles' regions and paths above are measured on it),
+# the hair is made on it, and the whole is then put back on the head as it is.
+HEADS = os.path.join(ROOT, "RawAssets", "metahuman")
+# The mannequin's skull above the brows, UE cm: top, half width, back and front
+MANNY_SKULL = (180.52, 8.85, -8.62, 13.87)
+
+
+def load_head(path):
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.import_scene.fbx(filepath=path)
+    armature = next(o for o in bpy.data.objects if o.type == "ARMATURE")
+    head = max((o for o in bpy.data.objects if o.type == "MESH"), key=lambda o: len(o.data.vertices))
+    # The armature hangs under an empty that carries the import's scale: it takes the scale itself, as the
+    # mannequin's armature has it
+    placed = armature.matrix_world.copy()
+    armature.parent = None
+    armature.matrix_world = placed
+    for other in [o for o in bpy.data.objects if o not in (armature, head)]:
+        bpy.data.objects.remove(other, do_unlink=True)
+    # Only the skin, the biggest section: eyes, teeth and lashes go
+    counts = {}
+    for poly in head.data.polygons:
+        counts[poly.material_index] = counts.get(poly.material_index, 0) + 1
+    skin = max(counts, key=counts.get)
+    bm = bmesh.new()
+    bm.from_mesh(head.data)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.material_index != skin], context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    bm.to_mesh(head.data)
+    bm.free()
+    return armature, head
+
+
+def fit_to_mannequin(head):
+    """The world-space change that puts this skull where the mannequin's is, as big."""
+    points = [to_ue(head, v.co) for v in head.data.vertices]
+    top = max(p.z for p in points)
+    skull = [p for p in points if p.z > top - 11.0]
+    left, right = min(p.x for p in skull), max(p.x for p in skull)
+    back, front = min(p.y for p in skull), max(p.y for p in skull)
+    top_m, half_m, back_m, front_m = MANNY_SKULL
+    sx = half_m / ((right - left) * 0.5)
+    sy = (front_m - back_m) / (front - back)
+    cx = (left + right) * 0.5
+    # UE: x' = sx (x - cx), y' = sy (y - back) + back_m, z' = z + (top_m - top); Blender has y = -UE y, in metres
+    fit = Matrix.Diagonal((sx, sy, 1.0, 1.0))
+    fit.translation = Vector((-sx * cx / 100.0, (sy * back - back_m) / 100.0, (top_m - top) / 100.0))
+    return fit
+
+
+def move_vertices(piece, change):
+    """Moves the mesh's vertices by a change in world space (the object's own placement stays: a stretch along the world's
+    axes cannot be put into the placement of an object turned by the FBX import)."""
+    bpy.context.view_layer.update()  # a new copy's placement is only worked out on an update
+    to_local = piece.matrix_world.inverted() @ change @ piece.matrix_world
+    for v in piece.data.vertices:
+        v.co = to_local @ v.co
+    piece.data.update()
+
+
+if os.path.isdir(HEADS):
+    for file in sorted(os.listdir(HEADS)):
+        if not file.endswith("_Face.fbx"):
+            continue
+        face = int(file[len("FW_Face"):-len("_Face.fbx")])
+        for style in HAIR:
+            armature, head = load_head(os.path.join(HEADS, file))
+            fit = fit_to_mannequin(head)
+            move_vertices(head, fit)
+            piece = cut(armature, head, f"hair_{style}_face{face}", HAIR[style], 0.6 if style != 5 else 0.9, 0.3, "FW_Hair", hair_bumps(style))
+            extra = [hair_cards(head, style)]
+            if style == 4:
+                points = [Vector((0, -9.0 - 3.0 * t, 169.0 - 32.0 * t ** 1.2)) for t in (i / 10 for i in range(11))]
+                extra.append(shape_from_ue(head, points, [3.2 - 1.6 * (i / 10) for i in range(11)], "FW_Hair", "ponytail"))
+            hair = join([piece] + extra)
+            # Back onto the head as it is: what was made on the fitted skull is carried along, and the hair takes the
+            # head's own placement under the armature (which comes back from UE as it went)
+            bpy.context.view_layer.update()
+            back = head.matrix_world.inverted() @ fit.inverted() @ hair.matrix_world
+            for v in hair.data.vertices:
+                v.co = back @ v.co
+            hair.parent = armature
+            hair.matrix_parent_inverse = head.matrix_parent_inverse.copy()
+            hair.matrix_basis = head.matrix_basis.copy()
+            hair.data.update()
+            bpy.data.objects.remove(head, do_unlink=True)
+            export(armature, hair, f"hair_{style}_face{face}")

@@ -264,7 +264,8 @@ namespace FWGear
 			Material->SetScalarParameterValue(TEXT("FaceStyle"), Look.FaceStyle);
 		}
 		// The MetaHuman head over the painted one, which is then cut away
-		const bool bHead = !bArmsOnly && WearHead(Owner, Body, Gear, Look) != nullptr;
+		UFWHeadComponent* Head = bArmsOnly ? nullptr : WearHead(Owner, Body, Gear, Look);
+		const bool bHead = Head != nullptr;
 		if (UMaterialInstanceDynamic* Material = Cast<UMaterialInstanceDynamic>(Body->GetMaterial(0)))
 		{
 			Material->SetScalarParameterValue(TEXT("HideHead"), bHead ? 1.f : 0.f);
@@ -275,10 +276,19 @@ namespace FWGear
 		// First person: only the sleeves are seen; hair and the rest would only cost
 		if (!bArmsOnly)
 		{
-			USkeletalMeshComponent* Hair = Wear(Owner, Parent, Body, Gear, TEXT("hair"), Look.HairStyle > 0 ? FString::Printf(TEXT("hair_%d"), Look.HairStyle) : FString(), Look.Hair);
+			// On a MetaHuman head, the hair grown on that head's own scalp (Tools/blender/make_character_gear.py), hung on
+			// the head itself; the mannequin's hair, fitted over it, only when that is not there
+			USkeletalMeshComponent* Hair = bHead && Look.HairStyle > 0
+				? Wear(Owner, Head, Head, Gear, TEXT("hair"), FString::Printf(TEXT("hair_%d_face%d"), Look.HairStyle, Look.FaceStyle), Look.Hair)
+				: nullptr;
+			const bool bOwnHair = Hair != nullptr;
+			if (!bOwnHair)
+			{
+				Hair = Wear(Owner, Parent, Body, Gear, TEXT("hair"), Look.HairStyle > 0 ? FString::Printf(TEXT("hair_%d"), Look.HairStyle) : FString(), Look.Hair);
+			}
 			USkeletalMeshComponent* Beard = Wear(Owner, Parent, Body, Gear, TEXT("beard"), Look.FacialHair > 0 ? FString::Printf(TEXT("beard_%d"), Look.FacialHair) : FString(), Look.Hair);
 			const FHeadFit* Fit = bHead && Look.FaceStyle >= 0 && Look.FaceStyle < UE_ARRAY_COUNT(HeadFits) ? &HeadFits[Look.FaceStyle] : nullptr;
-			if (Hair)
+			if (Hair && !bOwnHair)
 			{
 				// Enlarged about the head's centre
 				const float Scale = Fit ? HairScale : 1.f;

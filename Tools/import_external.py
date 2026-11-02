@@ -413,6 +413,14 @@ if os.path.isdir(GEAR) and skeleton and cloth_master and hair_master:
     for file in sorted(os.listdir(GEAR)):
         if not file.endswith(".fbx"):
             continue
+        # Hair grown on a MetaHuman head (hair_<style>_face<n>) goes on that head's skeleton, the rest on the mannequin's
+        own = skeleton
+        if "_face" in file:
+            face = file[:-4].rsplit("_face", 1)[1]
+            head = f"/Game/MetaHumans/Built/FW_Face{face}/Face/SKM_FW_Face{face}_FaceMesh"
+            if not library.does_asset_exist(head):
+                continue
+            own = unreal.load_asset(head).get_editor_property("skeleton")
         task = unreal.AssetImportTask()
         task.set_editor_property("filename", os.path.abspath(os.path.join(GEAR, file)))
         task.set_editor_property("destination_path", destination)
@@ -423,7 +431,7 @@ if os.path.isdir(GEAR) and skeleton and cloth_master and hair_master:
         options.set_editor_property("import_mesh", True)
         options.set_editor_property("import_as_skeletal", True)
         options.set_editor_property("mesh_type_to_import", unreal.FBXImportType.FBXIT_SKELETAL_MESH)
-        options.set_editor_property("skeleton", skeleton)
+        options.set_editor_property("skeleton", own)
         options.set_editor_property("import_materials", False)
         options.set_editor_property("import_textures", False)
         options.set_editor_property("import_animations", False)
