@@ -2,6 +2,7 @@
 # deploy/download, which Caddy serves at https://<domain>/download/ (deploy/README.md, "Launcher").
 #   powershell -ExecutionPolicy Bypass -File Tools\dev\publish-game.ps1 -Build
 #   powershell -ExecutionPolicy Bypass -File Tools\dev\publish-game.ps1 -PackageDir D:\Factory-World\FactoryWorld3D-gra\FactoryWorld3D
+#   powershell -ExecutionPolicy Bypass -File Tools\dev\publish-game.ps1 -PackageDir ... -LocalDir D:\test\download -BaseUrl http://localhost:8091/download/
 # -Build packages the game first (Tools\dev\package.ps1); otherwise -PackageDir is a folder with FactoryWorld3D.exe.
 # Every file is stored as files/<sha256>: only files the server does not have yet are uploaded, and the new
 # manifest.json replaces the old one in one step, so players never see half a version.
@@ -13,7 +14,9 @@ param(
     [string]$Server = "root@2.31.169.64",
     [string]$RemoteDir = "/opt/factoryworld3d/deploy/download",
     [string]$Key = "$env:USERPROFILE\.ssh\factoryworld3d_deploy",
-    [string]$Version = (Get-Date -Format "yyyy.MM.dd-HHmm")
+    [string]$Version = (Get-Date -Format "yyyy.MM.dd-HHmm"),
+    # Instead of the server: a local folder (to test the launcher with -BaseUrl http://localhost:.../download/)
+    [string]$LocalDir = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,12 +58,27 @@ $manifest = [ordered]@{
 }
 $manifestFile = Join-Path $env:TEMP "factoryworld3d-manifest.json"
 [IO.File]::WriteAllText($manifestFile, ($manifest | ConvertTo-Json -Depth 5))
-Write-Host "$($files.Count) files, $([math]::Round(($files | Measure-Object -Property size -Sum).Sum / 1MB)) MB, version $Version, launcher $launcherVersion"
+Write-Host "$($files.Count) files, $([math]::Round(($files | ForEach-Object { $_.size } | Measure-Object -Sum).Sum / 1MB)) MB, version $Version, launcher $launcherVersion"
+
+$uploads = @($files | ForEach-Object { @{ sha = $_.sha256; local = $_.local; size = $_.size } }) + @(@{ sha = $launcherHash; local = $launcher; size = (Get-Item $launcher).Length })
+
+if ($LocalDir) {
+    # A folder laid out as the server's download/, to try the launcher against a local web server
+    Write-Host "== Copy to $LocalDir"
+    New-Item -ItemType Directory -Force (Join-Path $LocalDir "files") | Out-Null
+    foreach ($file in $uploads) {
+        $target = Join-Path $LocalDir "files\$($file.sha)"
+        if (-not (Test-Path $target)) { Copy-Item $file.local $target }
+    }
+    Copy-Item $launcher (Join-Path $LocalDir "FactoryWorld3D-Launcher.exe") -Force
+    Copy-Item $manifestFile (Join-Path $LocalDir "manifest.json") -Force
+    Write-Host "Published version ${Version} to $LocalDir"
+    return
+}
 
 Write-Host "== Upload"
 & ssh @Ssh $Server "mkdir -p $RemoteDir/files && ls $RemoteDir/files" | Set-Variable have
 $have = @($have)
-$uploads = @($files | ForEach-Object { @{ sha = $_.sha256; local = $_.local; size = $_.size } }) + @(@{ sha = $launcherHash; local = $launcher; size = (Get-Item $launcher).Length })
 $new = $uploads | Where-Object { $have -notcontains $_.sha } | Sort-Object { $_.sha } -Unique
 $i = 0
 foreach ($file in $new) {

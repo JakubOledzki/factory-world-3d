@@ -3,7 +3,8 @@ namespace FactoryWorld.Launcher;
 internal static class Program
 {
     /// <summary>
-    /// The game goes to %LOCALAPPDATA%\FactoryWorld3DGame (no administrator rights needed), or where --dir says.
+    /// The game goes to %LOCALAPPDATA%\FactoryWorld3DGame (no administrator rights needed), or where --dir says;
+    /// --play starts it as soon as it is up to date (a desktop shortcut, tests).
     /// </summary>
     [STAThread]
     private static void Main(string[] args)
@@ -14,6 +15,6 @@ internal static class Program
             ? Path.GetFullPath(args[at + 1])
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FactoryWorld3DGame");
         ApplicationConfiguration.Initialize();
-        Application.Run(new LauncherForm(directory));
+        Application.Run(new LauncherForm(directory, args.Contains("--play")));
     }
 }

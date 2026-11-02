@@ -25,8 +25,11 @@ public sealed class LauncherForm : Form
     private DateTime speedFrom = DateTime.UtcNow;
     private long speedBytes;
 
-    public LauncherForm(string gameDirectory)
+    private readonly bool autoPlay;
+
+    public LauncherForm(string gameDirectory, bool autoPlay)
     {
+        this.autoPlay = autoPlay;
         baseUrl = new Uri(Setting("LauncherBaseUrl"));
         serverUrl = Setting("GameServerUrl");
         updater = new Updater(http, baseUrl, gameDirectory);
@@ -99,6 +102,10 @@ public sealed class LauncherForm : Form
             bar.Value = bar.Maximum;
             play.Enabled = true;
             play.Focus();
+            if (autoPlay)
+            {
+                Play();
+            }
         }
         catch (OperationCanceledException)
         {

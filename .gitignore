@@ -46,3 +46,10 @@ Server/**/obj/
 deploy/.env
 deploy/backups/
 deploy/download/
+
+# Pak encryption and signing keys (Tools/dev/package.ps1 copies them in for packaging only; they live outside the repo)
+Config/DefaultCrypto.ini
+
+# The launcher build output
+Launcher/bin/
+Launcher/obj/

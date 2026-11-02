@@ -14,7 +14,9 @@ version of how to work on it.
   is not in git; never a real account.
 - Nothing is deployed anywhere but this computer without Jakub's say-so. How the server is set up on a VPS, backed up
   and updated: `deploy/README.md` (Docker, Caddy, secrets only in `deploy/.env` on the server); the game for players:
-  `Tools\dev\package.ps1 -ServerUrl wss://…/ws`. The deploy SSH key is `~/.ssh/factoryworld3d_deploy` (never in git).
+  `Tools\dev\package.ps1 -ServerUrl wss://…/ws` (encrypted with the keys in `D:\Factory-World\keys\`, never in git), or
+  for the launcher (`Launcher/`) `Tools\dev\publish-game.ps1 -Build`. The deploy SSH key is
+  `~/.ssh/factoryworld3d_deploy` (never in git).
 - Pull requests target `main`; no PR based on another PR's branch. A branch may carry an unmerged PR's commits, then the
   PR says "contains #N, merge #N first".
 - Before/after screenshots for every visible change (Tools/dev/autotest.ps1 makes them).
