@@ -167,7 +167,7 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 	const bool bBusy = bBuildMode || (Held && Held->IsVisible()) || Gesture != EGesture::None || Hold != EHold::None || ToolShown > 0.f
 		|| EquipTime >= 0.f;
 	// Empty hands stay in sight at the bottom of the view, lower than when busy (fully out of view they looked missing)
-	ArmsUp = FMath::FInterpTo(ArmsUp, bBusy ? 1.f : 0.55f, DeltaSeconds, bBusy ? 9.f : 3.f);
+	ArmsUp = FMath::FInterpTo(ArmsUp, bBusy ? 1.f : 0.85f, DeltaSeconds, bBusy ? 9.f : 3.f);
 
 	// Gestures: offsets of the right (index 1) and left hand over their length
 	FVector Gest[2] = { FVector::ZeroVector, FVector::ZeroVector };

@@ -140,8 +140,9 @@ void AFWCharacter::CreateBody()
 		Tool->SetupAttachment(Arms);
 		// Its grip in the palm, the head forward over the knuckles (the tool's +Z handle, +X head)
 		Tool->SetRelativeLocationAndRotation(FVector(-9.f, 1.5f, -3.f), FRotator(0.f, 0.f, 0.f));
-		// The import already turned metres into centimetres
-		Tool->SetRelativeScale3D(FVector(1.f));
+		// The import already turned metres into centimetres; at full size, this close to the eye, the tool covered
+		// half the screen and its head went off the top: smaller, as first-person tools are
+		Tool->SetRelativeScale3D(FVector(0.6f));
 		Tool->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Tool->SetOnlyOwnerSee(true);
 		Tool->SetCastShadow(false);
