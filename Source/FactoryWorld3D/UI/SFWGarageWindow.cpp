@@ -877,7 +877,7 @@ TSharedRef<SWidget> SFWGarageWindow::MakeSorting()
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
 			[
-				SNew(STextBlock).Font(FWStyle::Font(20, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text).Text(FText::FromString(FString::Printf(TEXT("Worki śmieci: %d"), Trash)))
+				SNew(STextBlock).Font(FWStyle::Display(26)).ColorAndOpacity(FWStyle::Text).Text(FText::FromString(FString::Printf(TEXT("Worki śmieci: %d"), Trash)))
 			]
 			+ SVerticalBox::Slot().AutoHeight()
 			[

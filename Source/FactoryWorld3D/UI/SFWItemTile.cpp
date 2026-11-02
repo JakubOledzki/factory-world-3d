@@ -82,14 +82,14 @@ void SFWItemTile::Construct(const FArguments& InArgs)
 			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(6.f, 3.f)
 			[
 				SNew(STextBlock)
-				.Font(FWStyle::Font(9, TEXT("Bold")))
+				.Font(FWStyle::Display(12, TEXT("SemiBold")))
 				.ColorAndOpacity(FWStyle::Muted)
 				.Text(InArgs._Label)
 			]
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(6.f, 2.f)
 			[
 				SNew(STextBlock)
-				.Font(FWStyle::Font(12, TEXT("Bold")))
+				.Font(FWStyle::Display(16))
 				.ColorAndOpacity(FWStyle::Text)
 				.ShadowOffset(FVector2D(1, 1))
 				.Text_Lambda([this]()

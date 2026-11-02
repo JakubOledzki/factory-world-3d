@@ -5,6 +5,8 @@
 #include "Engine/Texture2D.h"
 #include "Styling/CoreStyle.h"
 #include "UI/FWStyle.h"
+#include "UI/FWWidgets.h"
+#include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
@@ -19,8 +21,45 @@
 namespace
 {
 	constexpr double ToastSeconds = 4.0;
-	const FLinearColor Panel(0.02f, 0.025f, 0.03f, 0.72f);
-	const FLinearColor Accent(1.f, 0.62f, 0.15f);
+	const FLinearColor Accent = FWStyle::Accent;
+
+	// The keys shown in the corner, on foot and in build mode
+	struct FHint
+	{
+		const TCHAR* Key;
+		FText Label;
+	};
+
+	TArray<FHint> Hints(bool bBuild)
+	{
+		if (bBuild)
+		{
+			return { { TEXT("LPM"), LOCTEXT("Place", "postaw") }, { TEXT("R"), LOCTEXT("Rotate", "obróć") }, { TEXT("1–5"), LOCTEXT("Choose", "wybór") },
+				{ TEXT("PPM"), LOCTEXT("PickUp", "zabierz") }, { TEXT("B"), LOCTEXT("LeaveBuild", "wyjdź z budowania") } };
+		}
+		return { { TEXT("WASD"), LOCTEXT("Move", "ruch") }, { TEXT("Shift"), LOCTEXT("Run", "bieg") }, { TEXT("Spacja"), LOCTEXT("Jump", "skok") },
+			{ TEXT("E"), LOCTEXT("Use", "ścinaj · kop · otwórz") }, { TEXT("PPM"), LOCTEXT("Take", "zabierz") }, { TEXT("B"), LOCTEXT("Build", "budowanie") },
+			{ TEXT("Tab"), LOCTEXT("Backpack", "plecak") }, { TEXT("U"), LOCTEXT("Garage", "garaż") }, { TEXT("Esc"), LOCTEXT("Menu", "menu") } };
+	}
+
+	TSharedRef<SWidget> HintRow(bool bBuild)
+	{
+		TSharedRef<SWrapBox> Row = SNew(SWrapBox).PreferredSize(760.f).InnerSlotPadding(FVector2D(14.f, 6.f));
+		for (const FHint& Hint : Hints(bBuild))
+		{
+			Row->AddSlot()
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 6, 0)[FWUi::Key(FText::FromString(Hint.Key))]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					SNew(STextBlock).Text(Hint.Label).Font(FWStyle::Font(12, TEXT("Medium"))).ColorAndOpacity(FLinearColor(0.85f, 0.87f, 0.9f))
+					.ShadowOffset(FVector2D(1, 1)).ShadowColorAndOpacity(FLinearColor(0, 0, 0, 0.7f))
+				]
+			];
+		}
+		return Row;
+	}
 
 	// The ring round the crosshair while striking with the axe or pickaxe: one arc for each strike still to come; the
 	// arc of the strike just landed flies out and fades
@@ -98,7 +137,6 @@ namespace
 void SFWHud::Construct(const FArguments& InArgs)
 {
 	Controller = InArgs._Controller;
-	const FSlateBrush* White = FCoreStyle::Get().GetBrush("WhiteBrush");
 
 	TSharedRef<SHorizontalBox> HotbarBox = SNew(SHorizontalBox);
 	for (int32 Slot = 0; Slot < AFWPlayerController::HotbarSize; ++Slot)
@@ -110,15 +148,28 @@ void SFWHud::Construct(const FArguments& InArgs)
 	[
 		SNew(SOverlay)
 		.Visibility(EVisibility::HitTestInvisible)
-		// Crosshair
+		// Crosshair: a dot, amber with a faint halo when it points at something
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+		[
+			SNew(SBox).WidthOverride(16.f).HeightOverride(16.f)
+			[
+				SNew(SImage).Image(FWStyle::Swatch())
+				.ColorAndOpacity_Lambda([this]()
+				{
+					const AFWCharacter* Character = GetCharacter();
+					return FSlateColor(Character && Character->HasTarget() ? Accent.CopyWithNewOpacity(0.22f) : FLinearColor::Transparent);
+				})
+			]
+		]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 		[
 			SNew(SBox).WidthOverride(6.f).HeightOverride(6.f)
 			[
-				SNew(SBorder).BorderImage(White).BorderBackgroundColor_Lambda([this]()
+				SNew(SImage).Image(FWStyle::Swatch())
+				.ColorAndOpacity_Lambda([this]()
 				{
 					const AFWCharacter* Character = GetCharacter();
-					return Character && Character->HasTarget() ? Accent : FLinearColor(1.f, 1.f, 1.f, 0.8f);
+					return FSlateColor(Character && Character->HasTarget() ? Accent : FLinearColor(1.f, 1.f, 1.f, 0.85f));
 				})
 			]
 		]
@@ -131,49 +182,63 @@ void SFWHud::Construct(const FArguments& InArgs)
 				return Character && Character->GetStrikes(Left, Total, SinceHit);
 			})
 		]
-		// What the crosshair points at, and the progress of holding E or the right button
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0, 90, 0, 0)
+		// What the crosshair points at, on a small glass label, and the progress of holding the right button
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0, 110, 0, 0)
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 			[
-				SNew(STextBlock)
-				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 13))
-				.ShadowOffset(FVector2D(1, 1))
-				.Text_Lambda([this]()
+				SNew(SBorder).BorderImage(FWStyle::Panel()).Padding(FMargin(14.f, 6.f))
+				.Visibility_Lambda([this]()
 				{
 					const AFWCharacter* Character = GetCharacter();
-					return Character ? Character->GetTargetText() : FText::GetEmpty();
+					return Character && !Character->GetTargetText().IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 				})
+				[
+					SNew(STextBlock)
+					.Font(FWStyle::Font(14, TEXT("Medium")))
+					.ColorAndOpacity(FWStyle::Text)
+					.Text_Lambda([this]()
+					{
+						const AFWCharacter* Character = GetCharacter();
+						return Character ? Character->GetTargetText() : FText::GetEmpty();
+					})
+				]
 			]
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 6, 0, 0)
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 8, 0, 0)
 			[
-				SNew(SBox).WidthOverride(220.f).HeightOverride(8.f)
+				SNew(SBox).WidthOverride(200.f)
 				.Visibility_Lambda([this]()
 				{
 					const AFWCharacter* Character = GetCharacter();
 					return Character && Character->GetProgress() >= 0.f ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 				})
 				[
-					SNew(SProgressBar)
-					.FillColorAndOpacity(Accent)
-					.Percent_Lambda([this]()
+					FWUi::Bar(TAttribute<float>::CreateLambda([this]()
 					{
 						const AFWCharacter* Character = GetCharacter();
-						return Character ? TOptional<float>(Character->GetProgress()) : TOptional<float>();
-					})
+						return Character ? Character->GetProgress() : 0.f;
+					}), Accent)
 				]
 			]
 		]
-		// Money
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24)
+		// Money: the balance in large condensed figures under a small label
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(28)
 		[
-			SNew(SBorder).BorderImage(White).BorderBackgroundColor(Panel).Padding(FMargin(14, 8))
+			SNew(SBorder).BorderImage(FWStyle::Panel()).Padding(FMargin(18, 8, 18, 10))
 			[
-				SNew(STextBlock)
-				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 16))
-				.ColorAndOpacity(FLinearColor(0.55f, 0.9f, 0.45f))
-				.Text_Lambda([this]() { return Controller.IsValid() ? Money(Controller->GetBalanceCents()) : FText::GetEmpty(); })
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
+				[
+					SNew(STextBlock).Text(LOCTEXT("Balance", "SALDO")).Font(FWStyle::Display(12, TEXT("SemiBold"))).ColorAndOpacity(FWStyle::Muted)
+				]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
+				[
+					SNew(STextBlock)
+					.Font(FWStyle::Display(30))
+					.ColorAndOpacity(FWStyle::Good)
+					.Text_Lambda([this]() { return Controller.IsValid() ? Money(Controller->GetBalanceCents()) : FText::GetEmpty(); })
+				]
 			]
 		]
 		// Toasts
@@ -181,40 +246,55 @@ void SFWHud::Construct(const FArguments& InArgs)
 		[
 			SAssignNew(ToastBox, SVerticalBox)
 		]
-		// Key hints
-		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24)
+		// Key hints: key caps with what they do, on a faint dark glass in the corner
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(28)
 		[
-			SNew(SBorder).BorderImage(White).BorderBackgroundColor(Panel).Padding(FMargin(12, 8))
+			SNew(SBorder).BorderImage(FWStyle::Panel()).BorderBackgroundColor(FLinearColor(1.f, 1.f, 1.f, 0.6f)).Padding(FMargin(12.f, 8.f))
 			[
-				SNew(STextBlock)
-				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 11))
-				.ColorAndOpacity(FLinearColor(0.8f, 0.82f, 0.85f))
-				.Text_Lambda([this]()
+			SNew(SOverlay)
+			+ SOverlay::Slot()
+			[
+				SNew(SBox).Visibility_Lambda([this]()
 				{
 					const AFWCharacter* Character = GetCharacter();
-					if (Character && Character->IsBuildMode())
-					{
-						return LOCTEXT("BuildHints", "BUDOWANIE   LPM postaw   R obróć   1–5 wybór   PPM (przytrzymaj) zabierz   B wyjdź");
-					}
-					return LOCTEXT("Hints", "WASD ruch   Shift bieg   Spacja skok   E ścinaj / kop (przytrzymaj) · otwórz skrzynię   PPM (przytrzymaj) zabierz   B budowanie   1–5 pasek   Tab plecak   Esc menu");
+					return Character && Character->IsBuildMode() ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
 				})
+				[
+					HintRow(false)
+				]
+			]
+			+ SOverlay::Slot()
+			[
+				SNew(SVerticalBox)
+				.Visibility_Lambda([this]()
+				{
+					const AFWCharacter* Character = GetCharacter();
+					return Character && Character->IsBuildMode() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+				})
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
+				[
+					SNew(STextBlock).Text(LOCTEXT("Building", "BUDOWANIE")).Font(FWStyle::Display(20)).ColorAndOpacity(Accent)
+					.ShadowOffset(FVector2D(1, 1)).ShadowColorAndOpacity(FLinearColor(0, 0, 0, 0.7f))
+				]
+				+ SVerticalBox::Slot().AutoHeight()[HintRow(true)]
+			]
 			]
 		]
-		// Hotbar
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0, 0, 0, 24)
+		// Hotbar, with the name of what is in hand above it
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0, 0, 0, 26)
 		[
 			SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 8)
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 10)
 			[
 				SNew(STextBlock)
-				.Font(FWStyle::Font(14, TEXT("Bold")))
+				.Font(FWStyle::Display(20, TEXT("SemiBold")))
 				.ColorAndOpacity(FWStyle::Text)
 				.ShadowOffset(FVector2D(1, 1))
 				.ShadowColorAndOpacity(FLinearColor(0, 0, 0, 0.8f))
 				.Text_Lambda([this]()
 				{
 					const FString Id = Controller.IsValid() ? Controller->GetSelectedItem() : FString();
-					return Id.IsEmpty() ? FText::GetEmpty() : FText::FromString(Controller->ItemName(Id));
+					return Id.IsEmpty() ? FText::GetEmpty() : FText::FromString(Controller->ItemName(Id)).ToUpper();
 				})
 			]
 			+ SVerticalBox::Slot().AutoHeight()
@@ -232,43 +312,44 @@ TSharedRef<SWidget> SFWHud::MakeSlot(int32 Slot)
 		return Controller.IsValid() && Controller->GetHotbar().IsValidIndex(Slot) ? Controller->GetHotbar()[Slot] : FString();
 	};
 	auto Selected = [this, Slot]() { return Controller.IsValid() && Controller->GetSelectedSlot() == Slot; };
+	// The chosen slot is larger and lifted a little, with an amber frame
 	return SNew(SBox)
-		.WidthOverride_Lambda([Selected]() { return Selected() ? 92.f : 80.f; })
-		.HeightOverride_Lambda([Selected]() { return Selected() ? 92.f : 80.f; })
+		.WidthOverride_Lambda([Selected]() { return Selected() ? 90.f : 76.f; })
+		.HeightOverride_Lambda([Selected]() { return Selected() ? 90.f : 76.f; })
+		.RenderTransform_Lambda([Selected]() { return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2f(0.f, Selected() ? -6.f : 0.f))); })
 		[
 			SNew(SBorder)
 			.BorderImage(FWStyle::Panel())
-			.BorderBackgroundColor_Lambda([Selected]() { return Selected() ? FLinearColor(1.f, 0.8f, 0.55f, 1.f) : FLinearColor::White; })
 			.Padding(0.f)
 			[
 				SNew(SOverlay)
-				// The selected slot: an amber frame
 				+ SOverlay::Slot()
 				[
 					SNew(SImage)
 					.Image_Lambda([Selected]() { return FWStyle::SlotFrame(Selected()); })
 				]
 				// The item's own model
-				+ SOverlay::Slot().Padding(6.f)
+				+ SOverlay::Slot().Padding(8.f)
 				[
 					SNew(SImage)
 					.Image_Lambda([this, Item]() { return IconBrush(Item()); })
 					.Visibility_Lambda([this, Item]() { return IconBrush(Item()) ? EVisibility::HitTestInvisible : EVisibility::Hidden; })
 				]
-				+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(7.f, 4.f)
+				+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(7.f, 5.f)
 				[
 					SNew(STextBlock)
-					.Font(FWStyle::Font(10, TEXT("Bold")))
+					.Font(FWStyle::Display(14, TEXT("SemiBold")))
 					.ColorAndOpacity_Lambda([Selected]() { return Selected() ? FWStyle::Accent : FWStyle::Muted; })
 					.ShadowOffset(FVector2D(1, 1))
 					.Text(FText::AsNumber(Slot + 1))
 				]
-				+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(7.f, 3.f)
+				+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(8.f, 3.f)
 				[
 					SNew(STextBlock)
-					.Font(FWStyle::Font(13, TEXT("Bold")))
+					.Font(FWStyle::Display(18))
 					.ColorAndOpacity(FWStyle::Text)
 					.ShadowOffset(FVector2D(1, 1))
+					.ShadowColorAndOpacity(FLinearColor(0, 0, 0, 0.8f))
 					.Text_Lambda([this, Item]()
 					{
 						const FString Id = Item();
@@ -316,21 +397,35 @@ void SFWHud::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime,
 	ShownToasts = Visible;
 	LastToastAt = Newest;
 	ToastBox->ClearChildren();
-	const FSlateBrush* White = FCoreStyle::Get().GetBrush("WhiteBrush");
 	for (const FFWToast& Toast : Controller->GetToasts())
 	{
 		if (Now - Toast.ShownAt >= ToastSeconds)
 		{
 			continue;
 		}
+		// A glass card with a coloured stripe on the left (amber news, red errors), fading out in its last half second;
+		// the newest one slides in
+		const double ShownAt = Toast.ShownAt;
+		TSharedRef<SWidget> Card = SNew(SBorder).BorderImage(FWStyle::Panel()).Padding(0)
+			.ColorAndOpacity_Lambda([ShownAt]() { return FLinearColor(1.f, 1.f, 1.f, FMath::Clamp(float((ToastSeconds - (FPlatformTime::Seconds() - ShownAt)) / 0.5), 0.f, 1.f)); })
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10, 0, 0, 0)
+				[
+					SNew(SBox).WidthOverride(4.f).HeightOverride(22.f)
+					[
+						SNew(SImage).Image(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush"))).ColorAndOpacity(Toast.bError ? FWStyle::Error : Accent)
+					]
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(14, 9, 18, 9))
+				[
+					SNew(STextBlock).Font(FWStyle::Font(14, TEXT("Medium"))).Text(Toast.Text)
+					.ColorAndOpacity(Toast.bError ? FLinearColor(1.f, 0.8f, 0.77f) : FWStyle::Text)
+				]
+			];
 		ToastBox->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 6)
 		[
-			SNew(SBorder).BorderImage(White)
-			.BorderBackgroundColor(Toast.bError ? FLinearColor(0.35f, 0.04f, 0.03f, 0.85f) : Panel)
-			.Padding(FMargin(16, 8))
-			[
-				SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular", 13)).Text(Toast.Text)
-			]
+			ShownAt == Newest ? FWUi::Appear(Card, 0.2f) : Card
 		];
 	}
 }

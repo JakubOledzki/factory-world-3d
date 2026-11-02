@@ -104,7 +104,7 @@ void SFWBadgeToast::Next()
 				]
 				+ SVerticalBox::Slot().AutoHeight()
 				[
-					SNew(STextBlock).Text(FText::FromString(FWUi::Str(Badge, TEXT("name")))).Font(FWStyle::Font(20, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent)
+					SNew(STextBlock).Text(FText::FromString(FWUi::Str(Badge, TEXT("name")))).Font(FWStyle::Display(26)).ColorAndOpacity(FWStyle::Accent)
 				]
 				+ SVerticalBox::Slot().AutoHeight()
 				[
