@@ -287,20 +287,20 @@ void SFWChat::Rebuild()
 			Row->AddSlot().FillWidth(1.f)
 			[
 				Shadowed(FText::Format(LOCTEXT("ServerLine", "{0}: {1}"), FText::FromString(FWUi::Str(Message, TEXT("name"))), FText::FromString(Text)),
-					FWStyle::Font(12, TEXT("Bold")), FWStyle::Accent)
+					FWStyle::Font(13, TEXT("Bold")), FWStyle::Accent)
 			];
 		}
 		else
 		{
 			Row->AddSlot().AutoWidth().Padding(0, 0, 6, 0)
 			[
-				Shadowed(bWorld ? LOCTEXT("WorldTag", "[Świat]") : LOCTEXT("PlotTag", "[Działka]"), FWStyle::Font(12), bWorld ? FWChatLook::World : FWChatLook::Plot)
+				Shadowed(bWorld ? LOCTEXT("WorldTag", "[Świat]") : LOCTEXT("PlotTag", "[Działka]"), FWStyle::Font(13, TEXT("Medium")), bWorld ? FWChatLook::World : FWChatLook::Plot)
 			];
 			Row->AddSlot().AutoWidth().Padding(0, 0, 6, 0)
 			[
-				Shadowed(FText::Format(LOCTEXT("Name", "{0}:"), FText::FromString(FWUi::Str(Message, TEXT("name")))), FWStyle::Font(12, TEXT("Bold")), FWStyle::Text)
+				Shadowed(FText::Format(LOCTEXT("Name", "{0}:"), FText::FromString(FWUi::Str(Message, TEXT("name")))), FWStyle::Font(13, TEXT("Bold")), FWStyle::Text)
 			];
-			Row->AddSlot().FillWidth(1.f)[Shadowed(FText::FromString(Text), FWStyle::Font(12), FWStyle::Text)];
+			Row->AddSlot().FillWidth(1.f)[Shadowed(FText::FromString(Text), FWStyle::Font(13), FWStyle::Text)];
 		}
 		List->AddSlot().AutoHeight().Padding(0, 1)
 		[
