@@ -350,7 +350,7 @@ public:
 	// Opens the nearest object of a kind (e.g. furniture_workbench) and stands by it
 	UFUNCTION(Exec)
 	void FWOpenNearest(const FString& Kind);
-	// Market for tests: open it, pick a tab (0-2), an item's board, trade with the NPC trader (1 buy / 0 sell)
+	// Market for tests: open it, pick a tab (0-2, 3 the sale grid), an item's board, trade with the NPC trader (1 buy / 0 sell)
 	UFUNCTION(Exec)
 	void FWMarket() { OpenMarket(); }
 	// World map for tests: open it, centre on a plot at a zoom (pixels per plot), pick a plot, go to a plot
@@ -376,6 +376,11 @@ public:
 	void FWDevice(const FString& Kind);
 	UFUNCTION(Exec)
 	void FWMarketOffer(int32 Sell, int32 Quantity, float PriceDollars);
+	// The market's sale grid for tests: put an item on it (Slot -1: the first free one), sell all that lies on it
+	UFUNCTION(Exec)
+	void FWMarketSale(const FString& Item, int32 Quantity, int32 Slot = -1);
+	UFUNCTION(Exec)
+	void FWMarketSellAll();
 	// Places an item on the nearest free spot around the player
 	UFUNCTION(Exec)
 	void FWPlaceNear(const FString& Kind);

@@ -224,13 +224,14 @@ Każde okno ma też „Schowaj do ekwipunku”. Do testów: `FWDevice power_gene
 Jak w grze 2D, rynek otwiera się klawiszem **E przy komputerze** na działce:
 
 - Przedmioty są podzielone na grupy (surowce, materiały i wyroby, żywność i rolnictwo, paliwa, maszyny i budynki, logistyka i magazyny, energia, narzędzia i ubrania, inne) oraz „Masz w plecaku”, wybierane w kolumnie po lewej; grupę każdego przedmiotu podaje serwer (`ItemCategories`). Każda zakładka mówi w jednym zdaniu, do czego służy: u handlarza sprzedaje się od ręki, na giełdzie wystawia się oferty dla graczy.
+- **Sprzedaż** (otwiera się pierwsza): plecak po lewej i siatka 5×5 po prawej. Przedmioty przeciąga się z plecaka na siatkę (albo klika z Shiftem), pod siatką widać, ile handlarz za wszystko zapłaci, a „Sprzedaj wszystko” sprzedaje całą siatkę naraz (`market.sell` na każdy przedmiot). Z siatki zdejmuje się przeciągnięciem z powrotem albo kliknięciem z Shiftem; „Wyczyść” zdejmuje wszystko.
 - **Handlarz: od ręki:** ceny kupna i sprzedaży u handlarza NPC ze zmianą względem zwykłej ceny i bieżącym wydarzeniem rynkowym. Kupujesz 1 albo 10 sztuk, sprzedajesz 1 albo wszystko, a przycisk „Giełda” otwiera ten przedmiot na giełdzie (`market.prices/buy/sell`).
 - **Giełda graczy: oferty:** lista przedmiotów z najniższą ceną, a po wybraniu przedmiotu oferty sprzedaży i kupna innych graczy. Możesz kupić z oferty, sprzedać do zapytania albo wystawić własną ofertę: ile sztuk, po ile, sprzedaż albo kupno (`market.overview/item/purchase/fill/list/order`).
 - **Moje oferty:** twoje oferty sprzedaży i kupna osobno, z postępem i przyciskiem „Wycofaj” (`market.mine/unlist/cancelOrder`).
 
 U góry jest wyszukiwarka i stan konta.
 
-Do testów: `FWMarket`, `FWMarketTab <0–2>`, `FWMarketItem <przedmiot>`, `FWTrade <1 kup / 0 sprzedaj> <przedmiot> <ile>`, `FWMarketOffer <1 sprzedaż / 0 kupno> <ile> <cena $>`.
+Do testów: `FWMarket`, `FWMarketTab <0–3>` (3: sprzedaż), `FWMarketSale <przedmiot> <ile> [miejsce]`, `FWMarketSellAll`, `FWMarketItem <przedmiot>`, `FWTrade <1 kup / 0 sprzedaj> <przedmiot> <ile>`, `FWMarketOffer <1 sprzedaż / 0 kupno> <ile> <cena $>`.
 
 ## Mapa świata
 

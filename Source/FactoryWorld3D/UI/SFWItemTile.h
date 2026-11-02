@@ -6,8 +6,9 @@
 
 struct FSlateBrush;
 
-// Where a dragged item comes from or is dropped: a tile of the inventory, a hotbar slot or a storage's contents
-enum class EFWItemPlace : uint8 { Inventory, Hotbar, Storage };
+// Where a dragged item comes from or is dropped: a tile of the inventory, a hotbar slot, a storage's contents or the
+// market's grid of things to sell
+enum class EFWItemPlace : uint8 { Inventory, Hotbar, Storage, Sale };
 
 // An item being dragged between tiles
 class FFWItemDrag : public FDragDropOperation
