@@ -3,6 +3,7 @@
 #include "Net/FWNetSubsystem.h"
 #include "Styling/CoreStyle.h"
 #include "UI/FWStyle.h"
+#include "UI/FWWidgets.h"
 #include "Widgets/Layout/SBackgroundBlur.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Images/SImage.h"
@@ -75,24 +76,41 @@ void SFWLoginWidget::Construct(const FArguments& InArgs)
 				.VAlign(VAlign_Center)
 				[
 					SNew(SBox)
-					.WidthOverride(400.f)
+					.WidthOverride(420.f)
 					[
+						FWUi::Appear(
 						SNew(SVerticalBox)
+						// The name in tall condensed capitals on two lines, the second in amber, over an amber rule
 						+ SVerticalBox::Slot().AutoHeight()
 						[
 							SNew(STextBlock)
-							.Text(LOCTEXT("Title", "FACTORY WORLD"))
-							.Font(FWStyle::Font(40, TEXT("Bold")))
+							.Text(LOCTEXT("TitleFactory", "FACTORY"))
+							.Font(FWStyle::Display(76))
+							.ColorAndOpacity(FWStyle::Text)
+						]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0, -22, 0, 0)
+						[
+							SNew(STextBlock)
+							.Text(LOCTEXT("TitleWorld", "WORLD"))
+							.Font(FWStyle::Display(76))
 							.ColorAndOpacity(FWStyle::Accent)
 						]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0, 2, 0, 36)
+						+ SVerticalBox::Slot().AutoHeight().Padding(0, 2, 0, 0)
 						[
-							SNew(STextBlock)
-							.Text(LOCTEXT("Subtitle", "Zbuduj fabrykę w Tatrach"))
-							.Font(FWStyle::Font(14))
-							.ColorAndOpacity(FWStyle::Muted)
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 10, 0)
+							[
+								SNew(SBox).WidthOverride(48.f).HeightOverride(3.f)[SNew(SImage).Image(FWStyle::Swatch()).ColorAndOpacity(FWStyle::Accent)]
+							]
+							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(LOCTEXT("Subtitle", "Zbuduj fabrykę w Tatrach"))
+								.Font(FWStyle::Display(18, TEXT("SemiBold")))
+								.ColorAndOpacity(FWStyle::Accent)
+							]
 						]
-						+ SVerticalBox::Slot().AutoHeight()
+						+ SVerticalBox::Slot().AutoHeight().Padding(0, 32, 0, 0)
 						[
 							SNew(SBorder)
 							.BorderImage(FWStyle::Panel())
@@ -102,13 +120,13 @@ void SFWLoginWidget::Construct(const FArguments& InArgs)
 								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 18)
 								[
 									SNew(STextBlock)
-									.Text(LOCTEXT("Heading", "Zaloguj się"))
-									.Font(FWStyle::Font(20, TEXT("Bold")))
+									.Text(LOCTEXT("Heading", "ZALOGUJ SIĘ"))
+									.Font(FWStyle::Display(24))
 									.ColorAndOpacity(FWStyle::Text)
 								]
 								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
 								[
-									SNew(STextBlock).Text(LOCTEXT("Email", "E-mail")).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Muted)
+									SNew(STextBlock).Text(LOCTEXT("Email", "E-mail")).Font(FWStyle::Font(12, TEXT("Medium"))).ColorAndOpacity(FWStyle::Muted)
 								]
 								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 14)
 								[
@@ -118,7 +136,7 @@ void SFWLoginWidget::Construct(const FArguments& InArgs)
 								]
 								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
 								[
-									SNew(STextBlock).Text(LOCTEXT("Password", "Hasło")).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Muted)
+									SNew(STextBlock).Text(LOCTEXT("Password", "Hasło")).Font(FWStyle::Font(12, TEXT("Medium"))).ColorAndOpacity(FWStyle::Muted)
 								]
 								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 22)
 								[
@@ -141,7 +159,7 @@ void SFWLoginWidget::Construct(const FArguments& InArgs)
 									.IsEnabled(this, &SFWLoginWidget::CanSubmit)
 									.OnClicked(this, &SFWLoginWidget::OnLoginClicked)
 									[
-										SNew(STextBlock).Text(LOCTEXT("Login", "Zaloguj się")).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FLinearColor::White)
+										SNew(STextBlock).Text(LOCTEXT("Login", "Zaloguj się")).Font(FWStyle::Font(15, TEXT("Bold"))).ColorAndOpacity(FLinearColor::White)
 									]
 								]
 								+ SVerticalBox::Slot().AutoHeight()
@@ -152,7 +170,7 @@ void SFWLoginWidget::Construct(const FArguments& InArgs)
 									.IsEnabled(this, &SFWLoginWidget::CanSubmit)
 									.OnClicked(this, &SFWLoginWidget::OnRegisterClicked)
 									[
-										SNew(STextBlock).Text(LOCTEXT("Register", "Załóż nowe konto")).Font(FWStyle::Font(13)).ColorAndOpacity(FWStyle::Text)
+										SNew(STextBlock).Text(LOCTEXT("Register", "Załóż nowe konto")).Font(FWStyle::Font(14, TEXT("Medium"))).ColorAndOpacity(FWStyle::Text)
 									]
 								]
 								+ SVerticalBox::Slot().AutoHeight().Padding(0, 16, 0, 0)
@@ -166,10 +184,11 @@ void SFWLoginWidget::Construct(const FArguments& InArgs)
 						+ SVerticalBox::Slot().AutoHeight().Padding(0, 18, 0, 0)
 						[
 							SNew(STextBlock)
-							.Text(LOCTEXT("Shared", "To samo konto co w Factory World 2D."))
-							.Font(FWStyle::Font(10))
+							.Text(LOCTEXT("OwnWorld", "Gra 3D ma własny świat i własne konta. Konto z gry 2D tu nie działa."))
+							.Font(FWStyle::Font(12))
 							.ColorAndOpacity(FWStyle::Muted)
-						]
+							.AutoWrapText(true)
+						])
 					]
 				]
 			]

@@ -5,6 +5,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/ConfigCacheIni.h"
 #include "UI/FWStyle.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SSlider.h"
 #include "Widgets/Layout/SBackgroundBlur.h"
@@ -92,7 +93,15 @@ void SFWSettingsWindow::Construct(const FArguments& InArgs)
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 20)
 					[
-						SNew(STextBlock).Text(LOCTEXT("Title", "Ustawienia")).Font(FWStyle::Font(24, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 12, 0)
+						[
+							SNew(SBox).WidthOverride(4.f).HeightOverride(26.f)[SNew(SImage).Image(FWStyle::Swatch()).ColorAndOpacity(FWStyle::Accent)]
+						]
+						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+						[
+							SNew(STextBlock).Text(LOCTEXT("Title", "USTAWIENIA")).Font(FWStyle::Display(30)).ColorAndOpacity(FWStyle::Text)
+						]
 					]
 					+ SVerticalBox::Slot().AutoHeight()
 					[

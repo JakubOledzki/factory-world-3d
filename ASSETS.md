@@ -123,6 +123,10 @@ powershell -ExecutionPolicy Bypass -File Tools\migrate_titan.ps1 -Titan D:\Titan
 
 Skrypt sprawdza zależności w Titanie (`Tools/titan_dependencies.py`) i kopiuje tylko potrzebne pakiety (110), z zachowaniem ich ścieżek, bo odwołania w Unrealu opierają się na ścieżkach. Bez nich gra działa, tylko bez lasu.
 
+## Czcionka interfejsu: Barlow, licencja SIL OFL 1.1
+
+Interfejs gry używa czcionki [Barlow](https://github.com/jpt/barlow) (Jeremy Tribby) w krojach Regular, Medium, SemiBold i Bold do tekstu oraz Barlow Condensed (SemiBold, Bold) do tytułów. Licencja [SIL Open Font License 1.1](https://openfontlicense.org) pozwala na użycie komercyjne i dołączenie czcionki do gry. Pliki .ttf leżą w repozytorium w `Content/Fonts/Barlow`, razem z tekstem licencji (`OFL.txt`). Pobrano je z repozytorium Google Fonts (`ofl/barlow`, `ofl/barlowcondensed`). Czcionka ma pełny polski alfabet.
+
 ## Narzędzia
 
 - Blender 5.2 (GPL) służy tylko do przygotowania plików. Licencja programu nie obejmuje tego, co się w nim tworzy.
