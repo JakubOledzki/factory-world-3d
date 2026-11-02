@@ -376,3 +376,8 @@ anvil()
 furnace()
 research_table()
 print("FWGARAGE done")
+
+# The waste and bins of the sorting game at the trash bin, with their icons
+import runpy  # noqa: E402
+
+runpy.run_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "make_waste.py"), run_name="__main__")

@@ -15,10 +15,25 @@ public static class RecyclingRules
 
     public static readonly TimeSpan SortTime = TimeSpan.FromSeconds(10);
 
-    /// <summary>At the bin the player sorts by hand, one bag at a time: the client asks for the next
-    /// bag while the player stays and stops the current one when they walk away. The automatic
+    /// <summary>At the bin the player sorts by hand, one bag at a time: the bag's pieces go one by one into
+    /// their bins (<see cref="WasteSorting"/>), and walking away gives the bag back. The automatic
     /// sorting machine is a machine of its own (<see cref="SorterRules"/>) and does not sort at the bin.</summary>
     public const int MaxQueueByHand = 1;
+
+    /// <summary>The pieces of a new bag: random kinds, never all for the same bin.</summary>
+    public static IReadOnlyList<string> RollPieces()
+    {
+        while (true)
+        {
+            var pieces = Enumerable.Range(0, WasteSorting.Pieces)
+                .Select(_ => WasteSorting.Kinds[RandomNumberGenerator.GetInt32(WasteSorting.Kinds.Count)].Id)
+                .ToList();
+            if (pieces.Select(p => WasteSorting.ById[p].Bin).Distinct().Count() > 1)
+            {
+                return pieces;
+            }
+        }
+    }
 
     public const int XpPerSort = 5;
 
@@ -188,6 +203,19 @@ public sealed class SortingJob
     public DateTimeOffset FinishesAt { get; set; }
 }
 
+/// <summary>The bag a player is sorting by hand at the bin: its pieces (kinds, comma-separated, in the order the
+/// client shows them) and which of them are in their bins already (bit i for piece i).</summary>
+public sealed class SortingRound
+{
+    public Guid OwnerId { get; set; }
+
+    public string Pieces { get; set; } = "";
+
+    public int Sorted { get; set; }
+
+    public DateTimeOffset StartedAt { get; set; }
+}
+
 public sealed class RecyclingDbContext(DbContextOptions<RecyclingDbContext> options, GameDb gameDb) : ModuleDbContext(options, gameDb)
 {
     public const string Schema = "recycling";
@@ -270,6 +298,15 @@ public sealed class RecyclingDbContext(DbContextOptions<RecyclingDbContext> opti
             e.Property(j => j.FinishesAt).HasColumnName("finishes_at");
             e.HasIndex(j => new { j.OwnerId, j.FinishesAt });
         });
+        model.Entity<SortingRound>(e =>
+        {
+            e.ToTable("sorting_rounds");
+            e.HasKey(r => r.OwnerId);
+            e.Property(r => r.OwnerId).HasColumnName("owner_id");
+            e.Property(r => r.Pieces).HasColumnName("pieces").HasMaxLength(256);
+            e.Property(r => r.Sorted).HasColumnName("sorted");
+            e.Property(r => r.StartedAt).HasColumnName("started_at");
+        });
     }
 }
 
@@ -282,7 +319,20 @@ public sealed record GarageState(
     IReadOnlyList<string> Results,
     XpGain? Xp,
     IReadOnlyList<PlacedObject> Objects,
-    IReadOnlyDictionary<string, int> Upgrades);
+    IReadOnlyDictionary<string, int> Upgrades,
+    Round? Round = null,
+    PutResult? Put = null);
+
+/// <summary>The bag being sorted by hand: its pieces' kinds and which are in their bins.</summary>
+public sealed record Round(IReadOnlyList<string> Pieces, int Sorted)
+{
+    public bool IsSorted(int piece) => (Sorted & (1 << piece)) != 0;
+
+    public bool Done => Enumerable.Range(0, Pieces.Count).All(IsSorted);
+}
+
+/// <summary>Where the last piece went: into its bin, or back out of the wrong one.</summary>
+public sealed record PutResult(int Piece, string Bin, bool Correct);
 
 public sealed class RecyclingService(
     GameDb db, IInventory inventory, ICharacterProgress progress, IEnumerable<IMachineContents> machines, IProductionStats stats, TimeProvider time)
@@ -296,7 +346,7 @@ public sealed class RecyclingService(
             return await ReadStateAsync(owner, results, xp, cancellationToken);
         }, cancellationToken);
 
-    /// <summary>Queues <paramref name="count"/> sortings, taking one trash for each.</summary>
+    /// <summary>Opens a bag of trash at the bin (<paramref name="count"/> must be 1): its pieces wait to be put into their bins.</summary>
     public Task<GarageState> SortAsync(Guid owner, int count, CancellationToken cancellationToken) =>
         db.InTransactionAsync(async () =>
         {
@@ -317,32 +367,73 @@ public sealed class RecyclingService(
                 throw new GameException("no_bin", "Put the trash bin in the garage first.");
             }
 
-            var queue = await QueueAsync(owner, cancellationToken);
-            if (queue.Count + count > RecyclingRules.MaxQueueByHand)
+            if ((await QueueAsync(owner, cancellationToken)).Count > 0 || await RoundAsync(owner, cancellationToken) is not null)
             {
                 throw new GameException("queue_full", "A bag is being sorted already.");
             }
 
             await inventory.RemoveAsync(owner, Items.Trash, count, cancellationToken);
-
-            var now = time.GetUtcNow();
-            var start = queue.Count > 0 && queue[^1] > now ? queue[^1] : now;
-            // A warm garage sorts faster.
-            var sortTime = GarageUpgrades.SortTime(await GarageUpgradeRows.LevelsAsync(db, owner, cancellationToken));
-            for (var i = 1; i <= count; i++)
+            await using (var insert = await db.CommandAsync(
+                "INSERT INTO recycling.sorting_rounds (owner_id, pieces, sorted, started_at) VALUES (@owner, @pieces, 0, @now)", cancellationToken))
             {
-                await using var insert = await db.CommandAsync(
-                    "INSERT INTO recycling.sorting_jobs (owner_id, finishes_at) VALUES (@owner, @at)", cancellationToken);
                 insert.Parameters.AddWithValue("owner", owner);
-                insert.Parameters.AddWithValue("at", start + sortTime * i);
+                insert.Parameters.AddWithValue("pieces", string.Join(',', RecyclingRules.RollPieces()));
+                insert.Parameters.AddWithValue("now", time.GetUtcNow());
                 await insert.ExecuteNonQueryAsync(cancellationToken);
             }
 
             return await ReadStateAsync(owner, results, xp, cancellationToken);
         }, cancellationToken);
 
+    /// <summary>Puts piece <paramref name="piece"/> of the open bag into <paramref name="bin"/>. Into the wrong bin it
+    /// comes back; once every piece is in its bin, the bag is sorted and gives what a bag gives.</summary>
+    public Task<GarageState> PutAsync(Guid owner, int piece, string bin, CancellationToken cancellationToken) =>
+        db.InTransactionAsync(async () =>
+        {
+            if (!WasteSorting.Bins.Any(b => b.Id == bin))
+            {
+                throw new GameException("bad_bin", "There is no such bin.");
+            }
+
+            await EnsureGarageAsync(owner, cancellationToken);
+            var (results, xp) = await CompleteDueAsync(owner, cancellationToken);
+            await LockGarageAsync(owner, cancellationToken);
+            var round = await RoundAsync(owner, cancellationToken)
+                ?? throw new GameException("no_bag", "No bag is open at the bin.");
+            if (piece < 0 || piece >= round.Pieces.Count || round.IsSorted(piece))
+            {
+                throw new GameException("bad_piece", "There is no such piece left in the bag.");
+            }
+
+            var correct = WasteSorting.ById[round.Pieces[piece]].Bin == bin;
+            if (correct)
+            {
+                round = round with { Sorted = round.Sorted | (1 << piece) };
+                if (round.Done)
+                {
+                    await using (var delete = await db.CommandAsync("DELETE FROM recycling.sorting_rounds WHERE owner_id = @owner", cancellationToken))
+                    {
+                        delete.Parameters.AddWithValue("owner", owner);
+                        await delete.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    (results, xp) = await GiveSortedAsync(owner, [time.GetUtcNow()], cancellationToken);
+                }
+                else
+                {
+                    await using var update = await db.CommandAsync(
+                        "UPDATE recycling.sorting_rounds SET sorted = @sorted WHERE owner_id = @owner", cancellationToken);
+                    update.Parameters.AddWithValue("owner", owner);
+                    update.Parameters.AddWithValue("sorted", round.Sorted);
+                    await update.ExecuteNonQueryAsync(cancellationToken);
+                }
+            }
+
+            return await ReadStateAsync(owner, results, xp, cancellationToken, new PutResult(piece, bin, correct));
+        }, cancellationToken);
+
     /// <summary>The player walked away from the bin: the bag being sorted by hand is not finished
-    /// and goes back into the inventory.</summary>
+    /// and goes back into the inventory, the pieces sorted already with it.</summary>
     public Task<GarageState> StopAsync(Guid owner, CancellationToken cancellationToken) =>
         db.InTransactionAsync(async () =>
         {
@@ -355,6 +446,9 @@ public sealed class RecyclingService(
                 command.Parameters.AddWithValue("owner", owner);
                 command.Parameters.AddWithValue("now", time.GetUtcNow());
                 var stopped = await command.ExecuteNonQueryAsync(cancellationToken);
+                await using var open = await db.CommandAsync("DELETE FROM recycling.sorting_rounds WHERE owner_id = @owner", cancellationToken);
+                open.Parameters.AddWithValue("owner", owner);
+                stopped += await open.ExecuteNonQueryAsync(cancellationToken);
                 if (stopped > 0)
                 {
                     await inventory.AddAsync(owner, Items.Trash, stopped, cancellationToken);
@@ -523,13 +617,14 @@ public sealed class RecyclingService(
             }
         }
 
+        return finishedAt.Count == 0 ? ([], null) : await GiveSortedAsync(owner, finishedAt, cancellationToken);
+    }
+
+    /// <summary>What sorted bags give, one roll each, sorted at <paramref name="finishedAt"/>: the waste, and XP.</summary>
+    private async Task<(IReadOnlyList<string> Results, XpGain? Xp)> GiveSortedAsync(
+        Guid owner, IReadOnlyList<DateTimeOffset> finishedAt, CancellationToken cancellationToken)
+    {
         var finished = finishedAt.Count;
-
-        if (finished == 0)
-        {
-            return ([], null);
-        }
-
         var results = Enumerable.Range(0, finished)
             .Select(_ => RecyclingRules.DropForRoll(RandomNumberGenerator.GetInt32(100)))
             .ToList();
@@ -563,14 +658,26 @@ public sealed class RecyclingService(
         return queue;
     }
 
-    private async Task<GarageState> ReadStateAsync(Guid owner, IReadOnlyList<string> results, XpGain? xp, CancellationToken cancellationToken) =>
+    private async Task<Round?> RoundAsync(Guid owner, CancellationToken cancellationToken)
+    {
+        await using var command = await db.CommandAsync(
+            "SELECT pieces, sorted FROM recycling.sorting_rounds WHERE owner_id = @owner", cancellationToken);
+        command.Parameters.AddWithValue("owner", owner);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? new Round(reader.GetString(0).Split(','), reader.GetInt32(1)) : null;
+    }
+
+    private async Task<GarageState> ReadStateAsync(
+        Guid owner, IReadOnlyList<string> results, XpGain? xp, CancellationToken cancellationToken, PutResult? put = null) =>
         new(await inventory.CountAsync(owner, Items.Trash, cancellationToken),
             await QueueAsync(owner, cancellationToken),
             time.GetUtcNow(),
             results,
             xp,
             await ObjectsAsync(owner, cancellationToken),
-            await GarageUpgradeRows.LevelsAsync(db, owner, cancellationToken));
+            await GarageUpgradeRows.LevelsAsync(db, owner, cancellationToken),
+            await RoundAsync(owner, cancellationToken),
+            put);
 }
 
 /// <summary>Furniture standing in the player's garage, for other modules (e.g. the workbench to craft at).</summary>
@@ -617,6 +724,17 @@ public abstract class GarageHandler(IServiceScopeFactory scopes) : IMessageHandl
             // Level of each upgrade track, which the client draws: the floor, the walls and the light.
             upgrades = GarageUpgrades.Tracks.ToDictionary(t => t.Id, t => state.Upgrades.GetValueOrDefault(t.Id)),
             rank = GarageUpgrades.Rank(state.Upgrades),
+            // The bag open at the bin: its pieces in order, each until it is in its bin; null when none is open.
+            round = state.Round is { } round
+                ? new
+                {
+                    pieces = round.Pieces.Select((kind, i) => new { index = i, kind, name = WasteSorting.ById[kind].Name, sorted = round.IsSorted(i) }),
+                    left = round.Pieces.Count - round.Pieces.Where((_, i) => round.IsSorted(i)).Count(),
+                }
+                : null,
+            bins = WasteSorting.Bins.Select(b => new { id = b.Id, name = b.Name }),
+            // The piece just put into a bin, and whether that was its bin (if not, it is back in the bag).
+            put = state.Put is { } put ? new { piece = put.Piece, bin = put.Bin, correct = put.Correct } : null,
         });
     }
 
@@ -638,6 +756,20 @@ public sealed class SortHandler(IServiceScopeFactory scopes) : GarageHandler(sco
 
     protected override Task<GarageState> RunAsync(RecyclingService recycling, Guid owner, JsonElement? payload, CancellationToken cancellationToken) =>
         recycling.SortAsync(owner, Payload.Read<SortRequest>(payload).Count, cancellationToken);
+}
+
+public sealed record PutRequest(int Piece, string? Bin);
+
+/// <summary>A piece of the bag open at the bin goes into a bin; the server says whether it was the right one.</summary>
+public sealed class PutHandler(IServiceScopeFactory scopes) : GarageHandler(scopes)
+{
+    public override string Type => "recycling.put";
+
+    protected override Task<GarageState> RunAsync(RecyclingService recycling, Guid owner, JsonElement? payload, CancellationToken cancellationToken)
+    {
+        var request = Payload.Read<PutRequest>(payload);
+        return recycling.PutAsync(owner, request.Piece, request.Bin ?? "", cancellationToken);
+    }
 }
 
 public sealed class StopHandler(IServiceScopeFactory scopes) : GarageHandler(scopes)
@@ -688,6 +820,7 @@ public sealed class RecyclingModule : IGameModule
         services.AddScoped<WardrobeService>();
         services.AddSingleton<IMessageHandler, GetGarageHandler>();
         services.AddSingleton<IMessageHandler, SortHandler>();
+        services.AddSingleton<IMessageHandler, PutHandler>();
         services.AddSingleton<IMessageHandler, StopHandler>();
         services.AddSingleton<IMessageHandler, PlaceHandler>();
         services.AddSingleton<IMessageHandler, PickUpHandler>();

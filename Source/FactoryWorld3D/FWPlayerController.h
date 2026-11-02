@@ -228,6 +228,9 @@ public:
 	void FWGarage(int32 Tab = 0);
 	UFUNCTION(Exec)
 	void FWGarageSort();
+	// Puts piece Piece of the open bag into Bin (metal, plastic, glass), as dragging it there does
+	UFUNCTION(Exec)
+	void FWGarageSortPut(int32 Piece, const FString& Bin);
 	UFUNCTION(Exec)
 	void FWGaragePlace(const FString& Kind);
 	UFUNCTION(Exec)

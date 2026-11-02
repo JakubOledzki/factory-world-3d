@@ -32,6 +32,23 @@ public static class SortingMachine
     }
 }
 
+/// <summary>Sorts one bag of trash by hand at the bin, every piece into its bin; the garage reply after the last.</summary>
+public static class HandSorting
+{
+    public static async Task<JsonElement> SortBagAsync(GameClient client)
+    {
+        var garage = await client.SendAsync("recycling.sort", new { count = 1 });
+        Assert.Equal("garage", garage.Type());
+        foreach (var piece in garage.Payload().GetProperty("round").GetProperty("pieces").EnumerateArray().ToList())
+        {
+            var bin = WasteSorting.ById[piece.GetProperty("kind").GetString()!].Bin;
+            garage = await client.SendAsync("recycling.put", new { piece = piece.GetProperty("index").GetInt32(), bin });
+        }
+
+        return garage;
+    }
+}
+
 public sealed class GarageTests(ServerFactory factory) : IClassFixture<ServerFactory>
 {
     private static readonly string[] Waste = ["waste_paper", "waste_plastic", "waste_aluminium", "waste_glass", "waste_copper"];
@@ -64,48 +81,60 @@ public sealed class GarageTests(ServerFactory factory) : IClassFixture<ServerFac
     }
 
     [Fact]
-    public async Task Sorting_takes_10_seconds_each_and_gives_waste_and_xp()
+    public async Task A_bag_holds_five_pieces_for_the_three_bins_and_gives_waste_and_xp_once_all_are_in()
     {
         using var client = await factory.ConnectAsync();
         await client.RegisterWithCharacterAsync();
 
-        var queued = await client.SendAsync("recycling.sort", new { count = 1 });
-        Assert.Equal(49, queued.Payload().GetProperty("trash").GetInt64());
-        Assert.Equal(1, queued.Payload().GetProperty("queue").GetArrayLength());
+        var opened = (await client.SendAsync("recycling.sort", new { count = 1 })).Payload();
+        Assert.Equal(49, opened.GetProperty("trash").GetInt64());
+        Assert.Equal(["metal", "plastic", "glass"], opened.GetProperty("bins").EnumerateArray().Select(b => b.GetProperty("id").GetString()));
+        var pieces = opened.GetProperty("round").GetProperty("pieces").EnumerateArray().ToList();
+        Assert.Equal(WasteSorting.Pieces, pieces.Count);
+        Assert.True(pieces.Select(p => WasteSorting.ById[p.GetProperty("kind").GetString()!].Bin).Distinct().Count() > 1);
 
-        factory.Time.Advance(TimeSpan.FromSeconds(9));
-        Assert.Equal(0, (await client.SendAsync("garage.get")).Payload().GetProperty("results").GetArrayLength());
+        // Every piece but the last: no reward yet.
+        JsonElement garage = default;
+        foreach (var piece in pieces)
+        {
+            Assert.Equal(0, garage.ValueKind == JsonValueKind.Undefined ? 0 : garage.GetProperty("results").GetArrayLength());
+            garage = (await client.SendAsync("recycling.put", new { piece = piece.GetProperty("index").GetInt32(), bin = BinOf(piece) })).Payload();
+            Assert.True(garage.GetProperty("put").GetProperty("correct").GetBoolean());
+        }
 
-        factory.Time.Advance(TimeSpan.FromSeconds(1));
-        var first = await client.SendAsync("garage.get");
-        Assert.Equal(1, first.Payload().GetProperty("results").GetArrayLength());
-        Assert.Equal(5, first.Payload().GetProperty("xp").GetProperty("xp").GetInt64());
-        Assert.Equal(0, first.Payload().GetProperty("queue").GetArrayLength());
-
-        await client.SendAsync("recycling.sort", new { count = 1 });
-        factory.Time.Advance(TimeSpan.FromSeconds(10));
-        var second = await client.SendAsync("garage.get");
-        Assert.Equal(10, second.Payload().GetProperty("xp").GetProperty("xp").GetInt64());
-
+        Assert.Equal(JsonValueKind.Null, garage.GetProperty("round").ValueKind);
+        Assert.Equal(1, garage.GetProperty("results").GetArrayLength());
+        Assert.Equal(RecyclingRules.XpPerSort, garage.GetProperty("xp").GetProperty("xp").GetInt64());
         var inventory = await client.InventoryAsync();
-        Assert.Equal(2, Waste.Sum(w => inventory.GetValueOrDefault(w)));
-        Assert.Equal(48, inventory["trash"]);
+        Assert.Equal(1, Waste.Sum(w => inventory.GetValueOrDefault(w)));
+        Assert.Equal(49, inventory["trash"]);
     }
 
     [Fact]
-    public async Task Finished_sortings_are_collected_once()
+    public async Task A_piece_in_the_wrong_bin_comes_back_and_the_server_checks_every_piece()
     {
         using var client = await factory.ConnectAsync();
         await client.RegisterWithCharacterAsync();
-        await client.SendAsync("recycling.sort", new { count = 1 });
-        factory.Time.Advance(TimeSpan.FromSeconds(10));
+        Assert.Equal("no_bag", (await client.SendAsync("recycling.put", new { piece = 0, bin = "metal" })).ErrorCode());
 
-        Assert.Equal(1, (await client.SendAsync("garage.get")).Payload().GetProperty("results").GetArrayLength());
+        var pieces = (await client.SendAsync("recycling.sort", new { count = 1 })).Payload().GetProperty("round").GetProperty("pieces").EnumerateArray().ToList();
+        var first = pieces[0];
+        var wrong = WasteSorting.Bins.First(b => b.Id != BinOf(first)).Id;
+        var back = (await client.SendAsync("recycling.put", new { piece = 0, bin = wrong })).Payload();
+        Assert.False(back.GetProperty("put").GetProperty("correct").GetBoolean());
+        Assert.Equal(WasteSorting.Pieces, back.GetProperty("round").GetProperty("left").GetInt32());
+        Assert.False(back.GetProperty("round").GetProperty("pieces")[0].GetProperty("sorted").GetBoolean());
+
+        Assert.Equal("bad_bin", (await client.SendAsync("recycling.put", new { piece = 0, bin = "paper" })).ErrorCode());
+        Assert.Equal("bad_piece", (await client.SendAsync("recycling.put", new { piece = WasteSorting.Pieces, bin = "metal" })).ErrorCode());
+        Assert.Equal("garage", (await client.SendAsync("recycling.put", new { piece = 0, bin = BinOf(first) })).Type());
+        // A piece in its bin stays there; it cannot be put in twice.
+        Assert.Equal("bad_piece", (await client.SendAsync("recycling.put", new { piece = 0, bin = BinOf(first) })).ErrorCode());
         Assert.Equal(0, (await client.SendAsync("garage.get")).Payload().GetProperty("results").GetArrayLength());
     }
 
     [Fact]
-    public async Task By_hand_one_bag_is_sorted_at_a_time_and_walking_away_stops_it()
+    public async Task By_hand_one_bag_is_sorted_at_a_time_and_walking_away_gives_it_back()
     {
         using var client = await factory.ConnectAsync();
         await client.RegisterWithCharacterAsync();
@@ -113,18 +142,19 @@ public sealed class GarageTests(ServerFactory factory) : IClassFixture<ServerFac
         var garage = await client.SendAsync("recycling.sort", new { count = 1 });
         Assert.Equal(1, garage.Payload().GetProperty("maxQueue").GetInt32());
         Assert.Equal("queue_full", (await client.SendAsync("recycling.sort", new { count = 1 })).ErrorCode());
+        Assert.Equal("bad_quantity", (await client.SendAsync("recycling.sort", new { count = 5 })).ErrorCode());
 
-        factory.Time.Advance(TimeSpan.FromSeconds(4));
-        var stopped = await client.SendAsync("recycling.stop");
-        Assert.Equal(0, stopped.Payload().GetProperty("queue").GetArrayLength());
-        Assert.Equal(50, stopped.Payload().GetProperty("trash").GetInt64());
+        // Half sorted, then walked away: the bag goes back whole, and nothing is given.
+        var first = garage.Payload().GetProperty("round").GetProperty("pieces")[0];
+        await client.SendAsync("recycling.put", new { piece = 0, bin = BinOf(first) });
+        var stopped = (await client.SendAsync("recycling.stop")).Payload();
+        Assert.Equal(JsonValueKind.Null, stopped.GetProperty("round").ValueKind);
+        Assert.Equal(50, stopped.GetProperty("trash").GetInt64());
+        Assert.Equal(0, stopped.GetProperty("results").GetArrayLength());
 
-        // A bag that finished before walking away is kept.
+        // The open bag is still there when the garage is looked at again.
         await client.SendAsync("recycling.sort", new { count = 1 });
-        factory.Time.Advance(TimeSpan.FromSeconds(10));
-        var done = await client.SendAsync("recycling.stop");
-        Assert.Equal(1, done.Payload().GetProperty("results").GetArrayLength());
-        Assert.Equal(49, done.Payload().GetProperty("trash").GetInt64());
+        Assert.Equal(WasteSorting.Pieces, (await client.SendAsync("garage.get")).Payload().GetProperty("round").GetProperty("left").GetInt32());
     }
 
     [Fact]
@@ -134,13 +164,12 @@ public sealed class GarageTests(ServerFactory factory) : IClassFixture<ServerFac
         await client.RegisterWithCharacterAsync();
         await SortingMachine.InstallAsync(factory, client);
 
-        var queued = await client.SendAsync("recycling.sort", new { count = 1 });
-        Assert.Equal(1, queued.Payload().GetProperty("maxQueue").GetInt32());
-        Assert.Equal("bad_quantity", (await client.SendAsync("recycling.sort", new { count = 5 })).ErrorCode());
+        Assert.Equal("garage", (await client.SendAsync("recycling.sort", new { count = 1 })).Type());
         var stopped = await client.SendAsync("recycling.stop");
-        Assert.Equal(0, stopped.Payload().GetProperty("queue").GetArrayLength());
         Assert.Equal(50, stopped.Payload().GetProperty("trash").GetInt64());
     }
+
+    private static string BinOf(JsonElement piece) => WasteSorting.ById[piece.GetProperty("kind").GetString()!].Bin;
 
     [Fact]
     public async Task The_sorting_machine_sorts_its_own_queue_and_keeps_what_it_sorted()

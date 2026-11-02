@@ -494,7 +494,7 @@ if os.path.isdir(AUDIO):
             continue
         name = wave.get_name()
         wave.set_editor_property("looping", name.endswith("_loop"))
-        group = "Ambience" if name.startswith("amb_") else ("UI" if name.startswith("ui_") else "SFX")
+        group = "Ambience" if name.startswith("amb_") else ("UI" if name.startswith(("ui_", "sort_")) else "SFX")
         wave.set_editor_property("sound_class_object", classes[group])
         library.save_loaded_asset(wave)
     unreal.log_warning(f"FWIMPORT audio: {len(library.list_assets(destination, recursive=False, include_folder=False))} sounds")

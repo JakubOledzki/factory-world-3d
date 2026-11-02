@@ -1664,6 +1664,14 @@ void AFWPlayerController::FWGarageSort()
 	}
 }
 
+void AFWPlayerController::FWGarageSortPut(int32 Piece, const FString& Bin)
+{
+	if (GarageWindow.IsValid() && ShownWidget == GarageWindow)
+	{
+		GarageWindow->PutPiece(Piece, Bin);
+	}
+}
+
 void AFWPlayerController::FWGaragePlace(const FString& Kind)
 {
 	if (GarageWindow.IsValid() && ShownWidget == GarageWindow)

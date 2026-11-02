@@ -3,7 +3,10 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Fonts/FontMeasure.h"
 #include "FWPlayerController.h"
+#include "Game/FWArt.h"
+#include "Game/FWAudio.h"
 #include "Game/FWCatalog.h"
+#include "Input/DragAndDrop.h"
 #include "Net/FWNetSubsystem.h"
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
@@ -15,6 +18,7 @@
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/SBoxPanel.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/SLeafWidget.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -145,6 +149,260 @@ namespace FWGarageText
 		TArray<FPiece> Pieces;
 		int32 Floor = 0;
 	};
+
+	// The sorting game's bins, in the order the server lists them, with the colour of their labels
+	FLinearColor BinColor(const FString& Bin)
+	{
+		return Bin == TEXT("metal") ? FLinearColor(0.62f, 0.67f, 0.74f) : Bin == TEXT("plastic") ? FLinearColor(1.f, 0.72f, 0.1f)
+			: Bin == TEXT("glass") ? FLinearColor(0.32f, 0.78f, 0.42f) : FWStyle::Muted;
+	}
+
+	double Now() { return FPlatformTime::Seconds(); }
+
+	// Seconds since a bin last took (true) or threw back (false) a piece
+	using FBinFlash = TOptional<TPair<double, bool>>;
+
+	// A piece of waste carried from the bag to a bin
+	class FWasteDrag : public FDragDropOperation
+	{
+	public:
+		DRAG_DROP_OPERATOR_TYPE(FWasteDrag, FDragDropOperation)
+
+		int32 Piece = -1;
+		const FSlateBrush* Brush = nullptr;
+		TFunction<void()> OnEnded;
+
+		static TSharedRef<FWasteDrag> New(int32 InPiece, const FSlateBrush* InBrush, TFunction<void()> InOnEnded)
+		{
+			TSharedRef<FWasteDrag> Op = MakeShared<FWasteDrag>();
+			Op->Piece = InPiece;
+			Op->Brush = InBrush;
+			Op->OnEnded = MoveTemp(InOnEnded);
+			Op->Construct();
+			return Op;
+		}
+
+		virtual TSharedPtr<SWidget> GetDefaultDecorator() const override
+		{
+			// Held under the cursor's middle, a little larger, as if lifted
+			return SNew(SBox).WidthOverride(120.f).HeightOverride(120.f).RenderTransform(FSlateRenderTransform(FVector2f(-60.f, -60.f)))
+				[
+					SNew(SImage).Image(Brush)
+				];
+		}
+
+		virtual void OnDrop(bool bDropWasHandled, const FPointerEvent& MouseEvent) override
+		{
+			FDragDropOperation::OnDrop(bDropWasHandled, MouseEvent);
+			if (OnEnded)
+			{
+				OnEnded();
+			}
+		}
+	};
+
+	// A piece in the open bag: picked up with the mouse, bobbing gently, shaking red when it comes back out of a wrong bin
+	class SWastePiece : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWastePiece) {}
+			SLATE_ARGUMENT(int32, Index)
+			SLATE_ARGUMENT(const FSlateBrush*, Brush)
+			SLATE_ARGUMENT(FString, Name)
+			// Seconds since it came back out of a wrong bin (large when it did not), and whether it is away (held or on its way)
+			SLATE_ATTRIBUTE(double, SinceWrong)
+			SLATE_ATTRIBUTE(bool, Away)
+			SLATE_ARGUMENT(TFunction<void(int32)>, OnPicked)
+			SLATE_ARGUMENT(TFunction<void()>, OnDragEnded)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			Index = InArgs._Index;
+			Brush = InArgs._Brush;
+			SinceWrong = InArgs._SinceWrong;
+			Away = InArgs._Away;
+			OnPicked = InArgs._OnPicked;
+			OnDragEnded = InArgs._OnDragEnded;
+			SetCursor(EMouseCursor::GrabHand);
+			const int32 Seed = Index;
+			ChildSlot
+			[
+				SNew(SVerticalBox)
+				.Visibility_Lambda([this]() { return Away.Get() ? EVisibility::Hidden : EVisibility::Visible; })
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+				[
+					SNew(SBox).WidthOverride(108.f).HeightOverride(108.f)
+					.RenderTransformPivot(FVector2D(0.5f, 0.5f))
+					.RenderTransform_Lambda([this, Seed]()
+					{
+						const double Wrong = SinceWrong.Get();
+						const float Shake = Wrong < 0.5 ? float(FMath::Sin(Wrong * 48.0) * 12.0 * (1.0 - Wrong / 0.5)) : 0.f;
+						const float Bob = float(FMath::Sin(Now() * 2.2 + Seed * 1.3) * 3.0);
+						return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FScale2f(bHover ? 1.1f : 1.f), FVector2f(Shake, Bob - (bHover ? 4.f : 0.f))));
+					})
+					[
+						SNew(SImage).Image(Brush)
+						.ColorAndOpacity_Lambda([this]()
+						{
+							const double Wrong = SinceWrong.Get();
+							return Wrong < 0.6 ? FSlateColor(FLinearColor::LerpUsingHSV(FLinearColor(1.f, 0.35f, 0.3f), FLinearColor::White, float(Wrong / 0.6)))
+								: FSlateColor(FLinearColor::White);
+						})
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 4, 0, 0)
+				[
+					SNew(SBox).WidthOverride(124.f)
+					[
+						SNew(STextBlock).Text(FText::FromString(InArgs._Name)).Font(FWStyle::Font(10)).ColorAndOpacity(FWStyle::Muted)
+						.Justification(ETextJustify::Center).AutoWrapText(true)
+					]
+				]
+			];
+		}
+
+		virtual FReply OnMouseButtonDown(const FGeometry& Geometry, const FPointerEvent& Event) override
+		{
+			return Event.GetEffectingButton() == EKeys::LeftMouseButton ? FReply::Handled().DetectDrag(SharedThis(this), EKeys::LeftMouseButton)
+				: FReply::Unhandled();
+		}
+
+		virtual FReply OnDragDetected(const FGeometry& Geometry, const FPointerEvent& Event) override
+		{
+			if (OnPicked)
+			{
+				OnPicked(Index);
+			}
+			return FReply::Handled().BeginDragDrop(FWasteDrag::New(Index, Brush, OnDragEnded));
+		}
+
+		virtual void OnMouseEnter(const FGeometry& Geometry, const FPointerEvent& Event) override
+		{
+			SCompoundWidget::OnMouseEnter(Geometry, Event);
+			bHover = true;
+		}
+
+		virtual void OnMouseLeave(const FPointerEvent& Event) override
+		{
+			SCompoundWidget::OnMouseLeave(Event);
+			bHover = false;
+		}
+
+	private:
+		int32 Index = -1;
+		const FSlateBrush* Brush = nullptr;
+		TAttribute<double> SinceWrong;
+		TAttribute<bool> Away;
+		TFunction<void(int32)> OnPicked;
+		TFunction<void()> OnDragEnded;
+		bool bHover = false;
+	};
+
+	// A bin to drop pieces into: it lights up while a piece is held over it, and flashes green (bouncing) when it takes
+	// one and red when it throws one back
+	class SWasteBin : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWasteBin) {}
+			SLATE_ARGUMENT(const FSlateBrush*, Brush)
+			SLATE_ARGUMENT(FText, Name)
+			SLATE_ARGUMENT(FLinearColor, Color)
+			// Seconds since this bin last took (true) or threw back (false) a piece; unset when it did neither lately
+			SLATE_ATTRIBUTE(FBinFlash, Flash)
+			SLATE_ARGUMENT(TFunction<void(int32)>, OnPiece)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			Flash = InArgs._Flash;
+			OnPiece = InArgs._OnPiece;
+			const FLinearColor Color = InArgs._Color;
+			ChildSlot
+			[
+				SNew(SBorder)
+				.BorderImage(FCoreStyle::Get().GetBrush(TEXT("GenericWhiteBox")))
+				.Padding(FMargin(10.f, 8.f))
+				.BorderBackgroundColor_Lambda([this]()
+				{
+					FLinearColor Back(1.f, 1.f, 1.f, bHot ? 0.12f : 0.035f);
+					const FBinFlash F = Flash.Get();
+					if (F.IsSet() && F->Key < 0.6)
+					{
+						Back = FMath::Lerp(Back, (F->Value ? FWStyle::Good : FWStyle::Error).CopyWithNewOpacity(0.45f), 1.f - float(F->Key / 0.6));
+					}
+					return FSlateColor(Back);
+				})
+				[
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+					[
+						SNew(SBox).WidthOverride(170.f).HeightOverride(170.f)
+						.RenderTransformPivot(FVector2D(0.5f, 1.f))
+						.RenderTransform_Lambda([this]()
+						{
+							const FBinFlash F = Flash.Get();
+							float Scale = bHot ? 1.06f : 1.f;
+							if (F.IsSet() && F->Value && F->Key < 0.35)
+							{
+								Scale += float(FMath::Sin(F->Key / 0.35 * PI) * 0.08);
+							}
+							return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FScale2f(Scale)));
+						})
+						[
+							SNew(SImage).Image(InArgs._Brush)
+						]
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0, 6, 0, 0)
+					[
+						SNew(SBorder)
+						.BorderImage(FCoreStyle::Get().GetBrush(TEXT("GenericWhiteBox")))
+						.BorderBackgroundColor(Color)
+						.HAlign(HAlign_Center)
+						.Padding(FMargin(8.f, 4.f))
+						[
+							SNew(STextBlock).Text(InArgs._Name).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FLinearColor(0.05f, 0.05f, 0.05f))
+						]
+					]
+				]
+			];
+		}
+
+		virtual void OnDragEnter(const FGeometry& Geometry, const FDragDropEvent& Event) override
+		{
+			bHot = Event.GetOperationAs<FWasteDrag>().IsValid();
+		}
+
+		virtual void OnDragLeave(const FDragDropEvent& Event) override
+		{
+			bHot = false;
+		}
+
+		virtual FReply OnDragOver(const FGeometry& Geometry, const FDragDropEvent& Event) override
+		{
+			return Event.GetOperationAs<FWasteDrag>().IsValid() ? FReply::Handled() : FReply::Unhandled();
+		}
+
+		virtual FReply OnDrop(const FGeometry& Geometry, const FDragDropEvent& Event) override
+		{
+			bHot = false;
+			const TSharedPtr<FWasteDrag> Op = Event.GetOperationAs<FWasteDrag>();
+			if (!Op.IsValid())
+			{
+				return FReply::Unhandled();
+			}
+			if (OnPiece)
+			{
+				OnPiece(Op->Piece);
+			}
+			return FReply::Handled();
+		}
+
+	private:
+		TAttribute<FBinFlash> Flash;
+		TFunction<void(int32)> OnPiece;
+		bool bHot = false;
+	};
 }
 
 void SFWGarageWindow::Construct(const FArguments& InArgs)
@@ -179,9 +437,8 @@ void SFWGarageWindow::Construct(const FArguments& InArgs)
 
 SFWGarageWindow::~SFWGarageWindow()
 {
-	// Walking away from the bin stops sorting by hand; the bag in progress goes back to the bin
-	const TArray<TSharedPtr<FJsonValue>>* Queue = nullptr;
-	if (AFWPlayerController* PC = Controller.Get(); PC && Garage.IsValid() && Garage->TryGetArrayField(TEXT("queue"), Queue) && Queue->Num() > 0)
+	// Walking away from the bin stops sorting by hand; the open bag goes back to the bin
+	if (AFWPlayerController* PC = Controller.Get(); PC && HasRound())
 	{
 		PC->Send(TEXT("recycling.stop"), nullptr, nullptr);
 	}
@@ -241,7 +498,6 @@ void SFWGarageWindow::ApplyGarage(const FFWNetReply& Reply)
 	AFWPlayerController* PC = Controller.Get();
 	if (Reply.Type != TEXT("garage"))
 	{
-		bHandSorting = false;
 		if (PC)
 		{
 			PC->ToastError(Reply);
@@ -256,6 +512,7 @@ void SFWGarageWindow::ApplyGarage(const FFWNetReply& Reply)
 	for (const TSharedPtr<FJsonObject>& Item : Results)
 	{
 		Recent.Insert(TPair<FString, FString>(FWUi::Str(Item, TEXT("id")), FWUi::Str(Item, TEXT("name"))), 0);
+		LastBag = FText::Format(LOCTEXT("BagDone", "Worek posegregowany! +1 {0}"), FText::FromString(FWUi::Str(Item, TEXT("name"))));
 		if (PC)
 		{
 			PC->Toast(FText::Format(LOCTEXT("Found", "+1 {0}"), FText::FromString(FWUi::Str(Item, TEXT("name")))));
@@ -269,20 +526,9 @@ void SFWGarageWindow::ApplyGarage(const FFWNetReply& Reply)
 	{
 		PC->RefreshInventory();
 	}
+	// A bag sorted earlier the old way (by waiting) is asked about again when it should be done
 	const TArray<TSharedPtr<FJsonValue>>* Queue = nullptr;
-	const int32 Queued = Garage->TryGetArrayField(TEXT("queue"), Queue) ? Queue->Num() : 0;
-	const int32 Trash = int32(FWUi::Num(Garage, TEXT("trash")));
-	if (Trash < 1 && Queued == 0)
-	{
-		bHandSorting = false;
-	}
-	// The next bag as soon as the last one is done
-	if (bHandSorting && Queued == 0 && Trash > 0 && !bSortPending)
-	{
-		Sort();
-	}
-	// While a bag is being sorted, asked again when it should be done
-	if (Queued > 0)
+	if (Garage->TryGetArrayField(TEXT("queue"), Queue) && Queue->Num() > 0)
 	{
 		const double DoneAt = (*Queue)[0]->AsNumber();
 		NextPoll = FPlatformTime::Seconds() + FMath::Clamp((DoneAt - ServerNow()) / 1000.0 + 0.15, 0.3, 5.0);
@@ -297,11 +543,14 @@ void SFWGarageWindow::ApplyGarage(const FFWNetReply& Reply)
 void SFWGarageWindow::Sort()
 {
 	AFWPlayerController* PC = Controller.Get();
-	if (!PC)
+	if (!PC || bSortPending)
 	{
 		return;
 	}
 	bSortPending = true;
+	LastBag = FText::GetEmpty();
+	WrongAt.Reset();
+	FWAudio::Play2D(PC, TEXT("sort_pick"), 0.8f);
 	TSharedPtr<FJsonObject> P = MakeShared<FJsonObject>();
 	P->SetNumberField(TEXT("count"), 1);
 	TWeakPtr<SFWGarageWindow> WeakThis = SharedThis(this);
@@ -315,6 +564,12 @@ void SFWGarageWindow::Sort()
 	});
 }
 
+bool SFWGarageWindow::HasRound() const
+{
+	const TSharedPtr<FJsonObject>* Round = nullptr;
+	return Garage.IsValid() && Garage->TryGetObjectField(TEXT("round"), Round) && Round && Round->IsValid();
+}
+
 void SFWGarageWindow::ToggleSorting()
 {
 	AFWPlayerController* PC = Controller.Get();
@@ -322,18 +577,12 @@ void SFWGarageWindow::ToggleSorting()
 	{
 		return;
 	}
-	if (!bHandSorting)
+	if (!HasRound())
 	{
-		bHandSorting = true;
-		const TArray<TSharedPtr<FJsonValue>>* Queue = nullptr;
-		if (!(Garage->TryGetArrayField(TEXT("queue"), Queue) && Queue->Num() > 0) && FWUi::Num(Garage, TEXT("trash")) > 0.0)
-		{
-			Sort();
-		}
-		Rebuild();
+		Sort();
 		return;
 	}
-	bHandSorting = false;
+	// Putting the bag back unsorted
 	TWeakPtr<SFWGarageWindow> WeakThis = SharedThis(this);
 	PC->Send(TEXT("recycling.stop"), nullptr, [WeakThis](const FFWNetReply& Reply)
 	{
@@ -342,6 +591,81 @@ void SFWGarageWindow::ToggleSorting()
 			This->ApplyGarage(Reply);
 		}
 	});
+}
+
+void SFWGarageWindow::PutPiece(int32 Piece, const FString& Bin)
+{
+	AFWPlayerController* PC = Controller.Get();
+	DraggingPiece = -1;
+	if (!PC || !HasRound() || PendingPiece >= 0)
+	{
+		return;
+	}
+	// The piece stays out of the bag until the server has said where it went
+	PendingPiece = Piece;
+	TSharedPtr<FJsonObject> P = MakeShared<FJsonObject>();
+	P->SetNumberField(TEXT("piece"), Piece);
+	P->SetStringField(TEXT("bin"), Bin);
+	TWeakPtr<SFWGarageWindow> WeakThis = SharedThis(this);
+	PC->Send(TEXT("recycling.put"), P, [WeakThis, Piece, Bin](const FFWNetReply& Reply)
+	{
+		TSharedPtr<SFWGarageWindow> This = WeakThis.Pin();
+		if (!This)
+		{
+			return;
+		}
+		This->PendingPiece = -1;
+		AFWPlayerController* Inner = This->Controller.Get();
+		if (Reply.Type != TEXT("garage"))
+		{
+			// Out of step with the server (e.g. the bag was closed elsewhere): show the garage as it is
+			if (Inner)
+			{
+				Inner->ToastError(Reply);
+			}
+			This->LoadGarage();
+			return;
+		}
+		const TSharedPtr<FJsonObject> Put = FWUi::Obj(Reply.Payload, TEXT("put"));
+		const bool bCorrect = Put.IsValid() && Put->GetBoolField(TEXT("correct"));
+		This->FlashBin = Bin;
+		This->FlashAt = FWGarageText::Now();
+		This->bFlashGood = bCorrect;
+		if (bCorrect)
+		{
+			FWAudio::Play2D(Inner, FString::Printf(TEXT("sort_%s"), *Bin), 0.9f);
+			const TSharedPtr<FJsonObject>* Round = nullptr;
+			if (!(Reply.Payload->TryGetObjectField(TEXT("round"), Round) && Round && Round->IsValid()))
+			{
+				FWAudio::Play2D(Inner, TEXT("sort_done"), 0.8f);
+			}
+		}
+		else
+		{
+			This->WrongAt.Add(Piece, FWGarageText::Now());
+			FWAudio::Play2D(Inner, TEXT("sort_wrong"), 0.8f);
+		}
+		This->ApplyGarage(Reply);
+	});
+}
+
+const FSlateBrush* SFWGarageWindow::WasteBrush(const FString& Name)
+{
+	if (const TSharedPtr<FSlateBrush>* Found = WasteBrushes.Find(Name))
+	{
+		return Found->Get();
+	}
+	TSharedPtr<FSlateBrush> Brush;
+	const FString Asset = FString::Printf(TEXT("icon_%s"), *Name);
+	if (UTexture2D* Texture = FWArt::Texture(*FString::Printf(TEXT("/Game/External/Icons/%s.%s"), *Asset, *Asset)))
+	{
+		Brush = MakeShared<FSlateBrush>();
+		Brush->SetResourceObject(Texture);
+		Brush->ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
+		WasteTextures.Emplace(Texture);
+	}
+	WasteBrushes.Add(Name, Brush);
+	return Brush.Get();
 }
 
 void SFWGarageWindow::LoadTab()
@@ -542,9 +866,10 @@ TSharedRef<SWidget> SFWGarageWindow::MakeSorting()
 	TSharedRef<SVerticalBox> Page = SNew(SVerticalBox);
 	auto Add = [&Page](TSharedRef<SWidget> Widget, float Top = 6.f) { Page->AddSlot().AutoHeight().Padding(0, Top, 0, 0)[Widget]; };
 	const int32 Trash = int32(FWUi::Num(Garage, TEXT("trash")));
+	const bool bOpen = HasRound();
 	Add(SNew(STextBlock).Font(FWStyle::Font(13)).ColorAndOpacity(FWStyle::Muted).AutoWrapText(true)
 		.Text(FText::FromString(FString::Printf(TEXT("%s · %s"), *FWUi::Str(Garage, TEXT("rank")),
-			TEXT("tu zaczyna każdy: śmieci z kosza segreguje się ręcznie, worek po worku, a każdy daje losowy surowiec i 5 XP.")))), 0.f);
+			TEXT("tu zaczyna każdy: worek z kosza wysypujesz i segregujesz ręcznie do koszy na metal, plastik i szkło, a każdy posegregowany worek daje losowy surowiec i 5 XP.")))), 0.f);
 	Add(SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 12, 0)[FWUi::Icon(PC, TEXT("trash"), 56.f)]
 		+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
@@ -552,47 +877,29 @@ TSharedRef<SWidget> SFWGarageWindow::MakeSorting()
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
 			[
-				SNew(STextBlock).Font(FWStyle::Font(20, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text).Text(FText::FromString(FString::Printf(TEXT("Śmieci: %d"), Trash)))
+				SNew(STextBlock).Font(FWStyle::Font(20, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text).Text(FText::FromString(FString::Printf(TEXT("Worki śmieci: %d"), Trash)))
 			]
 			+ SVerticalBox::Slot().AutoHeight()
 			[
 				SNew(STextBlock).Font(FWStyle::Font(12)).ColorAndOpacity(FWStyle::Muted)
-				.Text(FText::FromString(FString::Printf(TEXT("Worek: %d s, losowy surowiec i 5 XP"), int32(FWUi::Num(Garage, TEXT("sortSeconds"), 10.0)))))
+				.Text(LOCTEXT("BagRules", "W worku 5 przedmiotów: przeciągnij każdy do właściwego kosza"))
 			]
 		]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 		[
 			SNew(SBox).WidthOverride(220.f)
 			[
-				FWUi::SmallButton(bHandSorting ? LOCTEXT("Stop", "Przestań") : LOCTEXT("Start", "Zacznij segregować"), [WeakThis]()
+				FWUi::SmallButton(bOpen ? LOCTEXT("PutBack", "Odłóż worek") : LOCTEXT("OpenBag", "Otwórz worek"), [WeakThis]()
 				{
 					if (TSharedPtr<SFWGarageWindow> This = WeakThis.Pin())
 					{
 						This->ToggleSorting();
 					}
-				}, !bHandSorting, bHandSorting || Trash > 0)
+				}, !bOpen, bOpen || (Trash > 0 && !bSortPending))
 			]
 		], 14.f);
 
-	// The bag being sorted now
-	const TArray<TSharedPtr<FJsonValue>>* Queue = nullptr;
-	const double DoneAt = Garage->TryGetArrayField(TEXT("queue"), Queue) && Queue->Num() > 0 ? (*Queue)[0]->AsNumber() : -1.0;
-	const double Total = FWUi::Num(Garage, TEXT("sortSeconds"), 10.0) * 1000.0;
-	Add(SNew(STextBlock).Font(FWStyle::Font(13, TEXT("Bold"))).ColorAndOpacity(bHandSorting ? FWStyle::Accent : FWStyle::Muted)
-		.Text_Lambda([WeakThis, DoneAt]()
-		{
-			TSharedPtr<SFWGarageWindow> This = WeakThis.Pin();
-			if (!This || DoneAt < 0.0)
-			{
-				return This && This->bHandSorting ? LOCTEXT("NextBag", "Segregacja ręczna: następny worek…") : LOCTEXT("Idle", "Segregacja ręczna");
-			}
-			return FText::FromString(FString::Printf(TEXT("Segregacja ręczna: worek po worku · jeszcze %d s"), int32(FMath::CeilToDouble(FMath::Max(DoneAt - This->ServerNow(), 0.0) / 1000.0))));
-		}), 16.f);
-	Add(FWUi::Bar(TAttribute<float>::CreateLambda([WeakThis, DoneAt, Total]()
-		{
-			TSharedPtr<SFWGarageWindow> This = WeakThis.Pin();
-			return This && DoneAt >= 0.0 ? float(FMath::Clamp(1.0 - (DoneAt - This->ServerNow()) / Total, 0.0, 1.0)) : 0.f;
-		}), FWStyle::Accent), 6.f);
+	Add(MakeSortingGame(), 14.f);
 
 	// What the last bags gave
 	Add(FWUi::Heading(LOCTEXT("Recent", "Ostatnio wysegregowane")), 18.f);
@@ -609,9 +916,138 @@ TSharedRef<SWidget> SFWGarageWindow::MakeSorting()
 		}
 		Add(Row, 6.f);
 	}
-	Add(FWUi::Note(LOCTEXT("SortingHelp", "Segregujesz ręcznie, więc okno musi być otwarte: zamknięcie przerywa worek, a śmieci wracają do kosza. Automatyczna sortownia (Rynek, 1000 $) to osobna maszyna: włóż do niej do 50 worków, a posegreguje je sama, także gdy cię nie ma. Śmieci kupisz na rynku."),
+	Add(FWUi::Note(LOCTEXT("SortingHelp", "Segregujesz ręcznie, więc okno musi być otwarte: zamknięcie odkłada otwarty worek z powrotem do kosza. Przedmiot wrzucony do złego kosza wraca do worka. Automatyczna sortownia (Rynek, 1000 $) to osobna maszyna: włóż do niej do 50 worków, a posegreguje je sama, także gdy cię nie ma. Śmieci kupisz na rynku."),
 		FWStyle::Muted), 18.f);
 	return Page;
+}
+
+TSharedRef<SWidget> SFWGarageWindow::MakeSortingGame()
+{
+	TWeakPtr<SFWGarageWindow> WeakThis = SharedThis(this);
+	TSharedRef<SVerticalBox> Area = SNew(SVerticalBox);
+	const TSharedPtr<FJsonObject> Round = HasRound() ? FWUi::Obj(Garage, TEXT("round")) : nullptr;
+	if (!Round.IsValid())
+	{
+		// No bag open: the last bag's result, or how to start
+		const bool bDone = !LastBag.IsEmpty();
+		Area->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0, 34, 0, 6)
+		[
+			SNew(STextBlock).Font(FWStyle::Font(bDone ? 22 : 15, TEXT("Bold"))).ColorAndOpacity(bDone ? FWStyle::Good : FWStyle::Muted)
+			.Text(bDone ? LastBag : LOCTEXT("NoBag", "Otwórz worek, a jego zawartość wysypie się tutaj."))
+		];
+		if (bDone)
+		{
+			Area->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 30)
+			[
+				SNew(STextBlock).Font(FWStyle::Font(12)).ColorAndOpacity(FWStyle::Muted).Text(LOCTEXT("NextBagHint", "Otwórz następny worek, aby segregować dalej."))
+			];
+		}
+	}
+	else
+	{
+		const int32 Left = int32(FWUi::Num(Round, TEXT("left")));
+		const int32 Total = FWUi::Objects(Round, TEXT("pieces")).Num();
+		Area->AddSlot().AutoHeight().Padding(0, 0, 0, 8)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+			[
+				SNew(STextBlock).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FWStyle::Accent)
+				.Text(LOCTEXT("DragHint", "Przeciągnij każdy przedmiot do właściwego kosza"))
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(STextBlock).Font(FWStyle::Font(13)).ColorAndOpacity(FWStyle::Text)
+				.Text(FText::Format(LOCTEXT("Left", "Zostało {0} z {1}"), FText::AsNumber(Left), FText::AsNumber(Total)))
+			]
+		];
+		Area->AddSlot().AutoHeight().Padding(0, 0, 0, 10)
+		[
+			FWUi::Bar(float(Total - Left) / FMath::Max(Total, 1), FWStyle::Accent)
+		];
+		// The bag's pieces, on their places; a sorted one leaves an empty place
+		TSharedRef<SHorizontalBox> Pieces = SNew(SHorizontalBox);
+		for (const TSharedPtr<FJsonObject>& Piece : FWUi::Objects(Round, TEXT("pieces")))
+		{
+			const int32 Index = int32(FWUi::Num(Piece, TEXT("index")));
+			TSharedRef<SWidget> Place = SNew(SBox).WidthOverride(132.f).HeightOverride(150.f);
+			if (!Piece->GetBoolField(TEXT("sorted")))
+			{
+				Place = SNew(SBox).WidthOverride(132.f).HeightOverride(150.f).HAlign(HAlign_Center)
+					[
+						SNew(FWGarageText::SWastePiece)
+						.Index(Index)
+						.Brush(WasteBrush(FWUi::Str(Piece, TEXT("kind"))))
+						.Name(FWUi::Str(Piece, TEXT("name")))
+						.SinceWrong_Lambda([WeakThis, Index]()
+						{
+							TSharedPtr<SFWGarageWindow> This = WeakThis.Pin();
+							const double* At = This ? This->WrongAt.Find(Index) : nullptr;
+							return At ? FWGarageText::Now() - *At : 100.0;
+						})
+						.Away_Lambda([WeakThis, Index]()
+						{
+							TSharedPtr<SFWGarageWindow> This = WeakThis.Pin();
+							return This && (This->DraggingPiece == Index || This->PendingPiece == Index);
+						})
+						.OnPicked([WeakThis](int32 Picked)
+						{
+							if (TSharedPtr<SFWGarageWindow> This = WeakThis.Pin())
+							{
+								This->DraggingPiece = Picked;
+								FWAudio::Play2D(This->Controller.Get(), TEXT("sort_pick"), 0.6f);
+							}
+						})
+						.OnDragEnded([WeakThis]()
+						{
+							// Dropped anywhere but on a bin: back into the bag
+							if (TSharedPtr<SFWGarageWindow> This = WeakThis.Pin())
+							{
+								This->DraggingPiece = -1;
+							}
+						})
+					];
+			}
+			Pieces->AddSlot().FillWidth(1.f).HAlign(HAlign_Center)[Place];
+		}
+		Area->AddSlot().AutoHeight().Padding(0, 4, 0, 18)[Pieces];
+	}
+
+	// The bins stand there all the time, to drop pieces in while a bag is open
+	TSharedRef<SHorizontalBox> Bins = SNew(SHorizontalBox);
+	for (const TSharedPtr<FJsonObject>& Bin : FWUi::Objects(Garage, TEXT("bins")))
+	{
+		const FString Id = FWUi::Str(Bin, TEXT("id"));
+		Bins->AddSlot().FillWidth(1.f).HAlign(HAlign_Center).Padding(8, 0)
+		[
+			SNew(FWGarageText::SWasteBin)
+			.Brush(WasteBrush(FString::Printf(TEXT("bin_%s"), *Id)))
+			.Name(FText::FromString(FWUi::Str(Bin, TEXT("name"))))
+			.Color(FWGarageText::BinColor(Id))
+			.Flash_Lambda([WeakThis, Id]()
+			{
+				TSharedPtr<SFWGarageWindow> This = WeakThis.Pin();
+				return This && This->FlashBin == Id ? FWGarageText::FBinFlash(TPair<double, bool>(FWGarageText::Now() - This->FlashAt, This->bFlashGood))
+					: FWGarageText::FBinFlash();
+			})
+			.OnPiece([WeakThis, Id](int32 Piece)
+			{
+				if (TSharedPtr<SFWGarageWindow> This = WeakThis.Pin())
+				{
+					This->PutPiece(Piece, Id);
+				}
+			})
+		];
+	}
+	Area->AddSlot().AutoHeight()[Bins];
+
+	return SNew(SBorder)
+		.BorderImage(FCoreStyle::Get().GetBrush(TEXT("GenericWhiteBox")))
+		.BorderBackgroundColor(FLinearColor(0.f, 0.f, 0.f, 0.28f))
+		.Padding(FMargin(18.f, 16.f))
+		[
+			Area
+		];
 }
 
 TSharedRef<SWidget> SFWGarageWindow::MakeSorter()
@@ -1199,7 +1635,14 @@ void SFWGarageWindow::Tick(const FGeometry& Geometry, const double CurrentTime, 
 		NextPoll = FPlatformTime::Seconds() + 2.0;
 		return;
 	}
-	LoadGarage(true);
+	if (HasRound())
+	{
+		NextPoll = FPlatformTime::Seconds() + 5.0;
+	}
+	else
+	{
+		LoadGarage(true);
+	}
 	if (Tab == 1 && Sorter.IsValid())
 	{
 		SendSorter(TEXT("sorter.get"), MakeShared<FJsonObject>());

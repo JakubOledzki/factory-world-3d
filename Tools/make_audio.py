@@ -194,7 +194,7 @@ def belt_loop(seconds=4.0):
     hum = 0.3 * np.sin(2 * np.pi * 100 * t) + 0.15 * np.sin(2 * np.pi * 200 * t) + 0.05 * np.sin(2 * np.pi * 300 * t)
     ticks = np.zeros(n)
     for i in range(int(seconds / 0.25)):
-        s = int((i * 0.25 + rng.uniform(-0.004, 0.004)) * RATE)
+        s = max(0, int((i * 0.25 + rng.uniform(-0.004, 0.004)) * RATE))
         k = int(0.05 * RATE)
         ticks[s:s + k] += modes(k / RATE, [1400 + rng.uniform(-80, 80), 2600], [0.008, 0.005], [1, 0.5])[:max(0, min(k, n - s))]
     x = normalize(rumble) * 0.6 + hum * 0.5 + normalize(ticks) * 0.25
@@ -318,6 +318,92 @@ def confirm():
     return normalize(out, 0.5)
 
 
+
+# The sorting game at the garage bin: a piece dropping into its bin (metal, plastic, glass), into the wrong one, and the
+# bag done ----------------------------------------------------------------------------------------------------------
+
+def bin_drop():
+    """The thud of the bin's plastic body as something lands in it."""
+    k = 0.35
+    n = int(k * RATE)
+    return band(white(n), 70, 400) * env(n, 0.002, 0.12, 5) + modes(k, [95, 160, 240], [0.09, 0.06, 0.04], [0.5, 0.35, 0.2])
+
+
+def sort_metal():
+    """An empty can or tin landing in the bin: a bright, ringing clatter that bounces once."""
+    k = 0.7
+    n = int(k * RATE)
+    out = normalize(bin_drop()) * 0.45
+    out = np.concatenate([out, np.zeros(n - len(out))])
+    for start, level in ((0.0, 1.0), (0.11, 0.45), (0.19, 0.2)):
+        s = int(start * RATE)
+        hit = modes(k - start, [1180, 2310, 3470, 5120, 6890], [0.16, 0.11, 0.08, 0.05, 0.03], [1, 0.8, 0.6, 0.35, 0.2])
+        hit += band(white(len(hit)), 2500, 9000) * env(len(hit), 0.0005, 0.01, 6) * 0.6
+        out[s:] += normalize(hit) * level * 0.7
+    return normalize(out, 0.75)
+
+
+def sort_plastic():
+    """A light bottle or cup: a hollow, dull knock and a short rattle."""
+    k = 0.45
+    n = int(k * RATE)
+    out = normalize(bin_drop()) * 0.55
+    out = np.concatenate([out, np.zeros(n - len(out))])
+    for start, level in ((0.0, 1.0), (0.07, 0.4)):
+        s = int(start * RATE)
+        hit = modes(k - start, [410, 690, 1130], [0.035, 0.025, 0.015], [1, 0.7, 0.4])
+        hit += band(white(len(hit)), 600, 3500) * env(len(hit), 0.001, 0.03, 5) * 0.8
+        out[s:] += normalize(hit) * level * 0.6
+    return normalize(out, 0.7)
+
+
+def sort_glass():
+    """A bottle or jar onto the others: a clear clink that rings on."""
+    k = 1.1
+    n = int(k * RATE)
+    out = normalize(bin_drop()) * 0.3
+    out = np.concatenate([out, np.zeros(n - len(out))])
+    for start, level, base in ((0.0, 1.0, 2630), (0.06, 0.5, 3120)):
+        s = int(start * RATE)
+        hit = modes(k - start, [base, base * 2.32, base * 4.25, base * 6.63], [0.42, 0.25, 0.14, 0.08], [1, 0.55, 0.3, 0.15])
+        hit += band(white(len(hit)), 4000, 12000) * env(len(hit), 0.0003, 0.006, 6) * 0.5
+        out[s:] += normalize(hit) * level * 0.6
+    return normalize(out, 0.6)
+
+
+def sort_wrong():
+    """Not this bin: a soft low double buzz."""
+    k = 0.36
+    t = t_axis(k)
+    n = len(t)
+    tone = (np.sin(2 * np.pi * 150 * t) + 0.5 * np.sign(np.sin(2 * np.pi * 150 * t)) * 0.4) * env(n, 0.004, 0.12, 4)
+    second = np.roll(tone, int(0.15 * RATE))
+    second[:int(0.15 * RATE)] = 0
+    return normalize(lowpass(tone + second * 0.8, 1400), 0.45)
+
+
+def sort_done():
+    """The bag is sorted: a rising arpeggio with a little shimmer."""
+    k = 1.0
+    t = t_axis(k)
+    n = len(t)
+    out = np.zeros(n)
+    for i, f in enumerate((523.25, 659.25, 783.99, 1046.5)):
+        s = int(i * 0.075 * RATE)
+        m = n - s
+        tt = np.arange(m) / RATE
+        out[s:] += (np.sin(2 * np.pi * f * tt) + 0.25 * np.sin(4 * np.pi * f * tt) + 0.1 * np.sin(6 * np.pi * f * tt)) * env(m, 0.004, 0.55, 4)
+    out += band(white(n), 6000, 12000) * env(n, 0.25, 0.5, 4) * 0.04
+    return normalize(out, 0.5)
+
+
+def sort_pick():
+    """A piece taken out of the bag: a soft rustle of the sack."""
+    k = 0.18
+    n = int(k * RATE)
+    return normalize(band(white(n), 1200, 7000) * env(n, 0.01, 0.12, 4) * smooth_noise(n, 60), 0.35)
+
+
 # Write everything --------------------------------------------------------------------------------------------
 save("amb_wind_loop", wind_loop(), stereo=True)
 for i in range(3):
@@ -343,3 +429,9 @@ for i in range(3):
     save(f"mine_hit_{i + 1}", mine_hit(i))
 save("build_invalid", invalid())
 save("ui_confirm", confirm())
+save("sort_metal", sort_metal())
+save("sort_plastic", sort_plastic())
+save("sort_glass", sort_glass())
+save("sort_wrong", sort_wrong())
+save("sort_done", sort_done())
+save("sort_pick", sort_pick())
