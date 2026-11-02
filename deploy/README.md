@@ -31,6 +31,38 @@ Hasła są tylko w pliku `deploy/.env` na serwerze. Ten plik nie trafia do gita.
    ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw --force enable
    ```
 
+### Wariant: Google Cloud (Compute Engine)
+
+Zamiast punktów 1, 3 i 4 powyżej (punkt 2, domena, bez zmian):
+
+1. W [console.cloud.google.com](https://console.cloud.google.com) utwórz projekt (np. `factoryworld3d`) i podłącz
+   rozliczenia.
+   - Od razu ustaw budżet z alertem: Billing → Budgets & alerts, np. 30 $ miesięcznie, powiadomienia na e-mail.
+2. Compute Engine → VM instances → Create instance:
+   - nazwa `factoryworld3d`, region **europe-central2 (Warszawa)**, typ maszyny **e2-medium** (2 vCPU, 4 GB);
+   - dysk startowy: Ubuntu 24.04 LTS, 30 GB, „Balanced persistent disk”;
+   - Firewall: zaznacz **Allow HTTP traffic** i **Allow HTTPS traffic**;
+   - Security → Manage access → Add item (SSH keys): wklej cały publiczny klucz
+     `~/.ssh/factoryworld3d_deploy.pub`. Nazwą użytkownika na serwerze będzie końcówka klucza:
+     `factoryworld3d-deploy`.
+3. Stały adres IP: VPC network → IP addresses → przy zewnętrznym adresie maszyny „Promote to static”. Bez tego IP
+   zmienia się po restarcie maszyny, a domena przestaje działać.
+4. Połącz się i zainstaluj Dockera. Na Google loguje się zwykły użytkownik, więc komendy idą przez `sudo`. Zaporę
+   zapewnia Google (punkt 2), więc `ufw` jest niepotrzebny.
+
+   ```
+   ssh -i ~/.ssh/factoryworld3d_deploy factoryworld3d-deploy@IP_SERWERA
+   curl -fsSL https://get.docker.com | sudo sh
+   sudo usermod -aG docker $USER && exit
+   ```
+
+   Po ponownym zalogowaniu `docker` działa bez `sudo`. W punkcie 2 poniżej katalog zakłada się raz przez sudo:
+   `sudo mkdir -p /opt/factoryworld3d && sudo chown $USER /opt/factoryworld3d`. W poleceniach `scp` i `ssh` z dalszych
+   punktów zamiast `root@` jest `factoryworld3d-deploy@`.
+
+Koszt w przybliżeniu: e2-medium ok. 25–30 $ miesięcznie, dysk ok. 3 $, ruch wychodzący ok. 0,12 $ za GB. Nowe konto
+ma 300 $ kredytu na 90 dni.
+
 ## 2. Pierwsze uruchomienie
 
 ```
