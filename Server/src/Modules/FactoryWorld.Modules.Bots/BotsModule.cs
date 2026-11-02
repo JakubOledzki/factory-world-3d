@@ -4,14 +4,19 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace FactoryWorld.Modules.Bots;
 
 /// <summary>Settings under <c>Bots</c> in the configuration.</summary>
 public sealed class BotsOptions
 {
-    /// <summary>Whether the bots play at all. Off, the roster is not even registered.</summary>
-    public bool Enabled { get; set; } = true;
+    /// <summary>Whether the bots play at all (off unless turned on). Off, the roster is not even registered.</summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>While the bots are off, the server removes the ones it made earlier on start, with all that is theirs
+    /// (<see cref="BotRemoval"/>); turned on again, they start afresh.</summary>
+    public bool RemoveWhenOff { get; set; } = true;
 
     /// <summary>How many bots there are: the founders first, then made-up ones (<see cref="BotRoster.First"/>).</summary>
     public int Count { get; set; } = 2000;
@@ -81,6 +86,15 @@ public sealed class BotsModule : IGameModule
         services.AddHostedService<BotRunner>();
     }
 
-    public Task InitializeAsync(IServiceProvider services, CancellationToken cancellationToken) =>
-        services.MigrateModuleAsync<BotsDbContext>(cancellationToken);
+    public async Task InitializeAsync(IServiceProvider services, CancellationToken cancellationToken)
+    {
+        await services.MigrateModuleAsync<BotsDbContext>(cancellationToken);
+        // Before anyone connects, so no player sees a bot that is going
+        var options = services.GetRequiredService<BotsOptions>();
+        if (!options.Enabled && options.RemoveWhenOff)
+        {
+            await BotRemoval.RemoveAsync(services.GetRequiredService<NpgsqlDataSource>(),
+                services.GetRequiredService<ILogger<BotsModule>>(), cancellationToken);
+        }
+    }
 }
