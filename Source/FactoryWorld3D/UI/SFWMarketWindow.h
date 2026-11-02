@@ -7,11 +7,13 @@
 class AFWPlayerController;
 class SBox;
 class SEditableTextBox;
+class SScrollBox;
 struct FFWNetReply;
 
 /**
  * The market, opened at the plot's computer as in the 2D game. Three tabs:
- *   Handlarz: the NPC trader's prices (market.prices), buying and selling 1, 10 or all (market.buy / market.sell)
+ *   Handlarz: the NPC trader's prices (market.prices), buying and selling 1, 10 or all (market.buy / market.sell); a trade
+ *     asks only for the inventory again, right behind it, and a sale shows its pieces gone before the server answers
  *   Giełda: the players' market (market.overview); an item's board of offers to sell and to buy (market.item), buying
  *     from an offer (market.purchase), selling into a request (market.fill), and putting up one's own offer to sell
  *     or to buy at a price (market.list / market.order)
@@ -46,10 +48,15 @@ private:
 	TSharedRef<SWidget> SmallButton(const FText& Text, TFunction<void()> OnClick, bool bPrimary = false, bool bEnabled = true);
 	void Send(const TCHAR* Type, TSharedPtr<FJsonObject> Payload);
 	bool Matches(const FString& Name) const;
+	// How many of an item the player has, less what is being sold to the trader right now
+	int32 Have(const FString& Item) const;
 
 	TWeakObjectPtr<AFWPlayerController> Controller;
 	int32 Tab = 0;
 	TSharedPtr<SBox> Content;
+	// The tab's long list as last built, so a rebuild keeps where the player had scrolled to
+	TSharedPtr<SScrollBox> List;
+	int32 ListTab = -1;
 	TSharedPtr<SEditableTextBox> Search;
 	FString Filter;
 	TSharedPtr<FJsonObject> Prices;
@@ -60,4 +67,13 @@ private:
 	// The own-offer form on an item's board
 	FString OfferQuantity = TEXT("10");
 	FString OfferPrice;
+	// Sales to the trader sent but not yet in the inventory: their pieces are shown gone at once
+	struct FPendingSale
+	{
+		int32 Seq = 0;
+		FString Item;
+		int32 Quantity = 0;
+	};
+	TArray<FPendingSale> PendingSales;
+	int32 TradeSeq = 0;
 };
