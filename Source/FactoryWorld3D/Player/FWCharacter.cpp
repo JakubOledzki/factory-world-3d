@@ -91,7 +91,7 @@ void AFWCharacter::BeginPlay()
 
 void AFWCharacter::CreateBody()
 {
-	USkeletalMesh* Mannequin = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	USkeletalMesh* Mannequin = FWGear::BodyMesh();
 	if (!Mannequin || !IsLocallyControlled())
 	{
 		return;

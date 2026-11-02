@@ -19,6 +19,7 @@ import bmesh
 import bpy
 
 from mathutils import Matrix, Vector, noise
+from mathutils.geometry import intersect_point_line
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 SOURCE = os.path.join(ROOT, "RawAssets", "mannequin", "SKM_Manny_Simple.fbx")
@@ -99,7 +100,99 @@ def load_body():
     bpy.ops.import_scene.fbx(filepath=SOURCE)
     armature = next(o for o in bpy.data.objects if o.type == "ARMATURE")
     body = next(o for o in bpy.data.objects if o.type == "MESH")
+    reshape_body(armature, body)
     return armature, body
+
+
+# The game's body: the mannequin made an ordinary build instead of a bodybuilder's. Each part keeps this much of its
+# thickness around its bone (1 = as the mannequin): narrower shoulders, slimmer arms, a flatter chest.
+KEEP = {
+    "clavicle": 0.80, "upperarm": 0.80, "upperarm_twist_01": 0.80, "upperarm_twist_02": 0.82,
+    "lowerarm": 0.88, "lowerarm_twist_01": 0.88, "lowerarm_twist_02": 0.90,
+    "spine_05": 0.88, "spine_04": 0.90, "spine_03": 0.93, "spine_02": 0.97,
+    "thigh": 0.96, "thigh_twist_01": 0.96, "thigh_twist_02": 0.97, "calf": 0.97, "calf_twist_01": 0.97, "calf_twist_02": 0.97,
+    "neck_01": 0.96,
+}
+
+
+def reshape_body(armature, body):
+    """Pulls each vertex towards its bones by their KEEP (the chest towards the body's middle plane), weighted as the
+    skin is, then softens the muscles a little; hands, feet and the head stay as they are."""
+    bones = {b.name: (armature.matrix_world @ b.head_local, armature.matrix_world @ b.tail_local) for b in armature.data.bones}
+    names = {g.index: g.name for g in body.vertex_groups}
+    world = body.matrix_world
+    inverse = world.inverted()
+    for v in body.data.vertices:
+        p = world @ v.co
+        moved = Vector()
+        total = 0.0
+        for g in v.groups:
+            name = names[g.group]
+            if g.weight <= 0.0 or name not in bones:
+                continue
+            base = name[:-2] if name.endswith(("_l", "_r")) else name
+            keep = KEEP.get(base, 1.0)
+            head, tail = bones[name]
+            t = min(max(intersect_point_line(p, head, tail)[1], 0.0), 1.0)
+            closest = head + (tail - head) * t
+            if name.startswith("spine_0"):
+                target = Vector((p.x * keep, p.y if p.y < closest.y else closest.y + (p.y - closest.y) * keep, p.z))
+            else:
+                target = closest + (p - closest) * keep
+            moved += target * g.weight
+            total += g.weight
+        if total > 0.0:
+            v.co = inverse @ (moved / total + p * (1.0 - min(total, 1.0)))
+    body.data.update()
+    soft = body.vertex_groups.new(name="FW_Soft")
+    detail = ("hand", "index", "middle", "ring", "pinky", "thumb", "foot", "ball", "head")
+    for v in body.data.vertices:
+        fine = sum(g.weight for g in v.groups if names.get(g.group, "").startswith(detail))
+        soft.add([v.index], max(0.0, 1.0 - fine * 1.5), "REPLACE")
+    bpy.context.view_layer.objects.active = body
+    mod = body.modifiers.new("Soft", "LAPLACIANSMOOTH")
+    mod.vertex_group = soft.name
+    mod.lambda_factor = 0.6
+    mod.iterations = 6
+    mod.use_volume_preserve = True
+    mod.use_normalized = True
+    bpy.ops.object.modifier_move_to_index(modifier=mod.name, index=0)
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    body.vertex_groups.remove(body.vertex_groups["FW_Soft"])
+
+
+def envelope(body):
+    """The body as one smooth closed surface for clothes to be cut from: the mannequin's chest plates and panels are
+    pieces of their own, whose edges would show through the fabric. Without skin weights: the clothes take theirs
+    from the body (weigh_from)."""
+    shell = body.copy()
+    shell.data = body.data.copy()
+    shell.name = "envelope"
+    bpy.context.scene.collection.objects.link(shell)
+    bpy.context.view_layer.objects.active = shell
+    remesh = shell.modifiers.new("Merge", "REMESH")
+    remesh.mode = "VOXEL"
+    remesh.voxel_size = 0.7  # cm: the mesh's own units
+    bpy.ops.object.modifier_move_to_index(modifier=remesh.name, index=0)
+    bpy.ops.object.modifier_apply(modifier=remesh.name)
+    soft = shell.modifiers.new("Soft", "LAPLACIANSMOOTH")
+    soft.lambda_factor = 1.0
+    soft.iterations = 12
+    soft.use_volume_preserve = True
+    soft.use_normalized = True
+    bpy.ops.object.modifier_move_to_index(modifier=soft.name, index=0)
+    bpy.ops.object.modifier_apply(modifier=soft.name)
+    shell.vertex_groups.clear()
+    return shell
+
+
+def clothes(armature, body, name, inside, offset, thickness, slot):
+    """A piece of clothing cut from the body's smooth envelope, skinned as the body under it."""
+    shell = envelope(body)
+    piece = cut(armature, shell, name, inside, offset, thickness, slot)
+    bpy.data.objects.remove(shell, do_unlink=True)
+    weigh_from(body, piece)
+    return piece
 
 
 def to_ue(body, co):
@@ -417,7 +510,10 @@ for kind, builders in (
     for style, make in builders.items():
         armature, body = load_body()
         inside, offset, thickness, slot, bumps = make()
-        piece = cut(armature, body, f"{kind}_{style}", inside, offset, thickness, slot, bumps)
+        if kind == "shirt":
+            piece = clothes(armature, body, f"{kind}_{style}", inside, offset, thickness, slot)
+        else:
+            piece = cut(armature, body, f"{kind}_{style}", inside, offset, thickness, slot, bumps)
         extra = []
         if kind == "hair":
             extra.append(hair_cards(body, style))
@@ -435,11 +531,15 @@ for kind, builders in (
         bpy.data.objects.remove(body, do_unlink=True)
         export(armature, join([piece] + extra), f"{kind}_{style}")
 
-for name, inside, offset, thickness, slot in (("pants", pants, 0.9, 0.3, "FW_Denim"), ("shoes", shoes, 0.9, 0.4, "FW_Leather")):
+for name, inside, offset, thickness, slot in (("pants", pants, 1.5, 0.3, "FW_Denim"), ("shoes", shoes, 0.9, 0.4, "FW_Leather")):
     armature, body = load_body()
-    piece = cut(armature, body, name, inside, offset, thickness, slot)
+    piece = clothes(armature, body, name, inside, offset, thickness, slot)
     bpy.data.objects.remove(body, do_unlink=True)
     export(armature, piece, name)
+
+# The body itself, which the game draws under the clothes (in the mannequin's place)
+armature, body = load_body()
+export(armature, body, "body")
 
 # Hair for the MetaHuman heads (Tools/export_metahuman_heads.py -> RawAssets/metahuman/FW_Face<n>_Face.fbx): each
 # hairstyle grown on each head's own scalp, as hair_<style>_face<n> on that head's skeleton, so the game hangs it on

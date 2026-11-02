@@ -384,7 +384,7 @@ if os.path.isdir(DECALS):
         unreal.log(f"FWIMPORT decal {decal_id}")
 
 # Character hair and clothes from Tools/blender/make_character_gear.py: skeletal meshes on the mannequin's
-# skeleton (Tools/copy_mannequins.ps1), one per style, in /Game/External/Character
+# skeleton (Tools/copy_mannequins.ps1), one per style, and the body they are made for, in /Game/External/Gear
 GEAR = os.path.join(MODELS, "character")
 skeleton = unreal.load_asset("/Game/Characters/Mannequins/Meshes/SK_Mannequin") if library.does_asset_exist("/Game/Characters/Mannequins/Meshes/SK_Mannequin") else None
 cloth_master = unreal.load_asset("/Game/Materials/M_FWCloth.M_FWCloth")
@@ -394,7 +394,7 @@ card_master = unreal.load_asset("/Game/Materials/M_FWHairCard.M_FWHairCard")
 FABRICS = {"FW_Jersey": ("cotton_jersey", 12.0), "FW_Fleece": ("knitted_fleece", 16.0), "FW_Denim": ("denim_fabric_05", 22.0),
            "FW_Leather": ("leather_white", 14.0)}
 if os.path.isdir(GEAR) and skeleton and cloth_master and hair_master:
-    destination = "/Game/External/Character"
+    destination = "/Game/External/Gear"
     if library.list_assets(destination, recursive=True):
         library.delete_directory(destination)  # always rebuilt from the script's latest output
     materials = {}
