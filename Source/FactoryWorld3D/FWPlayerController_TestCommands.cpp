@@ -270,6 +270,14 @@ void AFWPlayerController::FWMarketTab(int32 Tab)
 	}
 }
 
+void AFWPlayerController::FWMarketCategory(const FString& Category)
+{
+	if (Market.IsValid())
+	{
+		Market->ShowCategory(Category == TEXT("all") ? FString() : Category);
+	}
+}
+
 void AFWPlayerController::FWMarketItem(const FString& Item)
 {
 	if (Market.IsValid())

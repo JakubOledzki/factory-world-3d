@@ -11,7 +11,9 @@ class SScrollBox;
 struct FFWNetReply;
 
 /**
- * The market, opened at the plot's computer as in the 2D game. Three tabs:
+ * The market, opened at the plot's computer as in the 2D game. Items are sorted into groups (raw materials, food,
+ * machines, ...; the server's ItemCategories), picked in a column on the left, and each tab says in a line what it is
+ * for, so that a player knows where to sell at once and where to put up an offer. Three tabs:
  *   Handlarz: the NPC trader's prices (market.prices), buying and selling 1, 10 or all (market.buy / market.sell); a trade
  *     asks only for the inventory again, right behind it, and a sale shows its pieces gone before the server answers
  *   Giełda: the players' market (market.overview); an item's board of offers to sell and to buy (market.item), buying
@@ -34,6 +36,8 @@ public:
 	// Also used by the test console commands
 	void ShowTab(int32 Tab);
 	void OpenItem(const FString& Item);
+	// A group of items ("" every item, "mine" what the player has)
+	void ShowCategory(const FString& InCategory);
 	void Trade(bool bBuy, const FString& Item, int32 Quantity);
 	// An own offer on the open item: to sell (market.list) or to buy (market.order), price per piece in cents
 	void PutOffer(bool bSell, int32 Quantity, double PriceCents);
@@ -44,6 +48,12 @@ private:
 	TSharedRef<SWidget> MakeTrader();
 	TSharedRef<SWidget> MakeExchange();
 	TSharedRef<SWidget> MakeMine();
+	// The column of groups on the left, with how many of Source's items (as the search leaves them) each has
+	TSharedRef<SWidget> MakeCategories(const TSharedPtr<FJsonObject>& Source);
+	// A line under the tabs: what this tab is for
+	TSharedRef<SWidget> Hint(const FText& Text);
+	bool InCategory(const FJsonObject& Item) const;
+	bool Has(const FString& Item) const;
 	TSharedRef<SWidget> ItemRow(const FString& Item, const FString& Name, TSharedRef<SWidget> Right);
 	TSharedRef<SWidget> SmallButton(const FText& Text, TFunction<void()> OnClick, bool bPrimary = false, bool bEnabled = true);
 	void Send(const TCHAR* Type, TSharedPtr<FJsonObject> Payload);
@@ -59,6 +69,7 @@ private:
 	int32 ListTab = -1;
 	TSharedPtr<SEditableTextBox> Search;
 	FString Filter;
+	FString Category;
 	TSharedPtr<FJsonObject> Prices;
 	TSharedPtr<FJsonObject> Overview;
 	TSharedPtr<FJsonObject> Board;

@@ -553,6 +553,7 @@ public sealed class OverviewHandler(IServiceScopeFactory scopes, TraderMarket tr
                 {
                     id = item.Key,
                     name = item.Value,
+                    category = ItemCategories.Of(item.Key),
                     quickSaleCents = prices.Buys.TryGetValue(item.Key, out var floor) ? floor : (long?)null,
                     lowestCents = s?.LowestCents,
                     listed = s?.Listed ?? 0,

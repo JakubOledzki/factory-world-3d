@@ -223,9 +223,10 @@ Każde okno ma też „Schowaj do ekwipunku”. Do testów: `FWDevice power_gene
 
 Jak w grze 2D, rynek otwiera się klawiszem **E przy komputerze** na działce:
 
-- **Handlarz:** ceny kupna i sprzedaży u handlarza NPC ze zmianą względem zwykłej ceny i bieżącym wydarzeniem rynkowym. Kupujesz 1 albo 10 sztuk, sprzedajesz 1 albo wszystko (`market.prices/buy/sell`).
-- **Giełda graczy:** lista przedmiotów z najniższą ceną, a po wybraniu przedmiotu oferty sprzedaży i kupna innych graczy. Możesz kupić z oferty, sprzedać do zapytania albo wystawić własną ofertę: ile sztuk, po ile, sprzedaż albo kupno (`market.overview/item/purchase/fill/list/order`).
-- **Moje oferty:** twoje oferty z postępem i przyciskiem „Wycofaj” (`market.mine/unlist/cancelOrder`).
+- Przedmioty są podzielone na grupy (surowce, materiały i wyroby, żywność i rolnictwo, paliwa, maszyny i budynki, logistyka i magazyny, energia, narzędzia i ubrania, inne) oraz „Masz w plecaku”, wybierane w kolumnie po lewej; grupę każdego przedmiotu podaje serwer (`ItemCategories`). Każda zakładka mówi w jednym zdaniu, do czego służy: u handlarza sprzedaje się od ręki, na giełdzie wystawia się oferty dla graczy.
+- **Handlarz: od ręki:** ceny kupna i sprzedaży u handlarza NPC ze zmianą względem zwykłej ceny i bieżącym wydarzeniem rynkowym. Kupujesz 1 albo 10 sztuk, sprzedajesz 1 albo wszystko, a przycisk „Giełda” otwiera ten przedmiot na giełdzie (`market.prices/buy/sell`).
+- **Giełda graczy: oferty:** lista przedmiotów z najniższą ceną, a po wybraniu przedmiotu oferty sprzedaży i kupna innych graczy. Możesz kupić z oferty, sprzedać do zapytania albo wystawić własną ofertę: ile sztuk, po ile, sprzedaż albo kupno (`market.overview/item/purchase/fill/list/order`).
+- **Moje oferty:** twoje oferty sprzedaży i kupna osobno, z postępem i przyciskiem „Wycofaj” (`market.mine/unlist/cancelOrder`).
 
 U góry jest wyszukiwarka i stan konta.
 
