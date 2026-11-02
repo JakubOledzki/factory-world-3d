@@ -94,7 +94,7 @@ TSharedRef<SWidget> SFWInventoryWindow::MakeInventoryPanel()
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(1.f)
 				[
-					SNew(STextBlock).Text(LOCTEXT("Inventory", "Plecak")).Font(FWStyle::Font(20, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)
+					SNew(STextBlock).Text(LOCTEXT("Inventory", "Plecak")).Font(FWStyle::Display(28)).ColorAndOpacity(FWStyle::Text)
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom)
 				[
@@ -122,7 +122,7 @@ TSharedRef<SWidget> SFWInventoryWindow::MakeInventoryPanel()
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0, 16, 0, 6)
 			[
-				SNew(STextBlock).Text(LOCTEXT("Hotbar", "Pasek szybkiego wyboru")).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Muted)
+				FWUi::Heading(LOCTEXT("Hotbar", "Pasek szybkiego wyboru"))
 			]
 			+ SVerticalBox::Slot().AutoHeight()
 			[
@@ -155,7 +155,7 @@ TSharedRef<SWidget> SFWInventoryWindow::MakeStoragePanel()
 				+ SHorizontalBox::Slot().FillWidth(1.f)
 				[
 					SNew(STextBlock)
-					.Font(FWStyle::Font(20, TEXT("Bold")))
+					.Font(FWStyle::Display(28))
 					.ColorAndOpacity(FWStyle::Text)
 					.Text_Lambda([this]() { return Controller.IsValid() ? FText::FromString(Controller->GetStorage().Name) : FText::GetEmpty(); })
 				]

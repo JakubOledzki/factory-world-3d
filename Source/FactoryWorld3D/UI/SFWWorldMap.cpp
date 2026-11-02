@@ -106,7 +106,7 @@ void SFWWorldMap::Construct(const FArguments& InArgs)
 			SNew(SBorder).BorderImage(FWStyle::Panel()).Padding(FMargin(16.f, 10.f))
 			[
 				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(LOCTEXT("Title", "Mapa świata")).Font(FWStyle::Font(20, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text)]
+				+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(LOCTEXT("Title", "Mapa świata")).Font(FWStyle::Display(28)).ColorAndOpacity(FWStyle::Text)]
 				+ SVerticalBox::Slot().AutoHeight()
 				[
 					SNew(STextBlock).Font(FWStyle::Font(10)).ColorAndOpacity(FWStyle::Muted)
