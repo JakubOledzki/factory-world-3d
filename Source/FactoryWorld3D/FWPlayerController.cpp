@@ -2029,6 +2029,74 @@ void AFWPlayerController::ToastError(const FFWNetReply& Reply)
 	Toast(FWCatalog::ErrorText(Reply.ErrorCode(), Reply.ErrorMessage()), true);
 }
 
+void AFWPlayerController::StrikeHit(int32 MineId, FIntPoint Tile)
+{
+	TSharedPtr<FJsonObject> P = PlotPayload(Plot);
+	if (MineId >= 0)
+	{
+		P->SetNumberField(TEXT("mine"), MineId);
+	}
+	else
+	{
+		P->SetNumberField(TEXT("tileX"), Tile.X);
+		P->SetNumberField(TEXT("tileY"), Tile.Y);
+	}
+	Net()->Request(TEXT("plot.hit"), P, [](const FFWNetReply&) {});
+}
+
+void AFWPlayerController::Harvest(FIntPoint Tile, TFunction<void(bool)> Done)
+{
+	TSharedPtr<FJsonObject> P = PlotPayload(Plot);
+	P->SetNumberField(TEXT("tileX"), Tile.X);
+	P->SetNumberField(TEXT("tileY"), Tile.Y);
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Net()->Request(TEXT("plot.harvest"), P, [WeakThis, Tile, Done = MoveTemp(Done)](const FFWNetReply& Reply)
+	{
+		AFWPlayerController* This = WeakThis.Get();
+		if (!This)
+		{
+			return;
+		}
+		const bool bOk = Reply.Type == TEXT("plot.harvested");
+		if (bOk)
+		{
+			TArray<FString> Parts;
+			const TArray<TSharedPtr<FJsonValue>>* Items = nullptr;
+			if (Reply.Payload->TryGetArrayField(TEXT("items"), Items))
+			{
+				for (const TSharedPtr<FJsonValue>& Value : *Items)
+				{
+					const TSharedPtr<FJsonObject> Item = Value->AsObject();
+					Parts.Add(FString::Printf(TEXT("+%d %s"), int32(Item->GetNumberField(TEXT("quantity"))), *Item->GetStringField(TEXT("name"))));
+				}
+			}
+			This->Toast(Parts.IsEmpty() ? LOCTEXT("HarvestedNothing", "Nic tym razem.") : FText::FromString(FString::Join(Parts, TEXT(", "))));
+			if (This->Plot)
+			{
+				This->Plot->ClearTile(Tile);
+				const TArray<TSharedPtr<FJsonValue>>* Felled = nullptr;
+				if (Reply.Payload->TryGetArrayField(TEXT("felled"), Felled))
+				{
+					for (const TSharedPtr<FJsonValue>& Value : *Felled)
+					{
+						const TSharedPtr<FJsonObject> Other = Value->AsObject();
+						This->Plot->ClearTile(FIntPoint(int32(Other->GetNumberField(TEXT("tileX"))), int32(Other->GetNumberField(TEXT("tileY")))));
+					}
+				}
+			}
+			This->RefreshInventory();
+		}
+		else
+		{
+			This->ToastError(Reply);
+		}
+		if (Done)
+		{
+			Done(bOk);
+		}
+	});
+}
+
 void AFWPlayerController::Mine(int32 MineId, TFunction<void(bool)> Done)
 {
 	TSharedPtr<FJsonObject> P = PlotPayload(Plot);
@@ -2220,6 +2288,49 @@ void AFWPlayerController::FWPromptSecondary()
 	{
 		Prompt->PressSecondary();
 	}
+}
+
+void AFWPlayerController::FWAimAt(const FString& What)
+{
+	APawn* Walker = GetPawn();
+	if (!Plot || !Walker)
+	{
+		return;
+	}
+	const FIntPoint From = Plot->TileAt(Walker->GetActorLocation());
+	const FIntPoint Sides[] = { FIntPoint(0, 1), FIntPoint(1, 0), FIntPoint(0, -1), FIntPoint(-1, 0) };
+	int64 Best = MAX_int64;
+	FIntPoint Target(-1, -1), Stand(-1, -1);
+	for (int32 Y = 1; Y < 199; ++Y)
+	{
+		for (int32 X = 1; X < 199; ++X)
+		{
+			const FIntPoint Tile(X, Y);
+			if (!Plot->Contains(Tile) || (What == TEXT("rock") ? Plot->TileCode(Tile) != FWCatalog::Rock : !Plot->IsTree(Tile)))
+			{
+				continue;
+			}
+			const int64 Distance = int64(X - From.X) * (X - From.X) + int64(Y - From.Y) * (Y - From.Y);
+			for (const FIntPoint& Side : Sides)
+			{
+				if (Distance < Best && Plot->TileCode(Tile + Side) == FWCatalog::Empty && !Plot->FindObjectAt(Tile + Side))
+				{
+					Best = Distance;
+					Target = Tile;
+					Stand = Tile + Side;
+				}
+			}
+		}
+	}
+	if (Target.X < 0)
+	{
+		return;
+	}
+	PlaceOnGround(Plot->GroundAt(Stand));
+	const FVector Eye = Walker->GetPawnViewLocation();
+	// At the foot of it, about where the ground is under the player (its own ground height is the top of what stands there)
+	const FVector Foot(Plot->TileCenter(Target).X, Plot->TileCenter(Target).Y, Eye.Z - 150.f);
+	SetControlRotation((Foot - Eye).Rotation());
 }
 
 void AFWPlayerController::FWGoto(int32 TileX, int32 TileY, float Yaw, float Pitch)

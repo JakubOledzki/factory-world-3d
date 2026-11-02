@@ -194,7 +194,7 @@ def belt_loop(seconds=4.0):
     hum = 0.3 * np.sin(2 * np.pi * 100 * t) + 0.15 * np.sin(2 * np.pi * 200 * t) + 0.05 * np.sin(2 * np.pi * 300 * t)
     ticks = np.zeros(n)
     for i in range(int(seconds / 0.25)):
-        s = int((i * 0.25 + rng.uniform(-0.004, 0.004)) * RATE)
+        s = max(0, int((i * 0.25 + rng.uniform(-0.004, 0.004)) * RATE))
         k = int(0.05 * RATE)
         ticks[s:s + k] += modes(k / RATE, [1400 + rng.uniform(-80, 80), 2600], [0.008, 0.005], [1, 0.5])[:max(0, min(k, n - s))]
     x = normalize(rumble) * 0.6 + hum * 0.5 + normalize(ticks) * 0.25
@@ -297,6 +297,17 @@ def mine_hit(variant):
     return normalize(normalize(strike) * 0.6 + normalize(crack) * 0.6 + chips + normalize(thud) * 0.5, 0.9)
 
 
+def axe_chop(variant):
+    """The axe biting into a trunk: a dull, woody thunk with the crack of the blade going in and a rustle from the crown."""
+    k = 0.75
+    n = int(k * RATE)
+    thunk = modes(k, rng.uniform([150, 330, 610], [190, 380, 690]), [0.07, 0.045, 0.03], [1, 0.6, 0.35])
+    bite = band(white(n), 900, 5000) * env(n, 0.0005, 0.025, 6)
+    body = band(white(n), 80, 600) * env(n, 0.001, 0.09, 5)
+    rustle = band(white(n), 2500, 9000) * env(n, 0.06, 0.45, 3) * smooth_noise(n, 25) * 0.25
+    return normalize(normalize(thunk) * 0.8 + normalize(bite) * 0.55 + normalize(body) * 0.6 + rustle, 0.85)
+
+
 def invalid():
     k = 0.3
     t = t_axis(k)
@@ -341,5 +352,7 @@ save("build_rotate", rotate())
 save("build_pickup", pickup())
 for i in range(3):
     save(f"mine_hit_{i + 1}", mine_hit(i))
+for i in range(3):
+    save(f"axe_chop_{i + 1}", axe_chop(i))
 save("build_invalid", invalid())
 save("ui_confirm", confirm())

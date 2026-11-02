@@ -1732,6 +1732,7 @@ public sealed class WorldModule : IGameModule
         services.AddSingleton<IMessageHandler, PresenceHandler>();
         services.AddSingleton<IMessageHandler, LeavePlotHandler>();
         services.AddSingleton<IMessageHandler, HarvestHandler>();
+        services.AddSingleton<IMessageHandler, HitHandler>();
         services.AddSingleton<IMessageHandler, GetStationHandler>();
         services.AddSingleton<IMessageHandler, LoadStationHandler>();
         services.AddSingleton<IMessageHandler, UnloadStationHandler>();

@@ -280,7 +280,7 @@ public sealed class UpgradeTests(ServerFactory factory) : IClassFixture<ServerFa
 
         // One load first, so the built-up mine keeps what was dug out.
         factory.Time.Advance(Mining.Time);
-        Assert.Equal("plot.mined", (await client.SendAsync("plot.mine", At(0))).Type());
+        Assert.Equal("plot.mined", (await factory.StrikeAsync(client, "plot.mine", At(0))).Type());
 
         Assert.Equal("not_enough_items", (await client.SendAsync("plot.upgradeMine", At(0))).ErrorCode());
         foreach (var cost in upgrade.GetProperty("cost").EnumerateArray())
@@ -304,7 +304,7 @@ public sealed class UpgradeTests(ServerFactory factory) : IClassFixture<ServerFa
 
         // Its loads now take 4 s.
         factory.Time.Advance(TimeSpan.FromSeconds(4));
-        var load = await client.SendAsync("plot.mine", At(0));
+        var load = await factory.StrikeAsync(client, "plot.mine", At(0));
         Assert.Equal(98, load.Payload().GetProperty("mine").GetProperty("units").GetInt32());
 
         var level3 = built.GetProperty("upgrade");

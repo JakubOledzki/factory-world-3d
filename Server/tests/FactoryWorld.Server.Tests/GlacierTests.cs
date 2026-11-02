@@ -303,7 +303,7 @@ public sealed class GlacierTests(ServerFactory factory) : IClassFixture<ServerFa
 
         var ice = First(tiles, TileObject.IceBlock);
         factory.Time.Advance(HarvestRules.Time);
-        var cut = await client.SendAsync("plot.harvest", At(x, y, ice));
+        var cut = await factory.StrikeAsync(client, "plot.harvest", At(x, y, ice));
         Assert.True(cut.Type() == "plot.harvested", cut.ToString());
         Assert.Equal(2, (await client.InventoryAsync())[Items.Ice]);
 
@@ -318,10 +318,10 @@ public sealed class GlacierTests(ServerFactory factory) : IClassFixture<ServerFa
         Assert.Equal("blocked", (await client.SendAsync("plot.place",
             new { x, y, kind = Items.Pole, tileX = crevasse % PlotLayout.Size, tileY = crevasse / PlotLayout.Size, rotation = 0 })).ErrorCode());
         factory.Time.Advance(HarvestRules.Time);
-        Assert.Equal("not_enough_items", (await client.SendAsync("plot.harvest", At(x, y, crevasse))).ErrorCode());
+        Assert.Equal("not_enough_items", (await factory.StrikeAsync(client, "plot.harvest", At(x, y, crevasse))).ErrorCode());
         await GiveAsync(client, Items.Beams, PlotLayout.BridgeBeams);
         factory.Time.Advance(HarvestRules.Time);
-        var bridged = (await client.SendAsync("plot.harvest", At(x, y, crevasse))).Payload();
+        var bridged = (await factory.StrikeAsync(client, "plot.harvest", At(x, y, crevasse))).Payload();
         Assert.Equal("bridge", bridged.GetProperty("object").GetString());
         Assert.Equal((byte)TileObject.Bridge, (await TilesAsync(client, x, y))[crevasse]);
         var placed = await client.SendAsync("plot.place",
@@ -349,11 +349,11 @@ public sealed class GlacierTests(ServerFactory factory) : IClassFixture<ServerFa
         Assert.Equal("buried", (await client.SendAsync("plot.pickup", new { x, y, id = chest })).ErrorCode());
 
         factory.Time.Advance(HarvestRules.Time);
-        Assert.Equal("wrong_tool", (await client.SendAsync("plot.harvest", At(x, y, spot))).ErrorCode());
+        Assert.Equal("wrong_tool", (await factory.StrikeAsync(client, "plot.harvest", At(x, y, spot))).ErrorCode());
         await GiveAsync(client, Items.Shovel, 1);
         await client.SendAsync("character.equip", new { item = Items.Shovel });
         factory.Time.Advance(HarvestRules.Time);
-        var dug = await client.SendAsync("plot.harvest", At(x, y, spot));
+        var dug = await factory.StrikeAsync(client, "plot.harvest", At(x, y, spot));
         Assert.True(dug.Type() == "plot.harvested", dug.ToString());
         Assert.Equal((byte)TileObject.None, (await TilesAsync(client, x, y))[spot]);
         Assert.Equal("plot.pickedUp", (await client.SendAsync("plot.pickup", new { x, y, id = chest })).Type());

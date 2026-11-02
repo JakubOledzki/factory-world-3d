@@ -17,9 +17,10 @@ class UStaticMeshComponent;
 struct FInputActionValue;
 
 /**
- * First-person player on a plot. Looks at a tile with the crosshair; holding E mines a mine or fills
- * a chest, holding the right button picks an object up, and in build mode a ghost of the hotbar item
- * shows where the left button places it.
+ * First-person player on a plot. Looks at a tile with the crosshair; holding E swings the axe at a tree or the
+ * pickaxe at a rock or a mine (five strikes fell, break or dig a load, shown by a ring of five round the crosshair),
+ * holding the right button picks an object up, and in build mode a ghost of the hotbar item shows where the left
+ * button places it.
  */
 UCLASS()
 class FACTORYWORLD3D_API AFWCharacter : public ACharacter
@@ -34,8 +35,12 @@ public:
 
 	bool IsBuildMode() const { return bBuildMode; }
 	bool HasTarget() const { return bHasTarget; }
-	// 0..1 while holding E or the right button on something, otherwise -1
+	// 0..1 while holding the right button on something, otherwise -1
 	float GetProgress() const;
+	// Strikes of the axe or pickaxe: how many are left of how many, and seconds since the last one struck; false when
+	// nothing is being struck
+	bool GetStrikes(int32& OutLeft, int32& OutTotal, float& OutSinceHit) const;
+	static constexpr int32 StrikeCount = 5;
 	FText GetTargetText() const;
 
 	// Console: switches build mode as B does
@@ -46,6 +51,9 @@ public:
 	void FWGroundCheck();
 	UFUNCTION(Exec)
 	void FWJump() { Jump(); }
+	// Console: holds E down (1) or lets it go (0), as when striking with the axe or pickaxe
+	UFUNCTION(Exec)
+	void FWStrike(int32 bHold) { bHold ? InteractStart() : InteractStop(); }
 
 	// The character's look (from the server): the first-person arms wear its sleeves and skin, and the body that
 	// casts the player's shadow all of it
@@ -97,8 +105,13 @@ private:
 	void UpdateBodyAnimation();
 	// Fingers: Amount 0 straight (the bind pose) .. 1 a fist round a handle
 	void CurlFingers(int32 Side, float Amount);
-	// The pickaxe meets the rock: sound, a jolt of the view, chips flying and a mark where it struck
+	// The axe meets the tree or the pickaxe the rock: sound, a jolt of the view, chips flying and a mark where it struck
 	void Strike();
+	// Starts swinging at a mine (MineId) or at the tree or rock on Tile (MineId < 0); Seconds is the whole work, shared
+	// out over the strikes. On the same target as just before, the strikes go on where they were.
+	void BeginStrike(int32 MineId, FIntPoint Tile, float Seconds, bool bAxe);
+	// A strike landed: counted by the server, the last one gathering
+	void OnImpact();
 	// Footsteps by the surface underfoot: "grass", "rock" or "metal" (anything built)
 	void UpdateFootsteps(float DeltaSeconds);
 	FString SurfaceUnder(const FHitResult* Hit = nullptr) const;
@@ -142,7 +155,18 @@ private:
 	bool bStruck = false;
 	float ShakeTime = 0.f;
 	FVector ShakeOffset = FVector::ZeroVector;
-	float MineSoundIn = 0.f;
+	// Striking: the target, strikes landed so far, the time each strike takes, how long a swing lasts, when the last one
+	// landed (world seconds), and whether it is the axe (a tree) or the pickaxe
+	FIntPoint StrikeTile = FIntPoint(-1, -1);
+	int32 StrikeHits = 0;
+	float StrikeInterval = 1.f;
+	float SwingLength = 0.6f;
+	float LastImpact = -100.f;
+	bool bStrikeAxe = false;
+	UPROPERTY()
+	TObjectPtr<UStaticMesh> PickaxeMesh;
+	UPROPERTY()
+	TObjectPtr<UStaticMesh> AxeMesh;
 
 	AFWPlayerController* GetFWController() const;
 	AFWPlot* GetPlot() const;
@@ -167,7 +191,7 @@ private:
 	bool bHasTarget = false;
 	FIntPoint TargetTile = FIntPoint::ZeroValue;
 
-	enum class EHold : uint8 { None, Mine, Pickup };
+	enum class EHold : uint8 { None, Strike, Pickup };
 	EHold Hold = EHold::None;
 	float HoldTime = 0.f;
 	float HoldNeeded = 1.f;

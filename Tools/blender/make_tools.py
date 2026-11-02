@@ -1,4 +1,4 @@
-# Builds the hand tools held in first person and writes them to RawAssets/processed/factory (imported with the
+# Builds the hand tools held in first person (the pickaxe and the axe) and writes them to RawAssets/processed/factory (imported with the
 # factory models by Tools/import_external.py). Sizes in metres; the origin is where the hand grips the tool, the
 # handle runs up +Z and the head points along +X. Material slots, bound by the import:
 #   FW_ToolSteel (metal_plate)   FW_Wood (weathered_planks)   FW_Grip (rubberized_track, a rubber wrap)
@@ -136,11 +136,65 @@ def pickaxe():
     return tool
 
 
+
+def axe():
+    parts = []
+    # Handle: oval hickory, 70 cm, a gentle S with a swell at the butt (as the pickaxe's, a little slimmer)
+    length = 0.70
+    sections = []
+    for i in range(25):
+        t = i / 24
+        z = -0.14 + t * length
+        swell = 1.0 + 0.3 * math.exp(-((t - 0.02) / 0.05) ** 2) - 0.1 * math.sin(t * math.pi) + 0.1 * max(0.0, t - 0.88) / 0.12
+        bend = 0.012 * math.sin(t * 2 * math.pi)
+        sections.append(ellipse(Vector((bend, 0, z)), 0.017 * swell, 0.013 * swell, 16))
+    parts.append(finish(loft(sections, "handle"), "FW_Wood", subdivide=1, uv_scale=0.4))
+    # Grip: a rubber wrap over the lower handle
+    sections = []
+    for i in range(31):
+        t = i / 30
+        z = -0.12 + t * 0.22
+        ridge = 1.0 + 0.04 * (0.5 + 0.5 * math.cos(t * 2 * math.pi * 11))
+        sections.append(ellipse(Vector((0, 0, z)), 0.0195 * ridge, 0.0155 * ridge, 16))
+    parts.append(finish(loft(sections, "grip"), "FW_Grip", uv_scale=0.1))
+    # Head: a forged wedge, thick at the eye and thinning to the edge, the bit flaring down into a beard; a short
+    # flat poll behind the eye
+    top = -0.14 + length - 0.05
+    sections = []
+    steps = 20
+    for i in range(steps + 1):
+        u = i / steps * 2 - 0.35  # -0.35 poll .. 1.65 edge, 0 the eye
+        x = u * 0.075
+        if u < 0:  # poll: square and blunt
+            width, height, drop = 0.021, 0.03, 0.0
+        else:
+            k = min(u / 1.65, 1.0)
+            width = 0.021 * (1 - k) ** 1.6 + 0.0015
+            height = 0.03 + 0.045 * k ** 2.2
+            drop = -0.03 * k ** 2.0  # the beard hangs below the eye
+        sections.append(ellipse(Vector((x, 0, top + drop)), width, height, 10, axis="x"))
+    parts.append(finish(loft(sections, "head"), "FW_ToolSteel", subdivide=1, uv_scale=0.15))
+    # The wedge driven into the top of the eye
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, top + 0.032))
+    wedge = bpy.context.active_object
+    wedge.scale = (0.03, 0.005, 0.01)
+    parts.append(finish(wedge, "FW_ToolSteel", bevel=0.002, uv_scale=0.15))
+    bpy.ops.object.select_all(action="DESELECT")
+    for part in parts:
+        part.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    tool = bpy.context.active_object
+    tool.name = "tool_axe"
+    return tool
+
+
 os.makedirs(OUT, exist_ok=True)
-bpy.ops.wm.read_factory_settings(use_empty=True)
-tool = pickaxe()
-bpy.ops.object.select_all(action="DESELECT")
-tool.select_set(True)
-path = os.path.join(OUT, "tool_pickaxe.glb")
-bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_apply=True)
-print(f"FWTOOL tool_pickaxe: {len(tool.data.polygons)} faces -> {path}")
+for name, build in (("tool_pickaxe", pickaxe), ("tool_axe", axe)):
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    tool = build()
+    bpy.ops.object.select_all(action="DESELECT")
+    tool.select_set(True)
+    path = os.path.join(OUT, f"{name}.glb")
+    bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_apply=True)
+    print(f"FWTOOL {name}: {len(tool.data.polygons)} faces -> {path}")
