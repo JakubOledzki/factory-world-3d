@@ -50,7 +50,8 @@ The client is the editor target (`FactoryWorld3DEditor Win64 Development`); the 
   exist only on a Development server with `Dev:Commands` (appsettings.Development.json), only for connections from
   this computer and only for the local test accounts in `Dev:Accounts` (test@gmail.com, the autotest account). In the
   game: the mod menu (F8, or a button in the Esc menu; `UI/SFWModWindow`) and console `FWDevWorld` (money, backpack,
-  axe and pickaxe, three plots, test machines).
+  axe and pickaxe, three plots, test machines). A public server has them only for the accounts in `Mod:Accounts`
+  (deploy/.env `MOD_ACCOUNT`), from any computer.
 - Bots (server-run players, module Bots) are off unless `Bots:Enabled` is true; while off, the server removes the bots it
   made before, with all that is theirs, on start (`Bots:RemoveWhenOff`, `BotRemoval`).
 

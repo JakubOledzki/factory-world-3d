@@ -12,14 +12,21 @@ namespace FactoryWorld.Server;
 /// biome, test machines on it, or all of it at once ("dev.world"). They exist only on a server started in Development
 /// with <c>Dev:Commands</c> set (appsettings.Development.json), and each also refuses a connection that is not from
 /// this computer and an account whose e-mail is not in <c>Dev:Accounts</c> (the local test accounts). A public server
-/// (Production) has none of them. The game's mod menu is built on them and asks "dev.access" whether to show itself.
+/// (Production) has none of them, unless it names mod accounts in <c>Mod:Accounts</c> (deploy/.env MOD_ACCOUNT):
+/// those few accounts may use them from anywhere, nobody else. The game's mod menu is built on them and asks
+/// "dev.access" whether to show itself.
 /// </summary>
 public static class DevCommands
 {
     /// <summary>Where a plot is looked for when no place is given: around the starter plot.</summary>
     public static readonly (int X, int Y) Around = (3852, 357);
 
+    /// <summary>On a development server with <c>Dev:Commands</c>, or on any server (also Production) that names mod
+    /// accounts in <c>Mod:Accounts</c>; with neither the commands do not exist at all.</summary>
     public static bool Enabled(IConfiguration configuration, IHostEnvironment environment) =>
+        DevMode(configuration, environment) || DevAccess.Emails(configuration, "Mod:Accounts").Count > 0;
+
+    public static bool DevMode(IConfiguration configuration, IHostEnvironment environment) =>
         environment.IsDevelopment() && configuration.GetValue("Dev:Commands", false);
 
     public static void Register(IServiceCollection services)
@@ -31,18 +38,6 @@ public static class DevCommands
         services.AddSingleton<IMessageHandler, DevPlotHandler>();
         services.AddSingleton<IMessageHandler, DevMachinesHandler>();
         services.AddSingleton<IMessageHandler, DevWorldHandler>();
-    }
-
-    /// <summary>The player sending a developer command; refused unless the server is a development one and the
-    /// connection comes from this computer. <see cref="DevAccess"/> also checks the account.</summary>
-    public static Guid Require(ClientContext client, IHostEnvironment environment)
-    {
-        if (!environment.IsDevelopment() || !client.IsLocal)
-        {
-            throw new GameException("not_allowed", "Developer commands work only on a development server on this computer.");
-        }
-
-        return client.RequireAccount();
     }
 
     /// <summary>Buys the free plot of <paramref name="biome"/> nearest (<paramref name="x"/>, <paramref name="y"/>),
@@ -143,37 +138,49 @@ public static class DevCommands
 }
 
 /// <summary>
-/// Who may use the developer commands (and so the mod menu): a development server, a connection from this computer and
-/// an account whose e-mail is listed in <c>Dev:Accounts</c>. Checked on every command, so the game showing or hiding
-/// its menu is only for looks.
+/// Who may use the developer commands (and so the mod menu): on a development server, a connection from this computer
+/// and an account whose e-mail is listed in <c>Dev:Accounts</c>; on any server, an account listed in
+/// <c>Mod:Accounts</c>, from anywhere (the launcher's game on the public server). Checked on every command, so the game
+/// showing or hiding its menu is only for looks.
 /// </summary>
 public sealed class DevAccess(IHostEnvironment environment, IConfiguration configuration)
 {
-    /// <summary>The listed e-mails, as accounts keep them (lower-cased, trimmed).</summary>
-    public IReadOnlySet<string> Accounts { get; } = (configuration.GetSection("Dev:Accounts").Get<string[]>() ?? [])
-        .Where(e => !string.IsNullOrWhiteSpace(e))
-        .Select(AccountRules.NormalizeEmail)
-        .ToHashSet();
+    /// <summary>The local test accounts, as accounts keep their e-mails (lower-cased, trimmed).</summary>
+    public IReadOnlySet<string> Accounts { get; } = Emails(configuration, "Dev:Accounts");
+
+    /// <summary>The mod accounts of any server.</summary>
+    public IReadOnlySet<string> ModAccounts { get; } = Emails(configuration, "Mod:Accounts");
+
+    public static IReadOnlySet<string> Emails(IConfiguration configuration, string key) =>
+        (configuration.GetSection(key).Get<string[]>() ?? [])
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Select(AccountRules.NormalizeEmail)
+            .ToHashSet();
 
     public async Task<bool> AllowedAsync(ClientContext client, IServiceProvider services, CancellationToken cancellationToken)
     {
-        if (!environment.IsDevelopment() || !client.IsLocal || client.AccountId is not { } player)
+        if (client.AccountId is not { } player)
+        {
+            return false;
+        }
+
+        var local = DevCommands.DevMode(configuration, environment) && client.IsLocal;
+        if (!local && ModAccounts.Count == 0)
         {
             return false;
         }
 
         var email = await services.GetRequiredService<AccountService>().EmailAsync(player, cancellationToken);
-        return email is not null && Accounts.Contains(email);
+        return email is not null && (ModAccounts.Contains(email) || (local && Accounts.Contains(email)));
     }
 
-    /// <summary>The player sending a developer command; "not_allowed" off a local development server, and
-    /// "not_test_account" for an account not in the list.</summary>
+    /// <summary>The player sending a developer command, or "not_test_account" for anyone else.</summary>
     public async Task<Guid> RequireAsync(ClientContext client, IServiceProvider services, CancellationToken cancellationToken)
     {
-        var player = DevCommands.Require(client, environment);
+        var player = client.RequireAccount();
         if (!await AllowedAsync(client, services, cancellationToken))
         {
-            throw new GameException("not_test_account", "Developer commands are only for the test accounts in Dev:Accounts.");
+            throw new GameException("not_test_account", "Developer commands are only for the test and mod accounts.");
         }
 
         return player;

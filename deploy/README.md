@@ -160,6 +160,20 @@ docker stats                      # pamięć i procesor
 
 Logi serwera są ograniczone do 5 plików po 20 MB.
 
+## Mod menu na serwerze
+
+Jedno konto może mieć na tym serwerze mod menu (F8 albo przycisk w menu pod Esc: pieniądze, przedmioty, narzędzia,
+działki). Domyślnie nie ma go nikt i serwer w ogóle nie zna komend testowych.
+
+1. **Najpierw** załóż to konto w grze (launcher), np. `test@gmail.com`, z własnym hasłem. Dopóki konto nie istnieje,
+   każdy mógłby je założyć i dostać menu.
+2. W `deploy/.env` dopisz `MOD_ACCOUNT=test@gmail.com` i uruchom serwer ponownie:
+   `cd /opt/factoryworld3d/deploy && docker compose up -d server`.
+3. Zaloguj się w grze jeszcze raz: menu pojawia się po zalogowaniu.
+
+Wyłączenie: puste `MOD_ACCOUNT=` i to samo polecenie. Serwer sprawdza konto przy każdej komendzie, więc inne konta nic
+z nich nie dostaną, nawet gdyby wysłały komendę same.
+
 ## 8. Launcher: gra dla znajomych z automatycznymi aktualizacjami
 
 Gracze pobierają raz launcher:

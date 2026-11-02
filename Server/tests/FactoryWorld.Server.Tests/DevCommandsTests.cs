@@ -1,6 +1,7 @@
 using FactoryWorld.Modules.Abstractions;
 using FactoryWorld.Modules.Abstractions.Contracts;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace FactoryWorld.Server.Tests;
@@ -19,7 +20,7 @@ public sealed class ProductionServerFactory : ServerFactory
 /// (appsettings.Development.json), one per test, as the tests share a database.</summary>
 public sealed class DevServerFactory : ServerFactory
 {
-    public static readonly string[] TestAccounts = ["dev-world@example.com", "dev-give@example.com", "dev-access@example.com"];
+    public static readonly string[] TestAccounts = ["dev-world@example.com", "dev-give@example.com", "dev-access@example.com", "dev-remote@example.com"];
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -92,23 +93,19 @@ public sealed class DevCommandsTests(DevServerFactory factory) : IClassFixture<D
     }
 
     [Fact]
-    public void A_connection_from_another_computer_is_refused_even_on_a_development_server()
+    public async Task A_connection_from_another_computer_is_refused_even_for_a_test_account()
     {
-        var development = new FakeEnvironment(Environments.Development);
-        var remote = new ClientContext { ConnectionId = Guid.NewGuid(), AccountId = Guid.NewGuid(), IsLocal = false };
-        Assert.Equal("not_allowed", Assert.Throws<GameException>(() => DevCommands.Require(remote, development)).Code);
+        using var client = await factory.ConnectAsync();
+        await client.RegisterWithCharacterAsync("dev-remote@example.com");
+        await using var scope = factory.Services.CreateAsyncScope();
+        var access = factory.Services.GetRequiredService<DevAccess>();
 
-        var local = new ClientContext { ConnectionId = Guid.NewGuid(), AccountId = Guid.NewGuid(), IsLocal = true };
-        Assert.Equal(local.AccountId, DevCommands.Require(local, development));
-        Assert.Equal("not_allowed", Assert.Throws<GameException>(() => DevCommands.Require(local, new FakeEnvironment(Environments.Production))).Code);
-    }
-
-    private sealed class FakeEnvironment(string name) : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = name;
-        public string ApplicationName { get; set; } = "test";
-        public string ContentRootPath { get; set; } = "";
-        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = null!;
+        var local = new ClientContext { ConnectionId = Guid.NewGuid(), AccountId = client.AccountId, IsLocal = true };
+        Assert.True(await access.AllowedAsync(local, scope.ServiceProvider, CancellationToken.None));
+        var remote = new ClientContext { ConnectionId = Guid.NewGuid(), AccountId = client.AccountId, IsLocal = false };
+        Assert.False(await access.AllowedAsync(remote, scope.ServiceProvider, CancellationToken.None));
+        Assert.Equal("not_test_account",
+            (await Assert.ThrowsAsync<GameException>(() => access.RequireAsync(remote, scope.ServiceProvider, CancellationToken.None))).Code);
     }
 }
 
@@ -126,5 +123,47 @@ public sealed class DevCommandsProductionTests(ProductionServerFactory factory) 
         }
 
         Assert.Equal(0, await client.BalanceAsync());
+    }
+}
+
+/// <summary>A public server (Production) that names a mod account, as deploy/.env MOD_ACCOUNT does.</summary>
+public sealed class ModProductionServerFactory : ServerFactory
+{
+    public const string ModAccount = "mod@example.com";
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.UseEnvironment(Environments.Production);
+        builder.UseSetting("Mod:Accounts:0", ModAccount);
+    }
+}
+
+/// <summary>On a public server only the named mod account has the mod menu, from any computer; nobody else gets
+/// anything from the developer commands.</summary>
+public sealed class ModProductionTests(ModProductionServerFactory factory) : IClassFixture<ModProductionServerFactory>
+{
+    [Fact]
+    public async Task Only_the_mod_account_has_the_mod_menu_from_any_computer()
+    {
+        using var mod = await factory.ConnectAsync();
+        await mod.RegisterWithCharacterAsync(ModProductionServerFactory.ModAccount);
+        Assert.True((await mod.SendAsync("dev.access")).Payload().GetProperty("allowed").GetBoolean());
+        Assert.Equal("dev.done", (await mod.SendAsync("dev.give", new { cents = 100_000 })).Type());
+        Assert.Equal(100_000, await mod.BalanceAsync());
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var remote = new ClientContext { ConnectionId = Guid.NewGuid(), AccountId = mod.AccountId, IsLocal = false };
+        Assert.True(await factory.Services.GetRequiredService<DevAccess>().AllowedAsync(remote, scope.ServiceProvider, CancellationToken.None));
+
+        using var other = await factory.ConnectAsync();
+        await other.RegisterWithCharacterAsync();
+        Assert.False((await other.SendAsync("dev.access")).Payload().GetProperty("allowed").GetBoolean());
+        foreach (var type in new[] { "dev.world", "dev.give", "dev.tool", "dev.plot", "dev.machines" })
+        {
+            Assert.Equal("not_test_account", (await other.SendAsync(type, new { cents = 100_000, tool = Items.Axe, biome = "forest" })).ErrorCode());
+        }
+
+        Assert.Equal(0, await other.BalanceAsync());
     }
 }

@@ -26,6 +26,8 @@ services:
     environment:
       # Production: no developer commands, no bots (both are off unless turned on)
       ASPNETCORE_ENVIRONMENT: Production
+      # The one account with the mod menu (F8: money, items...), from deploy/.env; empty: nobody, no dev commands at all
+      Mod__Accounts__0: ${MOD_ACCOUNT:-}
       ConnectionStrings__Game: "Host=db;Port=5432;Database=factoryworld3d;Username=factory;Password=${POSTGRES_PASSWORD}"
     depends_on:
       db:
