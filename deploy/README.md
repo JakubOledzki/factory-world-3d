@@ -159,3 +159,62 @@ docker stats                      # pamięć i procesor
 ```
 
 Logi serwera są ograniczone do 5 plików po 20 MB.
+
+## 8. Launcher: gra dla znajomych z automatycznymi aktualizacjami
+
+Gracze pobierają raz launcher:
+
+```
+https://twoja-domena/download/FactoryWorld3D-Launcher.exe
+```
+
+Launcher instaluje grę w `%LOCALAPPDATA%\FactoryWorld3DGame` (bez uprawnień administratora). Przy każdym
+uruchomieniu:
+- sprawdza na serwerze `download/manifest.json`;
+- pobiera tylko zmienione pliki (wznawia przerwane pobieranie i sprawdza sumy SHA-256);
+- usuwa pliki, których nowa wersja już nie ma;
+- przycisk „Graj” uruchamia grę z adresem serwera.
+
+Nowszą wersję launchera wymienia sam. Opcje: `--play` uruchamia grę od razu po aktualizacji (np. na skrót na
+pulpicie), a `--dir <folder>` instaluje grę w innym miejscu.
+
+Wydanie nowej wersji gry (na komputerze z grą, gdy gra jest zamknięta):
+
+```
+powershell -ExecutionPolicy Bypass -File Tools\dev\publish-game.ps1 -Build
+```
+
+Skrypt:
+1. pakuje grę (punkt 3, z szyfrowaniem z punktu 9) i buduje launcher;
+2. liczy sumy plików;
+3. wysyła kluczem SSH na serwer tylko pliki, których tam jeszcze nie ma (`deploy/download/files/<sha256>`);
+4. na końcu jednym ruchem podmienia `manifest.json`.
+
+Gracze nigdy nie widzą połowy wersji. Gotową paczkę można też wydać bez budowania:
+`-PackageDir <folder z FactoryWorld3D.exe>`.
+
+Caddy serwuje pod `/download/` wyłącznie katalog `deploy/download` na serwerze, tylko do odczytu. Są w nim tylko
+manifest, launcher i pliki gry, bez listy plików, repozytorium ani `.env`. Stare pliki w `files/` można co jakiś czas
+usunąć: wszystko, czego nie wymienia aktualny `manifest.json`.
+
+## 9. Szyfrowanie paczki gry
+
+Archiwa gry (modele, tekstury, dźwięki) są szyfrowane AES-256 i podpisane, więc zwykłe narzędzia ich nie otworzą.
+Klucze leżą **poza repozytorium**: `D:\Factory-World\keys\FactoryWorld3D-Crypto.ini` (albo w pliku wskazanym przez
+zmienną `FW3D_CRYPTO_INI`). `package.ps1` kopiuje go do `Config/DefaultCrypto.ini` tylko na czas pakowania i potem
+usuwa. Ten plik jest też w `.gitignore`.
+
+**Zrób kopię zapasową tego pliku**, np. na pendrive i w menedżerze haseł. Bez niego każda nowa paczka dostanie nowe
+klucze, a launcher pobierze wtedy całą grę od nowa (zamiast kilku zmienionych plików). Kto ma ten plik, odszyfruje
+grę, więc nie wysyłaj go nikomu.
+
+Nowe klucze (tylko gdy stare wyciekły) generuje:
+
+```
+"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" FactoryWorld3D.uproject -run=CryptoKeys -updateallkeys
+```
+
+Wynik trafia do `Config/DefaultCrypto.ini`. Trzeba w nim przestawić `bEncrypt…` i `bEnablePakSigning` na `True`,
+a potem przenieść go do `D:\Factory-World\keys\`.
+
+Szyfrowanie utrudnia, ale nie uniemożliwia wyciągnięcia plików: klucz musi być w grze, żeby mogła je czytać.

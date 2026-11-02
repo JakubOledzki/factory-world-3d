@@ -5,5 +5,17 @@
 	@metrics path /metrics
 	respond @metrics 404
 
-	reverse_proxy server:5081
+	# The game for the launcher (Tools/dev/publish-game.ps1): manifest.json, files/<sha256> and the launcher itself.
+	# Range requests resume broken downloads; only the small manifest is worth compressing.
+	handle_path /download/* {
+		root * /srv/download
+		@manifest path /manifest.json
+		header @manifest Cache-Control "no-cache"
+		encode @manifest zstd gzip
+		file_server
+	}
+
+	handle {
+		reverse_proxy server:5081
+	}
 }

@@ -48,6 +48,8 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # The game for the launcher, uploaded by Tools/dev/publish-game.ps1
+      - ./download:/srv/download:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
