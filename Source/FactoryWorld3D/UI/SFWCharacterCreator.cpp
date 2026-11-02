@@ -116,15 +116,15 @@ void SFWCharacterCreator::Construct(const FArguments& InArgs)
 						+ SVerticalBox::Slot().AutoHeight()
 						[
 							SNew(STextBlock)
-							.Text(LOCTEXT("Title", "Nowa postać"))
-							.Font(FWStyle::Font(34, TEXT("Bold")))
+							.Text(LOCTEXT("Title", "NOWA POSTAĆ"))
+							.Font(FWStyle::Display(56))
 							.ColorAndOpacity(FWStyle::Text)
 						]
 						+ SVerticalBox::Slot().AutoHeight().Padding(0, 2, 0, 22)
 						[
 							SNew(STextBlock)
 							.Text(LOCTEXT("Subtitle", "Tak będą cię widzieć inni gracze. Wygląd zmienisz później w grze."))
-							.Font(FWStyle::Font(12))
+							.Font(FWStyle::Font(14))
 							.ColorAndOpacity(FWStyle::Muted)
 							.AutoWrapText(true)
 						]
@@ -137,7 +137,7 @@ void SFWCharacterCreator::Construct(const FArguments& InArgs)
 								SNew(SVerticalBox)
 								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
 								[
-									SNew(STextBlock).Text(LOCTEXT("Name", "Imię postaci")).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Muted)
+									SNew(STextBlock).Text(LOCTEXT("Name", "Imię postaci")).Font(FWStyle::Font(12, TEXT("Medium"))).ColorAndOpacity(FWStyle::Muted)
 								]
 								+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 16)
 								[
@@ -166,7 +166,7 @@ void SFWCharacterCreator::Construct(const FArguments& InArgs)
 										.IsEnabled_Lambda([this] { return !bBusy; })
 										.OnClicked_Lambda([this] { Randomize(); return FReply::Handled(); })
 										[
-											SNew(STextBlock).Text(LOCTEXT("Random", "Losuj")).Font(FWStyle::Font(13)).ColorAndOpacity(FWStyle::Text)
+											SNew(STextBlock).Text(LOCTEXT("Random", "Losuj")).Font(FWStyle::Font(14, TEXT("Medium"))).ColorAndOpacity(FWStyle::Text)
 										]
 									]
 									+ SHorizontalBox::Slot().FillWidth(1.f)
@@ -177,7 +177,7 @@ void SFWCharacterCreator::Construct(const FArguments& InArgs)
 										.IsEnabled(this, &SFWCharacterCreator::CanSubmit)
 										.OnClicked_Lambda([this] { Submit(); return FReply::Handled(); })
 										[
-											SNew(STextBlock).Text(LOCTEXT("Create", "Utwórz postać")).Font(FWStyle::Font(14, TEXT("Bold"))).ColorAndOpacity(FLinearColor::White)
+											SNew(STextBlock).Text(LOCTEXT("Create", "Utwórz postać")).Font(FWStyle::Font(15, TEXT("Bold"))).ColorAndOpacity(FLinearColor::White)
 										]
 									]
 								]
@@ -228,7 +228,7 @@ TSharedRef<SWidget> SFWCharacterCreator::MakeRow(int32 RowIndex)
 			SNew(SBox)
 			.WidthOverride(124.f)
 			[
-				SNew(STextBlock).Text(Rows[RowIndex].Label).Font(FWStyle::Font(12)).ColorAndOpacity(FWStyle::Muted)
+				SNew(STextBlock).Text(Rows[RowIndex].Label).Font(FWStyle::Font(13, TEXT("Medium"))).ColorAndOpacity(FWStyle::Muted)
 			]
 		]
 		+ SHorizontalBox::Slot().AutoWidth()[Arrow(FText::FromString(TEXT("‹")), -1)]

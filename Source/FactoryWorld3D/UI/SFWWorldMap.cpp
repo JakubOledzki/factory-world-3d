@@ -54,11 +54,11 @@ namespace FWMapUi
 		return SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 10, 0)
 			[
-				SNew(SBox).WidthOverride(90.f)[SNew(STextBlock).Text(Label).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Muted)]
+				SNew(SBox).WidthOverride(100.f)[SNew(STextBlock).Text(Label).Font(FWStyle::Font(12)).ColorAndOpacity(FWStyle::Muted)]
 			]
 			+ SHorizontalBox::Slot().FillWidth(1.f)
 			[
-				SNew(STextBlock).Text(Value).Font(FWStyle::Font(11, TEXT("Bold"))).ColorAndOpacity(FWStyle::Text).AutoWrapText(true)
+				SNew(STextBlock).Text(Value).Font(FWStyle::Font(12, TEXT("SemiBold"))).ColorAndOpacity(FWStyle::Text).AutoWrapText(true)
 			];
 	}
 }
@@ -109,7 +109,7 @@ void SFWWorldMap::Construct(const FArguments& InArgs)
 				+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(LOCTEXT("Title", "Mapa świata")).Font(FWStyle::Display(28)).ColorAndOpacity(FWStyle::Text)]
 				+ SVerticalBox::Slot().AutoHeight()
 				[
-					SNew(STextBlock).Font(FWStyle::Font(10)).ColorAndOpacity(FWStyle::Muted)
+					SNew(STextBlock).Font(FWStyle::Font(12)).ColorAndOpacity(FWStyle::Muted)
 					.Text(LOCTEXT("Hint", "Przeciągnij, aby przesunąć  ·  kółko: przybliż  ·  klik: działka  ·  N / Esc zamyka"))
 				]
 			]
@@ -124,9 +124,9 @@ void SFWWorldMap::Construct(const FArguments& InArgs)
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(12.f).HeightOverride(12.f)[SNew(SImage).Image(FWStyle::Swatch()).ColorAndOpacity(FWStyle::Accent)]]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6, 0, 16, 0)[SNew(STextBlock).Text(LOCTEXT("Mine", "twoje działki")).Font(FWStyle::Font(10)).ColorAndOpacity(FWStyle::Text)]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6, 0, 16, 0)[SNew(STextBlock).Text(LOCTEXT("Mine", "twoje działki")).Font(FWStyle::Font(12, TEXT("Medium"))).ColorAndOpacity(FWStyle::Text)]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(12.f).HeightOverride(12.f)[SNew(SImage).Image(FWStyle::Swatch()).ColorAndOpacity(FLinearColor(0.9f, 0.3f, 0.25f))]]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6, 0, 0, 0)[SNew(STextBlock).Text(LOCTEXT("Others", "działki innych graczy")).Font(FWStyle::Font(10)).ColorAndOpacity(FWStyle::Text)]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6, 0, 0, 0)[SNew(STextBlock).Text(LOCTEXT("Others", "działki innych graczy")).Font(FWStyle::Font(12, TEXT("Medium"))).ColorAndOpacity(FWStyle::Text)]
 			]
 		]
 	];
