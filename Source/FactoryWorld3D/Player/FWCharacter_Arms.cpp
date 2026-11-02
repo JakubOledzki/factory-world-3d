@@ -166,8 +166,9 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 	// player walking with empty hands does not hold them up in front of their eyes
 	const bool bBusy = bBuildMode || (Held && Held->IsVisible()) || Gesture != EGesture::None || Hold != EHold::None || ToolShown > 0.f
 		|| EquipTime >= 0.f;
-	// Empty hands stay in sight at the bottom of the view, lower than when busy (fully out of view they looked missing)
-	ArmsUp = FMath::FInterpTo(ArmsUp, bBusy ? 1.f : 0.85f, DeltaSeconds, bBusy ? 9.f : 3.f);
+	// Empty hands are held up a little, in sight at the bottom of the view (out of view they looked missing)
+	ArmsUp = FMath::FInterpTo(ArmsUp, 1.f, DeltaSeconds, 9.f);
+	IdleHands = FMath::FInterpTo(IdleHands, bBusy ? 0.f : 1.f, DeltaSeconds, bBusy ? 9.f : 3.f);
 
 	// Gestures: offsets of the right (index 1) and left hand over their length
 	FVector Gest[2] = { FVector::ZeroVector, FVector::ZeroVector };
@@ -239,6 +240,8 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 		FVector Hand(Sign * (21.f - 4.f * BuildRaise), 48.f + 4.f * BuildRaise, 146.f + 6.f * BuildRaise);
 		Hand += FVector(StepSway * Sign * 0.3f + ViewLag.X * -0.8f, 0.f, Breath - StepBob - ViewLag.Y * 0.8f);
 		Hand += Gest[Side];
+		// Empty hands: higher, further forward and a little in, so both show at the bottom corners
+		Hand += FVector(-Sign * 3.f, 6.f, 10.f) * IdleHands;
 		// Lowered: down along the body and a little back, swinging gently with the steps
 		Hand += FVector(Sign * 6.f, -16.f + StepSway * Sign * 2.f, -62.f) * (1.f - ArmsUp);
 		// Changing items: the hands dip out of view and come back
