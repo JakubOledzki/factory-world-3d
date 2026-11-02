@@ -450,7 +450,8 @@ TSharedRef<SWidget> SFWMarketWindow::MakeTrader()
 {
 	// The columns of a row: what the player pays the trader, and what the trader pays the player
 	const float BuyWidth = 270.f, SellWidth = 300.f, ExchangeWidth = 84.f;
-	TSharedRef<SScrollBox> Rows = SNew(SScrollBox);
+	// The scroll bar always takes its place, so the column headings stay over their columns
+	TSharedRef<SScrollBox> Rows = SNew(SScrollBox).ScrollBarAlwaysVisible(true);
 	List = Rows;
 	TSharedRef<SVerticalBox> Page = SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 10)
@@ -480,7 +481,7 @@ TSharedRef<SWidget> SFWMarketWindow::MakeTrader()
 				SNew(STextBlock).Text(Text.ToUpper()).Font(FWStyle::Font(10, TEXT("Bold"))).ColorAndOpacity(Color)
 			];
 	};
-	Page->AddSlot().AutoHeight().Padding(8, 0, 16, 4)
+	Page->AddSlot().AutoHeight().Padding(8, 0, 28, 4)
 	[
 		SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().FillWidth(1.f).Padding(38, 0, 0, 0)[SNew(STextBlock).Text(LOCTEXT("ColItem", "PRZEDMIOT")).Font(FWStyle::Font(10, TEXT("Bold"))).ColorAndOpacity(FWStyle::Muted)]
@@ -753,7 +754,7 @@ TSharedRef<SWidget> SFWMarketWindow::MakeExchange()
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0, 0, 6, 0)[Field(LOCTEXT("Qty", "sztuk"), &OfferQuantity)]
-			+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0, 0, 6, 0)[Field(LOCTEXT("Price", "cena za sztukę ($)"), &OfferPrice)]
+			+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0, 0, 6, 0)[Field(LOCTEXT("Price", "cena/szt. ($)"), &OfferPrice)]
 			+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 6, 0)[SmallButton(LOCTEXT("List", "Wystaw na sprzedaż"), [Offer]() { Offer(true); }, true)]
 			+ SHorizontalBox::Slot().AutoWidth()[SmallButton(LOCTEXT("Order", "Chcę kupić"), [Offer]() { Offer(false); })]
 		];
