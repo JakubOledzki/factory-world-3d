@@ -201,6 +201,12 @@ public:
 	void FWPrompt(const FString& Text);
 	UFUNCTION(Exec)
 	void FWPromptSecondary();
+	// Developer commands of a local development server (Server/src/FactoryWorld.Server/DevCommands.cs), for tests: a test
+	// world (money, backpack, axe and pickaxe, three plots, test machines), and money or an item
+	UFUNCTION(Exec)
+	void FWDevWorld();
+	UFUNCTION(Exec)
+	void FWDevGive(const FString& Item, int32 Quantity = 1, float Dollars = 0.f);
 	UFUNCTION(Exec)
 	void FWGoto(int32 TileX, int32 TileY, float Yaw = 0.f, float Pitch = -30.f);
 	// Stands on a free tile next to the tree or rock ("tree", "rock") nearest the player and looks at it (tests)

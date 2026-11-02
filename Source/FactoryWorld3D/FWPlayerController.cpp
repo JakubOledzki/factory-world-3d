@@ -2290,6 +2290,49 @@ void AFWPlayerController::FWPrompt(const FString& Text)
 	}
 }
 
+void AFWPlayerController::FWDevWorld()
+{
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Net()->Request(TEXT("dev.world"), MakeShared<FJsonObject>(), [WeakThis](const FFWNetReply& Reply)
+	{
+		if (AFWPlayerController* This = WeakThis.Get())
+		{
+			if (Reply.IsError())
+			{
+				This->ToastError(Reply);
+				return;
+			}
+			This->Toast(LOCTEXT("DevWorld", "Świat testowy gotowy: pieniądze, narzędzia, trzy działki i maszyny"));
+			This->RefreshInventory();
+			This->RefreshWallet();
+		}
+	});
+}
+
+void AFWPlayerController::FWDevGive(const FString& Item, int32 Quantity, float Dollars)
+{
+	TSharedPtr<FJsonObject> P = MakeShared<FJsonObject>();
+	if (Item != TEXT("-"))
+	{
+		P->SetStringField(TEXT("item"), Item);
+		P->SetNumberField(TEXT("quantity"), Quantity);
+	}
+	P->SetNumberField(TEXT("cents"), FMath::RoundToDouble(Dollars * 100.0));
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Net()->Request(TEXT("dev.give"), P, [WeakThis](const FFWNetReply& Reply)
+	{
+		if (AFWPlayerController* This = WeakThis.Get())
+		{
+			if (Reply.IsError())
+			{
+				This->ToastError(Reply);
+			}
+			This->RefreshInventory();
+			This->RefreshWallet();
+		}
+	});
+}
+
 void AFWPlayerController::FWPromptSecondary()
 {
 	if (Prompt.IsValid())

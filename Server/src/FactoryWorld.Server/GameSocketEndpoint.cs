@@ -30,7 +30,8 @@ public static class GameSocketEndpoint
             DangerousEnableCompression = true,
             DisableServerContextTakeover = true,
         });
-        var client = new ClientContext { ConnectionId = Guid.NewGuid() };
+        var remote = context.Connection.RemoteIpAddress;
+        var client = new ClientContext { ConnectionId = Guid.NewGuid(), IsLocal = remote is null || System.Net.IPAddress.IsLoopback(remote) };
         var cancellationToken = context.RequestAborted;
         logger.LogInformation("Client {ConnectionId} connected", client.ConnectionId);
 
