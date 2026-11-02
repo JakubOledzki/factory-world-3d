@@ -178,6 +178,10 @@ namespace FWArt
 		{
 			Name = TEXT("tool_pickaxe");
 		}
+		else if (Item.StartsWith(TEXT("tool_axe")))
+		{
+			Name = TEXT("tool_axe");
+		}
 		else if (Item.Contains(TEXT("belt")) || Item.Contains(TEXT("splitter")))
 		{
 			Name = TEXT("belt_straight");

@@ -66,10 +66,18 @@ void AFWCharacter::UpdateHeld(float DeltaSeconds)
 			EquipTime = -1.f;
 		}
 	}
+	// The pickaxe or the axe on the hotbar is held in the right hand (striking a tree or a rock takes out the tool for
+	// it, whatever is selected)
 	const bool bPickaxe = HeldItem.StartsWith(TEXT("tool_pickaxe"));
-	if (bPickaxe)
+	const bool bAxe = HeldItem.StartsWith(TEXT("tool_axe"));
+	if (bPickaxe || bAxe)
 	{
 		ToolShown = 1.f;
+		UStaticMesh* InHand = bAxe && AxeMesh ? AxeMesh.Get() : PickaxeMesh.Get();
+		if (Tool && InHand && Hold != EHold::Strike && Gesture != EGesture::Swing && Tool->GetStaticMesh() != InHand)
+		{
+			Tool->SetStaticMesh(InHand);
+		}
 	}
 	if (Held)
 	{
@@ -158,7 +166,8 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 	// player walking with empty hands does not hold them up in front of their eyes
 	const bool bBusy = bBuildMode || (Held && Held->IsVisible()) || Gesture != EGesture::None || Hold != EHold::None || ToolShown > 0.f
 		|| EquipTime >= 0.f;
-	ArmsUp = FMath::FInterpTo(ArmsUp, bBusy ? 1.f : 0.f, DeltaSeconds, bBusy ? 9.f : 3.f);
+	// Empty hands stay in sight at the bottom of the view, lower than when busy (fully out of view they looked missing)
+	ArmsUp = FMath::FInterpTo(ArmsUp, bBusy ? 1.f : 0.55f, DeltaSeconds, bBusy ? 9.f : 3.f);
 
 	// Gestures: offsets of the right (index 1) and left hand over their length
 	FVector Gest[2] = { FVector::ZeroVector, FVector::ZeroVector };
@@ -264,11 +273,15 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 		const FVector Forward = Camera->GetForwardVector();
 		const FVector Right = Camera->GetRightVector();
 		const FVector Up = Camera->GetUpVector();
-		FVector Handle = Forward * 0.9f - Right * 0.4f + Up * 0.35f;
+		// At rest the handle stands up and leans forward and in, the head across the view (pick to the right), so the
+		// tool reads as a pickaxe or an axe rather than a stick seen end on; in a swing the head points ahead
+		const float Swinging = FMath::Max(SwingRaise, SwingStrike);
+		FVector Handle = Forward * 0.5f - Right * 0.3f + Up;
 		Handle = FMath::Lerp(Handle, -Forward * 0.25f - Right * 0.1f + Up, SwingRaise);
 		Handle = FMath::Lerp(Handle, Forward - Right * 0.1f - Up * 0.1f, SwingStrike);
 		Handle.Normalize();
-		FVector Head = Forward - Handle * FVector::DotProduct(Forward, Handle);
+		const FVector Aim = FMath::Lerp(Right * 0.8f + Forward * 0.6f, Forward, Swinging);
+		FVector Head = Aim - Handle * FVector::DotProduct(Aim, Handle);
 		Head = Head.IsNearlyZero() ? Up : Head.GetSafeNormal();
 		const FVector Grip = Arms->GetBoneLocation(TEXT("hand_r")) - Handle * 3.f;
 		Tool->SetWorldLocationAndRotation(Grip, FRotationMatrix::MakeFromZX(Handle, Head).Rotator());

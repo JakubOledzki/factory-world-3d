@@ -116,6 +116,10 @@ private:
 	// Brings the player back onto the land after falling through it (the screen was all sky from below)
 	void CatchFall(float DeltaSeconds);
 	float FallCheck = 0.f;
+	float LastCatch = -100.f;
+	FVector LastSafe = FVector::ZeroVector;
+	FString LastFloor;
+	bool bHasSafe = false;
 	void UpdateGhost();
 	void UpdateHold(float DeltaSeconds);
 	void UpdateHeadBob(float DeltaSeconds);

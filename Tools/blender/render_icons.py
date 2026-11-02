@@ -17,7 +17,7 @@ TEXTURES = os.path.join(ROOT, "polyhaven", "textures")
 OUT = os.environ.get("FW_ICON_OUT") or os.path.join(ROOT, "processed", "icons")
 SIZE = int(os.environ.get("FW_ICON_SIZE", "256"))
 ICONS = ["belt_straight", "inserter_base", "chest", "pole", "solar_panel", "turbine_tower", "machine", "chunk_ore",
-         "chunk_stone", "ingot", "crate", "tool_pickaxe", "workbench", "anvil", "computer", "research_table", "furnace",
+         "chunk_stone", "ingot", "crate", "tool_pickaxe", "tool_axe", "workbench", "anvil", "computer", "research_table", "furnace",
          "brick_furnace", "blast_furnace", "sawmill", "assembler", "mill"]
 if os.environ.get("FW_ICON_ONLY"):
     ICONS = os.environ["FW_ICON_ONLY"].split(",")

@@ -146,6 +146,8 @@ void AFWCharacter::CreateBody()
 		Tool->SetOnlyOwnerSee(true);
 		Tool->SetCastShadow(false);
 		Tool->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
+		// As the held item: the first-person pass drew the Nanite model black (a dark stick in the hand)
+		Tool->bDisallowNanite = true;
 		Tool->SetVisibility(false);
 		Tool->RegisterComponent();
 	}
@@ -225,11 +227,23 @@ void AFWCharacter::Tick(float DeltaSeconds)
 
 void AFWCharacter::CatchFall(float DeltaSeconds)
 {
+	const UCharacterMovementComponent* Movement = GetCharacterMovement();
+	if (!Movement)
+	{
+		return;
+	}
+	// Where the player last stood on solid ground, and on what (for the log when they fall through)
+	if (Movement->IsMovingOnGround() && Movement->CurrentFloor.IsWalkableFloor())
+	{
+		LastSafe = GetActorLocation();
+		const UPrimitiveComponent* Floor = Movement->CurrentFloor.HitResult.GetComponent();
+		LastFloor = Floor ? Floor->GetName() : FString();
+		bHasSafe = true;
+	}
 	// Looked at twice a second, and only while falling fast: a body that slipped through the land fell for ever, and
 	// the screen turned all sky blue (the land is not drawn from below)
 	FallCheck += DeltaSeconds;
-	const UCharacterMovementComponent* Movement = GetCharacterMovement();
-	if (FallCheck < 0.5f || !Movement || !Movement->IsFalling() || GetVelocity().Z > -600.f)
+	if (FallCheck < 0.5f || !Movement->IsFalling() || GetVelocity().Z > -600.f)
 	{
 		FallCheck = FMath::Min(FallCheck, 0.5f);
 		return;
@@ -249,24 +263,28 @@ void AFWCharacter::CatchFall(float DeltaSeconds)
 	{
 		return;
 	}
-	// Nothing under: the land is above. Back on top of it, where the player fell through, else at the plot's spawn
-	FVector Ground;
-	if (GetWorld()->LineTraceSingleByChannel(Hit, Feet + FVector(0, 0, 50000.f), Feet, ECC_Visibility, Params))
+	// Nothing under: back where the player last stood; caught again soon after, at the plot's spawn
+	const float Now = GetWorld()->GetTimeSeconds();
+	const bool bAgain = Now - LastCatch < 5.f;
+	LastCatch = Now;
+	FVector Where;
+	if (bHasSafe && !bAgain)
 	{
-		Ground = Hit.ImpactPoint;
+		Where = LastSafe + FVector(0, 0, 30.f);
 	}
 	else if (const AFWPlot* Plot = GetPlot())
 	{
-		Ground = Plot->SpawnLocation();
+		Where = Plot->SpawnLocation() + FVector(0, 0, HalfHeight + 30.f);
 	}
 	else
 	{
 		return;
 	}
-	UE_LOG(LogTemp, Warning, TEXT("FWCatchFall: fell through the land at %s, back on it at %s"), *Feet.ToString(), *Ground.ToString());
+	UE_LOG(LogTemp, Warning, TEXT("FWCatchFall: fell through the land at %s (last stood at %s on %s), back at %s"),
+		*Feet.ToString(), *LastSafe.ToString(), *LastFloor, *Where.ToString());
 	GetCharacterMovement()->StopMovementImmediately();
-	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-	SetActorLocation(Ground + FVector(0, 0, HalfHeight + 2.f), false, nullptr, ETeleportType::TeleportPhysics);
+	GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+	SetActorLocation(Where, false, nullptr, ETeleportType::TeleportPhysics);
 }
 
 FString AFWCharacter::SurfaceUnder(const FHitResult* Hit) const
