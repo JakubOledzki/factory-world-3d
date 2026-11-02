@@ -199,6 +199,8 @@ private:
 	bool bInteractHeld = false;
 	int32 HoldMine = -1;
 	FString HoldObject;
+	// The piece being put away is the garage's furniture, not a plot's object
+	bool bGaragePickup = false;
 
 	float WalkSpeed = 450.f;
 	float SprintSpeed = 900.f;

@@ -119,6 +119,31 @@ UMaterialInstanceDynamic* AFWGarageRoom::Surface(const FString& Set, const FLine
 	return Material;
 }
 
+FString AFWGarageRoom::KindOf(const FString& Id) const
+{
+	for (const TPair<TWeakObjectPtr<const UPrimitiveComponent>, TPair<FString, FString>>& Pick : Picks)
+	{
+		if (Pick.Value.Value == Id)
+		{
+			return Pick.Value.Key;
+		}
+	}
+	return FString();
+}
+
+bool AFWGarageRoom::CentreOf(const FString& Kind, FVector& OutCentre) const
+{
+	for (const TPair<TWeakObjectPtr<const UPrimitiveComponent>, TPair<FString, FString>>& Pick : Picks)
+	{
+		if (Pick.Value.Key == Kind && Pick.Key.IsValid())
+		{
+			OutCentre = Pick.Key->Bounds.Origin;
+			return true;
+		}
+	}
+	return false;
+}
+
 FString AFWGarageRoom::NameOf(const FString& Kind) const
 {
 	const TSharedPtr<FJsonObject>* Info = nullptr;

@@ -29,8 +29,10 @@ struct FSlateBrush;
 class SFWGarageWindow : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SFWGarageWindow) {}
+	SLATE_BEGIN_ARGS(SFWGarageWindow) : _AtBin(true) {}
 		SLATE_ARGUMENT(TWeakObjectPtr<AFWPlayerController>, Controller)
+		// Opened at the trash bin: only there is trash sorted by hand
+		SLATE_ARGUMENT(bool, AtBin)
 	SLATE_END_ARGS()
 
 	virtual ~SFWGarageWindow() override;
@@ -47,6 +49,8 @@ public:
 	// Puts piece Piece of the open bag into Bin ("metal", "plastic", "glass")
 	void PutPiece(int32 Piece, const FString& Bin);
 	void PlaceFurniture(const FString& Kind);
+	// Puts Kind from the backpack on the room's cell (its front-left corner), turned Rotation quarter turns
+	void PlaceFurnitureAt(const FString& Kind, FIntPoint Cell, int32 Rotation);
 	void LoadSorter(int32 Quantity);
 	void WearOutfit(int32 Number, bool bSave);
 	void HangUp(const FString& Item);
@@ -79,6 +83,10 @@ private:
 	TSharedPtr<FJsonObject> Wardrobe;
 	FString Track = TEXT("floor");
 	bool bSortPending = false;
+	bool bAtBin = true;
+	// Furniture from the backpack waiting for a place on the room's plan, and how it is turned
+	FString Placing;
+	int32 PlacingRotation = 0;
 	// The sorting game: the piece being dragged and the one on its way to the server (-1 for none), when each piece last
 	// came back out of a wrong bin, and the bin that last took or threw back a piece
 	int32 DraggingPiece = -1;

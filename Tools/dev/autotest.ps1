@@ -22,6 +22,8 @@ param(
     [Parameter(Mandatory = $true)][string]$Tag,
     [string]$Before = "",
     [int]$TimeoutSeconds = 600,
+    # Another server than the .ini's, e.g. ws://localhost:5091/ws for one run from a worktree
+    [string]$ServerUrl = "",
     [string]$Engine = "C:\Program Files\Epic Games\UE_5.8"
 )
 
@@ -39,8 +41,10 @@ if (Test-Path $Shots) { Get-ChildItem $Shots -Filter *.png | Remove-Item }
 $last = (Get-Content $ScriptPath | Where-Object { $_ -match "FWShot\s+(\S+)" } | Select-Object -Last 1) -replace ".*FWShot\s+(\S+).*", '$1'
 if (-not $last) { throw "The script takes no screenshot (FWShot <name>)." }
 
-$game = Start-Process -PassThru "$Engine\Engine\Binaries\Win64\UnrealEditor.exe" -ArgumentList @(
+$gameArgs = @(
     "`"$Root\FactoryWorld3D.uproject`"", "-game", "-windowed", "-ResX=1920", "-ResY=1080", "-nosplash", "-abslog=`"$Log`"", "-FWAutoTest=`"$ScriptPath`"")
+if ($ServerUrl) { $gameArgs += "-ServerUrl=$ServerUrl" }
+$game = Start-Process -PassThru "$Engine\Engine\Binaries\Win64\UnrealEditor.exe" -ArgumentList $gameArgs
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 while ((Get-Date) -lt $deadline -and -not $game.HasExited) {
     if ((Test-Path $Log) -and (Select-String -Path $Log -Pattern "FWShot $last|Fatal error" -Quiet)) {
