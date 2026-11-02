@@ -4,6 +4,7 @@
 #include "Net/FWNetSubsystem.h"
 #include "UI/FWStyle.h"
 #include "UI/FWWidgets.h"
+#include "UI/SFWItemTile.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -11,6 +12,7 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBox.h"
+#include "Widgets/Layout/SUniformGridPanel.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
@@ -115,6 +117,7 @@ void SFWMarketWindow::Construct(const FArguments& InArgs)
 			SNew(STextBlock).Font(FWStyle::Display(24)).ColorAndOpacity(FWStyle::Good)
 			.Text_Lambda([this]() { return Controller.IsValid() ? Money(double(Controller->GetBalanceCents())) : FText::GetEmpty(); }),
 			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth()[TabButton(SaleTab, LOCTEXT("SaleTab", "Sprzedaż"))]
 			+ SHorizontalBox::Slot().AutoWidth()[TabButton(0, LOCTEXT("Trader", "Handlarz: od ręki"))]
 			+ SHorizontalBox::Slot().AutoWidth()[TabButton(1, LOCTEXT("Exchange", "Giełda graczy: oferty"))]
 			+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 18, 0)[TabButton(2, LOCTEXT("Mine", "Moje oferty"))]
@@ -401,7 +404,7 @@ void SFWMarketWindow::Rebuild()
 	// Built anew on every answer: the list stays where it was scrolled to, unless the tab changed
 	const float Offset = List.IsValid() && ListTab == Tab ? List->GetScrollOffset() : 0.f;
 	List.Reset();
-	Content->SetContent(Tab == 0 ? MakeTrader() : Tab == 1 ? MakeExchange() : MakeMine());
+	Content->SetContent(Tab == SaleTab ? MakeSale() : Tab == 0 ? MakeTrader() : Tab == 1 ? MakeExchange() : MakeMine());
 	ListTab = Tab;
 	if (List.IsValid() && Offset > 0.f)
 	{
@@ -836,6 +839,306 @@ TSharedRef<SWidget> SFWMarketWindow::MakeMine()
 			Hint(LOCTEXT("MineHint", "Twoje oferty na giełdzie graczy. Wycofana oferta zwraca to, co nie zeszło: sztuki do plecaka, pieniądze do portfela."))
 		]
 		+ SVerticalBox::Slot().FillHeight(1.f)[Rows];
+}
+
+bool SFWMarketWindow::SellPrice(const FString& Item, double& OutCents) const
+{
+	for (const TSharedPtr<FJsonObject>& Entry : Objects(Prices, TEXT("items")))
+	{
+		if (JsonStr(*Entry, TEXT("id")) == Item)
+		{
+			return Num(*Entry, TEXT("sellCents"), OutCents);
+		}
+	}
+	return false;
+}
+
+int32 SFWMarketWindow::OnSale(const FString& Item) const
+{
+	int32 Count = 0;
+	for (const FSaleSlot& Slot : ForSale)
+	{
+		Count += Slot.Item == Item ? Slot.Quantity : 0;
+	}
+	return Count;
+}
+
+bool SFWMarketWindow::AddToSale(const FString& Item, int32 Quantity, int32 Slot)
+{
+	AFWPlayerController* PC = Controller.Get();
+	if (!PC || Item.IsEmpty())
+	{
+		return false;
+	}
+	double Price = 0.0;
+	if (Prices.IsValid() && !SellPrice(Item, Price))
+	{
+		PC->Toast(FText::Format(LOCTEXT("SaleNotBought", "Handlarz nie skupuje: {0}. Wystaw to na giełdzie graczy."), FText::FromString(PC->ItemName(Item))), true);
+		return false;
+	}
+	// Not more than the backpack holds beside what already lies on the grid
+	Quantity = FMath::Min(Quantity, Have(Item) - OnSale(Item));
+	if (Quantity <= 0)
+	{
+		return false;
+	}
+	if (Slot < 0 || Slot >= SaleSlots)
+	{
+		// The slot already holding the item, else the first free one
+		Slot = INDEX_NONE;
+		for (int32 Index = 0; Index < SaleSlots && Slot == INDEX_NONE; ++Index)
+		{
+			Slot = ForSale[Index].Quantity > 0 && ForSale[Index].Item == Item ? Index : INDEX_NONE;
+		}
+		for (int32 Index = 0; Index < SaleSlots && Slot == INDEX_NONE; ++Index)
+		{
+			Slot = ForSale[Index].Quantity <= 0 ? Index : INDEX_NONE;
+		}
+		if (Slot == INDEX_NONE)
+		{
+			PC->Toast(LOCTEXT("SaleFull", "Siatka sprzedaży jest pełna: sprzedaj albo zdejmij coś z niej."), true);
+			return false;
+		}
+	}
+	FSaleSlot& Target = ForSale[Slot];
+	if (Target.Quantity > 0 && Target.Item == Item)
+	{
+		Target.Quantity += Quantity;
+	}
+	else
+	{
+		// Something else on the slot goes back to the backpack
+		Target = { Item, Quantity };
+	}
+	PC->PlayUiSound(TEXT("build_pickup"));
+	Rebuild();
+	return true;
+}
+
+void SFWMarketWindow::DropOnSale(const FFWItemDrag& Drag, int32 Slot)
+{
+	if (Drag.From == EFWItemPlace::Sale)
+	{
+		// From one slot of the grid to another: the two swap
+		if (Drag.Index != Slot && Drag.Index >= 0 && Drag.Index < SaleSlots)
+		{
+			Swap(ForSale[Drag.Index], ForSale[Slot]);
+			Rebuild();
+		}
+		return;
+	}
+	AddToSale(Drag.Item, Drag.Quantity, Slot);
+}
+
+void SFWMarketWindow::DropOnBackpack(const FFWItemDrag& Drag)
+{
+	if (Drag.From == EFWItemPlace::Sale && Drag.Index >= 0 && Drag.Index < SaleSlots)
+	{
+		ForSale[Drag.Index] = FSaleSlot();
+		Rebuild();
+	}
+}
+
+void SFWMarketWindow::SellAll()
+{
+	// One sale per item, however many slots it lies on, in the grid's order
+	TArray<TPair<FString, int32>> Sales;
+	for (const FSaleSlot& Slot : ForSale)
+	{
+		if (Slot.Quantity <= 0)
+		{
+			continue;
+		}
+		if (TPair<FString, int32>* Same = Sales.FindByPredicate([&Slot](const TPair<FString, int32>& P) { return P.Key == Slot.Item; }))
+		{
+			Same->Value += Slot.Quantity;
+		}
+		else
+		{
+			Sales.Emplace(Slot.Item, Slot.Quantity);
+		}
+	}
+	for (FSaleSlot& Slot : ForSale)
+	{
+		Slot = FSaleSlot();
+	}
+	if (Sales.IsEmpty())
+	{
+		if (AFWPlayerController* PC = Controller.Get())
+		{
+			PC->Toast(LOCTEXT("SaleEmpty", "Najpierw przeciągnij przedmioty z plecaka na siatkę."), true);
+		}
+		Rebuild();
+		return;
+	}
+	for (const TPair<FString, int32>& Entry : Sales)
+	{
+		// The backpack may have less by now (used, built): the rest is not sold
+		const int32 Quantity = FMath::Min(Entry.Value, Have(Entry.Key));
+		if (Quantity > 0)
+		{
+			Trade(false, Entry.Key, Quantity);
+		}
+	}
+	Rebuild();
+}
+
+TSharedRef<SWidget> SFWMarketWindow::MakeSale()
+{
+	const float SaleTileSize = 72.f, SaleGap = 3.f;
+	const int32 BackpackColumns = 8;
+	auto IconOf = [this](const FString& Id) { return Controller.IsValid() ? Controller->GetIconBrush(Id) : nullptr; };
+	auto NameOf = [this](const FString& Id)
+	{
+		if (!Controller.IsValid())
+		{
+			return FText::GetEmpty();
+		}
+		double Price = 0.0;
+		const FText Name = FText::FromString(Controller->ItemName(Id));
+		return SellPrice(Id, Price) ? FText::Format(LOCTEXT("SaleTip", "{0}: handlarz płaci {1} za sztukę"), Name, Money(Price))
+			: FText::Format(LOCTEXT("SaleTipNo", "{0}: handlarz tego nie skupuje"), Name);
+	};
+
+	// The backpack: what the player has, less what already lies on the grid, a tile per item
+	struct FBackpackTile
+	{
+		FString Item;
+		int32 Quantity = 0;
+	};
+	TArray<FBackpackTile> Backpack;
+	if (Controller.IsValid())
+	{
+		for (const FFWStack& Stack : Controller->GetInventory())
+		{
+			const int32 Left = Have(Stack.Id) - OnSale(Stack.Id);
+			if (Left > 0 && Matches(Controller->ItemName(Stack.Id)) && !Backpack.ContainsByPredicate([&Stack](const FBackpackTile& T) { return T.Item == Stack.Id; }))
+			{
+				Backpack.Add({ Stack.Id, Left });
+			}
+		}
+	}
+	TSharedRef<SUniformGridPanel> BackpackGrid = SNew(SUniformGridPanel).SlotPadding(FMargin(SaleGap));
+	// Always a few empty tiles, so that there is room to drop what comes back from the grid
+	const int32 BackpackTiles = FMath::Max(BackpackColumns * 5, FMath::DivideAndRoundUp(Backpack.Num() + 1, BackpackColumns) * BackpackColumns);
+	for (int32 Index = 0; Index < BackpackTiles; ++Index)
+	{
+		const FBackpackTile Tile = Backpack.IsValidIndex(Index) ? Backpack[Index] : FBackpackTile();
+		BackpackGrid->AddSlot(Index % BackpackColumns, Index / BackpackColumns)
+		[
+			SNew(SFWItemTile)
+			.Size(SaleTileSize)
+			.Place(EFWItemPlace::Inventory)
+			.Index(Index)
+			.Item(Tile.Item)
+			.Quantity(Tile.Quantity)
+			.IconOf(IconOf)
+			.NameOf(NameOf)
+			.OnDropped_Lambda([this](const FFWItemDrag& Drag) { DropOnBackpack(Drag); })
+			.OnQuick_Lambda([this, Tile]() { AddToSale(Tile.Item, Tile.Quantity); })
+		];
+	}
+	TSharedRef<SScrollBox> BackpackScroll = SNew(SScrollBox) + SScrollBox::Slot()[BackpackGrid];
+	List = BackpackScroll;
+
+	// The 5x5 grid of what is to be sold
+	TSharedRef<SUniformGridPanel> SaleGrid = SNew(SUniformGridPanel).SlotPadding(FMargin(SaleGap));
+	for (int32 Slot = 0; Slot < SaleSlots; ++Slot)
+	{
+		SaleGrid->AddSlot(Slot % SaleColumns, Slot / SaleColumns)
+		[
+			SNew(SFWItemTile)
+			.Size(SaleTileSize)
+			.Place(EFWItemPlace::Sale)
+			.Index(Slot)
+			.Item_Lambda([this, Slot]() { return ForSale[Slot].Quantity > 0 ? ForSale[Slot].Item : FString(); })
+			.Quantity_Lambda([this, Slot]() { return ForSale[Slot].Quantity; })
+			.IconOf(IconOf)
+			.NameOf(NameOf)
+			.OnDropped_Lambda([this, Slot](const FFWItemDrag& Drag) { DropOnSale(Drag, Slot); })
+			.OnQuick_Lambda([this, Slot]() { ForSale[Slot] = FSaleSlot(); Rebuild(); })
+		];
+	}
+	double TotalCents = 0.0;
+	int32 Pieces = 0;
+	for (const FSaleSlot& Slot : ForSale)
+	{
+		double Price = 0.0;
+		if (Slot.Quantity > 0 && SellPrice(Slot.Item, Price))
+		{
+			TotalCents += Price * Slot.Quantity;
+			Pieces += Slot.Quantity;
+		}
+	}
+	auto Heading = [](const FText& Text, const FText& Sub)
+	{
+		return SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight()[FWUi::Heading(Text)]
+			+ SVerticalBox::Slot().AutoHeight().Padding(11, 0, 0, 8)[SNew(STextBlock).AutoWrapText(true).Text(Sub).Font(FWStyle::Font(10)).ColorAndOpacity(FWStyle::Muted)];
+	};
+	const float SaleWidth = SaleColumns * (SaleTileSize + 2.f * SaleGap);
+
+	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 10)
+		[
+			Hint(LOCTEXT("SaleHint", "Przeciągnij przedmioty z plecaka na siatkę po prawej (albo kliknij je z Shiftem) i kliknij „Sprzedaj wszystko”: "
+				"handlarz płaci od ręki. Z siatki zdejmiesz przedmiot, przeciągając go z powrotem do plecaka albo klikając z Shiftem."))
+		]
+		+ SVerticalBox::Slot().FillHeight(1.f)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0, 0, 24, 0)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[Heading(LOCTEXT("SaleBackpack", "Twój plecak"), LOCTEXT("SaleBackpackHint", "Najedź na przedmiot, żeby zobaczyć, ile płaci handlarz."))]
+				+ SVerticalBox::Slot().FillHeight(1.f)[BackpackScroll]
+			]
+			+ SHorizontalBox::Slot().AutoWidth()
+			[
+				SNew(SBox).WidthOverride(SaleWidth)
+				[
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()[Heading(LOCTEXT("SaleGrid", "Do sprzedaży"), LOCTEXT("SaleGridHint", "25 miejsc na to, co chcesz sprzedać."))]
+					+ SVerticalBox::Slot().AutoHeight()[SaleGrid]
+					+ SVerticalBox::Slot().AutoHeight().Padding(SaleGap, 14, SaleGap, 0)
+					[
+						SNew(SFWCard).Padding(FMargin(12.f, 8.f))
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+							[
+								SNew(STextBlock).Font(FWStyle::Font(11)).ColorAndOpacity(FWStyle::Muted)
+								.Text(FText::Format(LOCTEXT("SalePieces", "{0} szt. · handlarz zapłaci"), Pieces))
+							]
+							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+							[
+								SNew(STextBlock).Font(FWStyle::Display(22)).ColorAndOpacity(FWStyle::Good).Text(Money(TotalCents))
+							]
+						]
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(SaleGap, 10, SaleGap, 0)
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 8, 0)
+						[
+							SNew(SButton).ButtonStyle(&FWStyle::SecondaryButton()).ContentPadding(FMargin(14.f, 8.f)).IsEnabled(Pieces > 0)
+							.OnClicked_Lambda([this]() { for (FSaleSlot& Slot : ForSale) { Slot = FSaleSlot(); } Rebuild(); return FReply::Handled(); })
+							[
+								SNew(STextBlock).Text(LOCTEXT("SaleClear", "Wyczyść")).Font(FWStyle::Font(12)).ColorAndOpacity(FWStyle::Text)
+							]
+						]
+						+ SHorizontalBox::Slot().FillWidth(1.f)
+						[
+							SNew(SButton).ButtonStyle(&FWStyle::PrimaryButton()).HAlign(HAlign_Center).ContentPadding(FMargin(14.f, 8.f)).IsEnabled(Pieces > 0)
+							.OnClicked_Lambda([this]() { SellAll(); return FReply::Handled(); })
+							[
+								SNew(STextBlock).Text(LOCTEXT("SaleAll", "Sprzedaj wszystko")).Font(FWStyle::Font(13, TEXT("Bold"))).ColorAndOpacity(FLinearColor::White)
+							]
+						]
+					]
+				]
+			]
+		];
 }
 
 FReply SFWMarketWindow::OnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event)

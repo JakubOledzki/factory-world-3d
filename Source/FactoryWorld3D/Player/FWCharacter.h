@@ -111,6 +111,11 @@ private:
 	void SelectSlot(int32 Slot);
 
 	void UpdateTarget();
+	// The first rock or mine tile the line From-To passes through (by the boulder's size, not its collision)
+	bool RockAlong(const AFWPlot& Plot, const FVector& From, const FVector& To, FIntPoint& OutTile) const;
+	// Brings the player back onto the land after falling through it (the screen was all sky from below)
+	void CatchFall(float DeltaSeconds);
+	float FallCheck = 0.f;
 	void UpdateGhost();
 	void UpdateHold(float DeltaSeconds);
 	void UpdateHeadBob(float DeltaSeconds);

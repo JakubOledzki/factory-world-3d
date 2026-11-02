@@ -286,6 +286,23 @@ void AFWPlayerController::FWMarketItem(const FString& Item)
 	}
 }
 
+void AFWPlayerController::FWMarketSale(const FString& Item, int32 Quantity, int32 Slot)
+{
+	if (Market.IsValid())
+	{
+		Market->ShowTab(SFWMarketWindow::SaleTab);
+		Market->AddToSale(Item, Quantity, Slot);
+	}
+}
+
+void AFWPlayerController::FWMarketSellAll()
+{
+	if (Market.IsValid())
+	{
+		Market->SellAll();
+	}
+}
+
 void AFWPlayerController::FWMarketOffer(int32 Sell, int32 Quantity, float PriceDollars)
 {
 	if (Market.IsValid())

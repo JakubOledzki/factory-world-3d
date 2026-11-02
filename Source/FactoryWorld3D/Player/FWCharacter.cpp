@@ -212,6 +212,7 @@ void AFWCharacter::PawnClientRestart()
 void AFWCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	CatchFall(DeltaSeconds);
 	UpdateTarget();
 	UpdateGhost();
 	UpdateHold(DeltaSeconds);
@@ -220,6 +221,52 @@ void AFWCharacter::Tick(float DeltaSeconds)
 	UpdateHeld(DeltaSeconds);
 	UpdateArms(DeltaSeconds);
 	UpdateBodyAnimation();
+}
+
+void AFWCharacter::CatchFall(float DeltaSeconds)
+{
+	// Looked at twice a second, and only while falling fast: a body that slipped through the land fell for ever, and
+	// the screen turned all sky blue (the land is not drawn from below)
+	FallCheck += DeltaSeconds;
+	const UCharacterMovementComponent* Movement = GetCharacterMovement();
+	if (FallCheck < 0.5f || !Movement || !Movement->IsFalling() || GetVelocity().Z > -600.f)
+	{
+		FallCheck = FMath::Min(FallCheck, 0.5f);
+		return;
+	}
+	FallCheck = 0.f;
+	const AFWPlayerController* PC = GetFWController();
+	if (!PC || PC->IsInGarage())
+	{
+		return;
+	}
+	const float HalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const FVector Feet = GetActorLocation() - FVector(0, 0, HalfHeight);
+	FCollisionQueryParams Params(TEXT("FWCatchFall"), false, this);
+	FHitResult Hit;
+	// Land under the feet within 100 m: an ordinary fall, from a cliff or a roof
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Feet, Feet - FVector(0, 0, 10000.f), ECC_Visibility, Params))
+	{
+		return;
+	}
+	// Nothing under: the land is above. Back on top of it, where the player fell through, else at the plot's spawn
+	FVector Ground;
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Feet + FVector(0, 0, 50000.f), Feet, ECC_Visibility, Params))
+	{
+		Ground = Hit.ImpactPoint;
+	}
+	else if (const AFWPlot* Plot = GetPlot())
+	{
+		Ground = Plot->SpawnLocation();
+	}
+	else
+	{
+		return;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("FWCatchFall: fell through the land at %s, back on it at %s"), *Feet.ToString(), *Ground.ToString());
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	SetActorLocation(Ground + FVector(0, 0, HalfHeight + 2.f), false, nullptr, ETeleportType::TeleportPhysics);
 }
 
 FString AFWCharacter::SurfaceUnder(const FHitResult* Hit) const
