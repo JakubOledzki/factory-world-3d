@@ -138,6 +138,8 @@ private:
 	EGesture Gesture = EGesture::None;
 	float GestureTime = 0.f;
 	float BuildRaise = 0.f;
+	// 1 with the hands in front (a tool, something held, building, a gesture), 0 lowered out of view
+	float ArmsUp = 0.f;
 	FString BodyAnimation;
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> Tool;
