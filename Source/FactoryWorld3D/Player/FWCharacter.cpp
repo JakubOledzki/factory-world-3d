@@ -931,6 +931,21 @@ void AFWCharacter::InteractStop()
 
 void AFWCharacter::PickupStart()
 {
+	// In the garage: the piece of furniture looked at, put away into the backpack
+	if (AFWPlayerController* PC = GetFWController(); PC && PC->IsInGarage())
+	{
+		FString Kind, Id;
+		if (Hold == EHold::None && PC->GetGarageTarget(Kind, Id) && Kind != TEXT("door") && Kind != TEXT("board"))
+		{
+			Hold = EHold::Pickup;
+			bGaragePickup = true;
+			HoldObject = Id;
+			HoldNeeded = PickupSeconds;
+			HoldTime = 0.f;
+		}
+		return;
+	}
+	bGaragePickup = false;
 	const AFWPlot* Plot = GetPlot();
 	const FFWPlotObject* Object = Plot && bHasTarget ? Plot->FindObjectAt(TargetTile) : nullptr;
 	if (Object && Hold == EHold::None)
@@ -1048,6 +1063,11 @@ FString AFWCharacter::SurfaceUnder(const FHitResult* Hit) const
 		// ground material draws them); grass and earth elsewhere
 		return Hit->ImpactNormal.Z < 0.86f ? TEXT("rock") : Plot && Plot->IsSnowAt(Hit->ImpactPoint.Z) ? TEXT("snow") : TEXT("grass");
 	}
+	// The garage's floor is smooth concrete or boards, not scree: the recordings on concrete (the "metal" set)
+	if (Name.StartsWith(TEXT("garage_")))
+	{
+		return TEXT("metal");
+	}
 	// Belts, machines, rails and the like ring as metal (by their model); boulders, trunks, foundations, floors and
 	// the rest are stone and concrete
 	for (const TCHAR* Metal : { TEXT("belt"), TEXT("machine"), TEXT("grate"), TEXT("rail"), TEXT("splitter"), TEXT("merger"),
@@ -1149,6 +1169,24 @@ void AFWCharacter::UpdateHold(float DeltaSeconds)
 {
 	AFWPlayerController* PC = GetFWController();
 	const AFWPlot* Plot = GetPlot();
+	// Putting the garage's furniture away: held on the same piece, as on a plot
+	if (Hold == EHold::Pickup && bGaragePickup && PC)
+	{
+		FString Kind, Id;
+		if (!PC->IsInGarage() || !PC->GetGarageTarget(Kind, Id) || Id != HoldObject)
+		{
+			Hold = EHold::None;
+			return;
+		}
+		HoldTime += DeltaSeconds;
+		if (HoldTime >= HoldNeeded)
+		{
+			Hold = EHold::None;
+			PlayGesture(EGesture::Pickup);
+			PC->GaragePickup(HoldObject);
+		}
+		return;
+	}
 	if (Hold == EHold::None || bWaiting || !PC || !Plot)
 	{
 		return;

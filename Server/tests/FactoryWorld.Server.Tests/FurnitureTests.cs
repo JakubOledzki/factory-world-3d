@@ -16,12 +16,12 @@ public sealed class FurnitureTests(ServerFactory factory) : IClassFixture<Server
     public void Starter_furniture_fits_in_the_room_without_overlapping()
     {
         var starter = GarageLayout.Starter;
-        foreach (var (kind, x, y) in starter)
+        foreach (var (kind, x, y, rotation) in starter)
         {
-            Assert.True(GarageLayout.InsideRoom(kind, x, y), kind);
+            Assert.True(GarageLayout.InsideRoom(kind, x, y, rotation), kind);
         }
 
-        PlacedObject At(int i) => new(Guid.Empty, starter[i].Kind, starter[i].X, starter[i].Y);
+        PlacedObject At(int i) => new(Guid.Empty, starter[i].Kind, starter[i].X, starter[i].Y, starter[i].Rotation);
 
         for (var i = 0; i < starter.Length; i++)
         {

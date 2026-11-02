@@ -91,6 +91,8 @@ namespace FWGarageText
 			SLATE_ARGUMENT(FIntPoint, Room)
 			SLATE_ARGUMENT(TArray<FPiece>, Pieces)
 			SLATE_ARGUMENT(int32, Floor)
+			// A click on the plan: the cell clicked (none: the plan only shows the room)
+			SLATE_ARGUMENT(TFunction<void(FIntPoint)>, OnCell)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs)
@@ -98,7 +100,23 @@ namespace FWGarageText
 			Room = FIntPoint(FMath::Max(InArgs._Room.X, 1), FMath::Max(InArgs._Room.Y, 1));
 			Pieces = InArgs._Pieces;
 			Floor = InArgs._Floor;
+			OnCell = InArgs._OnCell;
 			SetClipping(EWidgetClipping::ClipToBounds);
+			if (OnCell)
+			{
+				SetCursor(EMouseCursor::Crosshairs);
+			}
+		}
+
+		virtual FReply OnMouseButtonDown(const FGeometry& Geometry, const FPointerEvent& Event) override
+		{
+			if (!OnCell || Event.GetEffectingButton() != EKeys::LeftMouseButton)
+			{
+				return FReply::Unhandled();
+			}
+			const FVector2D Local = Geometry.AbsoluteToLocal(Event.GetScreenSpacePosition());
+			OnCell(FIntPoint(FMath::Clamp(int32(Local.X / Cell), 0, Room.X - 1), FMath::Clamp(int32(Local.Y / Cell), 0, Room.Y - 1)));
+			return FReply::Handled();
 		}
 
 		virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(Cell * Room.X, Cell * Room.Y); }
@@ -145,6 +163,7 @@ namespace FWGarageText
 
 	private:
 		static constexpr float Cell = 42.f;
+		TFunction<void(FIntPoint)> OnCell;
 		FIntPoint Room;
 		TArray<FPiece> Pieces;
 		int32 Floor = 0;
@@ -408,6 +427,7 @@ namespace FWGarageText
 void SFWGarageWindow::Construct(const FArguments& InArgs)
 {
 	Controller = InArgs._Controller;
+	bAtBin = InArgs._AtBin;
 	Form = MakeShared<FFWForm>();
 	TWeakPtr<SFWGarageWindow> WeakThis = SharedThis(this);
 	auto MakeTab = [WeakThis](const FText& Text, int32 Index)
@@ -812,6 +832,41 @@ void SFWGarageWindow::HangUp(const FString& Item)
 	SendWardrobe(TEXT("wardrobe.put"), P);
 }
 
+void SFWGarageWindow::PlaceFurnitureAt(const FString& Kind, FIntPoint Cell, int32 Rotation)
+{
+	AFWPlayerController* PC = Controller.Get();
+	if (!PC)
+	{
+		return;
+	}
+	TSharedPtr<FJsonObject> P = MakeShared<FJsonObject>();
+	P->SetStringField(TEXT("kind"), Kind);
+	P->SetNumberField(TEXT("x"), Cell.X);
+	P->SetNumberField(TEXT("y"), Cell.Y);
+	P->SetNumberField(TEXT("rotation"), Rotation & 3);
+	TWeakPtr<SFWGarageWindow> WeakThis = SharedThis(this);
+	PC->Send(TEXT("garage.place"), P, [WeakThis](const FFWNetReply& Reply)
+	{
+		TSharedPtr<SFWGarageWindow> This = WeakThis.Pin();
+		AFWPlayerController* Inner = This ? This->Controller.Get() : nullptr;
+		if (!Inner)
+		{
+			return;
+		}
+		if (Reply.Type != TEXT("garage"))
+		{
+			// Off the floor or on something else: say so and keep it chosen for another try
+			Inner->ToastError(Reply);
+			return;
+		}
+		This->Placing.Reset();
+		Inner->PlayUiSound(TEXT("build_place"));
+		Inner->RefreshInventory();
+		Inner->RefreshGarageRoom(Reply.Payload);
+		This->ApplyGarage(Reply);
+	});
+}
+
 void SFWGarageWindow::PlaceFurniture(const FString& Kind)
 {
 	AFWPlayerController* PC = Controller.Get();
@@ -895,11 +950,22 @@ TSharedRef<SWidget> SFWGarageWindow::MakeSorting()
 					{
 						This->ToggleSorting();
 					}
-				}, !bOpen, bOpen || (Trash > 0 && !bSortPending))
+				}, !bOpen, bOpen || (Trash > 0 && !bSortPending && bAtBin))
 			]
 		], 14.f);
 
-	Add(MakeSortingGame(), 14.f);
+	// Trash is sorted at the bin: away from it the window only shows how many bags wait
+	if (!bAtBin && !HasRound())
+	{
+		Add(SNew(SFWCard).Padding(FMargin(16.f, 14.f))
+			[
+				FWUi::Note(LOCTEXT("GoToBin", "Segregować możesz tylko przy koszu na śmieci: podejdź do niego i wciśnij E."), FWStyle::Accent)
+			], 14.f);
+	}
+	else
+	{
+		Add(MakeSortingGame(), 14.f);
+	}
 
 	// What the last bags gave
 	Add(FWUi::Heading(LOCTEXT("Recent", "Ostatnio wysegregowane")), 18.f);
@@ -1549,6 +1615,14 @@ TSharedRef<SWidget> SFWGarageWindow::MakeFurniture()
 	Add(SNew(SBox).HAlign(HAlign_Center)
 		[
 			SNew(FWGarageText::SRoom).Room(Size).Pieces(Pieces).Floor(int32(FWUi::Num(FWUi::Obj(Garage, TEXT("upgrades")), TEXT("floor"))))
+			.OnCell([WeakThis](FIntPoint Cell)
+			{
+				TSharedPtr<SFWGarageWindow> This = WeakThis.Pin();
+				if (This && !This->Placing.IsEmpty())
+				{
+					This->PlaceFurnitureAt(This->Placing, Cell, This->PlacingRotation);
+				}
+			})
 		], 10.f);
 
 	// From the backpack into the room
@@ -1573,11 +1647,39 @@ TSharedRef<SWidget> SFWGarageWindow::MakeFurniture()
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				FWUi::SmallButton(LOCTEXT("Place", "Postaw w garażu"), [WeakThis, Kind]() { if (TSharedPtr<SFWGarageWindow> This = WeakThis.Pin()) { This->PlaceFurniture(Kind); } }, true)
+				FWUi::SmallButton(Placing == Kind ? LOCTEXT("Choosing", "Kliknij miejsce na planie") : LOCTEXT("Place", "Wybierz miejsce"), [WeakThis, Kind]()
+				{
+					if (TSharedPtr<SFWGarageWindow> This = WeakThis.Pin())
+					{
+						This->Placing = This->Placing == Kind ? FString() : Kind;
+						This->Rebuild();
+					}
+				}, Placing != Kind)
 			]
 		];
 	}
 	Add(FWUi::Heading(LOCTEXT("FromBag", "Z plecaka")), 16.f);
+	if (!Placing.IsEmpty())
+	{
+		static const TCHAR* Facing[] = { TEXT("przodem do bramy"), TEXT("przodem w prawo"), TEXT("przodem do tylnej ściany"), TEXT("przodem w lewo") };
+		Add(SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+			[
+				FWUi::Note(FText::FromString(FString::Printf(TEXT("Kliknij na planie, gdzie postawić: %s (%s)."), PC ? *PC->ItemName(Placing) : TEXT(""),
+					Facing[PlacingRotation & 3])), FWStyle::Accent)
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8, 0, 0, 0)
+			[
+				FWUi::SmallButton(LOCTEXT("Turn", "Obróć"), [WeakThis]()
+				{
+					if (TSharedPtr<SFWGarageWindow> This = WeakThis.Pin())
+					{
+						This->PlacingRotation = (This->PlacingRotation + 1) % 4;
+						This->Rebuild();
+					}
+				})
+			], 4.f);
+	}
 	Add(bAny ? StaticCastSharedRef<SWidget>(Bag) : FWUi::Note(LOCTEXT("NoFurniture", "W plecaku nie ma mebli do garażu."), FWStyle::Muted), 4.f);
 
 	// In the room

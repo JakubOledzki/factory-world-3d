@@ -97,18 +97,23 @@ public static class GarageLayout
         };
 
     /// <summary>How a new garage is furnished.</summary>
-    public static readonly (string Kind, int X, int Y)[] Starter =
+    public static readonly (string Kind, int X, int Y, int Rotation)[] Starter =
     [
-        (Items.TrashBin, 5, 8),
-        (Items.Workbench, 10, 10),
-        (Items.GasCylinder, 9, 11),
-        (Items.Shelf, 1, 5),
-        (Items.BarrelBlue, 15, 5),
-        (Items.BarrelRed, 15, 3),
-        (Items.Tyres, 12, 1),
-        (Items.Pallet, 2, 1),
-        (Items.ResearchTable, 1, 10),
+        (Items.TrashBin, 5, 8, 0),
+        // Its tools and vice towards the room, its back to the wall
+        (Items.Workbench, 10, 10, WorkbenchRotation),
+        (Items.GasCylinder, 9, 11, 0),
+        (Items.Shelf, 1, 5, 0),
+        (Items.BarrelBlue, 15, 5, 0),
+        (Items.BarrelRed, 15, 3, 0),
+        (Items.Tyres, 12, 1, 0),
+        (Items.Pallet, 2, 1, 0),
+        (Items.ResearchTable, 1, 10, 0),
     ];
+
+    /// <summary>How the starter workbench is turned: facing the room (garages made before this have it turned by the
+    /// WorkbenchFacesRoom migration).</summary>
+    public const int WorkbenchRotation = 2;
 
     /// <summary>Cells taken by a piece of furniture turned by `rotation` quarter turns.</summary>
     public static (int Width, int Depth) Size(string kind, int rotation)
@@ -131,11 +136,11 @@ public static class GarageLayout
         bool Fits(int x, int y, int rotation) =>
             InsideRoom(kind, x, y, rotation) && !objects.Any(o => Overlaps(new PlacedObject(Guid.Empty, kind, x, y, rotation), o));
 
-        foreach (var (starter, sx, sy) in Starter)
+        foreach (var (starter, sx, sy, sr) in Starter)
         {
-            if (starter == kind && Fits(sx, sy, 0))
+            if (starter == kind && Fits(sx, sy, sr))
             {
-                return (sx, sy, 0);
+                return (sx, sy, sr);
             }
         }
 
@@ -539,9 +544,9 @@ public sealed class RecyclingService(
             furnish.Parameters.AddWithValue("owner", owner);
             if (await furnish.ExecuteNonQueryAsync(cancellationToken) == 1)
             {
-                foreach (var (kind, x, y) in GarageLayout.Starter)
+                foreach (var (kind, x, y, rotation) in GarageLayout.Starter)
                 {
-                    await InsertObjectAsync(owner, kind, x, y, 0, cancellationToken);
+                    await InsertObjectAsync(owner, kind, x, y, rotation, cancellationToken);
                 }
             }
         }

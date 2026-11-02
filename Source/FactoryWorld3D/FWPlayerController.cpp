@@ -805,7 +805,8 @@ const FSlateBrush* AFWPlayerController::GetIconBrush(const FString& Item)
 
 void AFWPlayerController::OpenInventory(const FString& StorageId)
 {
-	if (!Plot)
+	// The backpack opens anywhere, in the garage too (without a plot); a chest is on a plot
+	if (!StorageId.IsEmpty() && !Plot)
 	{
 		return;
 	}
@@ -856,12 +857,14 @@ namespace
 void AFWPlayerController::OpenStation(const FString& ObjectId, const FString& Kind)
 {
 	StationKind = FWCatalog::StationOf(Kind);
-	if (StationKind < 0 || !Plot)
+	// Stations are asked about by their own id, so the garage's work as well without a plot
+	if (StationKind < 0)
 	{
 		return;
 	}
 	StationId = ObjectId;
-	StationName = ItemName(Kind);
+	// The garage's furniture is named by garage.get, not the backpack
+	StationName = bInGarage && GarageRoom ? GarageRoom->NameOf(Kind) : ItemName(Kind);
 	StationState.Reset();
 	++StationVersion;
 	TSharedRef<SFWStationWindow> Window = SNew(SFWStationWindow).Controller(this)
@@ -1629,10 +1632,46 @@ void AFWPlayerController::StorageTransferAll(bool bPut)
 	}
 }
 
-void AFWPlayerController::OpenGarage()
+void AFWPlayerController::OpenGarage(bool bAtBin)
 {
-	SAssignNew(GarageWindow, SFWGarageWindow).Controller(this);
+	SAssignNew(GarageWindow, SFWGarageWindow).Controller(this).AtBin(bAtBin);
 	ShowWidget(GarageWindow.ToSharedRef(), GarageWindow);
+}
+
+void AFWPlayerController::RefreshGarageRoom(const TSharedPtr<FJsonObject>& Garage)
+{
+	if (bInGarage && GarageRoom && Garage.IsValid())
+	{
+		GarageRoom->Build(Garage);
+	}
+}
+
+void AFWPlayerController::GaragePickup(const FString& Id)
+{
+	TSharedPtr<FJsonObject> P = MakeShared<FJsonObject>();
+	P->SetStringField(TEXT("id"), Id);
+	const FString Name = GarageRoom ? GarageRoom->NameOf(GarageRoom->KindOf(Id)) : FString();
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Send(TEXT("garage.pickup"), P, [WeakThis, Name](const FFWNetReply& Reply)
+	{
+		AFWPlayerController* This = WeakThis.Get();
+		if (!This)
+		{
+			return;
+		}
+		if (Reply.Type != TEXT("garage"))
+		{
+			This->ToastError(Reply);
+			return;
+		}
+		if (This->GarageRoom)
+		{
+			This->GarageRoom->Build(Reply.Payload);
+		}
+		This->PlayUiSound(TEXT("build_pickup"));
+		This->Toast(FText::Format(LOCTEXT("PutAway", "{0} w plecaku. Postawisz to z powrotem w oknie garażu, zakładka Meble."), FText::FromString(Name)));
+		This->RefreshInventory();
+	});
 }
 
 void AFWPlayerController::RefreshLook()
@@ -1647,11 +1686,11 @@ void AFWPlayerController::RefreshLook()
 	});
 }
 
-void AFWPlayerController::FWGarage(int32 Tab)
+void AFWPlayerController::FWGarage(int32 Tab, int32 AtBin)
 {
 	if (!GarageWindow.IsValid() || ShownWidget != GarageWindow)
 	{
-		OpenGarage();
+		OpenGarage(AtBin != 0);
 	}
 	GarageWindow->ShowTab(Tab);
 }
@@ -1795,12 +1834,17 @@ FText AFWPlayerController::GarageHint() const
 		return LOCTEXT("HintBoard", "Tablica  [E] ulepszenia garażu");
 	}
 	const FText Name = FText::FromString(GarageRoom->NameOf(Kind));
+	if (Kind == TEXT("furniture_pallet"))
+	{
+		return FText::Format(LOCTEXT("HintPallet", "{0}  [E] rynek: kupuj i sprzedawaj   [PPM] schowaj"), Name);
+	}
 	static const TMap<FString, FText> Uses = {
 		{ TEXT("furniture_trash_bin"), LOCTEXT("UseBin", "segreguj śmieci") }, { TEXT("furniture_sorting_machine"), LOCTEXT("UseSorter", "sortownia") },
 		{ TEXT("furniture_wardrobe"), LOCTEXT("UseWardrobe", "garderoba") }, { TEXT("furniture_workbench"), LOCTEXT("UseBench", "wytwarzaj") },
 		{ TEXT("furniture_anvil"), LOCTEXT("UseAnvil", "wytwarzaj") }, { TEXT("furniture_furnace"), LOCTEXT("UseFurnace", "wytapiaj") } };
 	const FText* Use = Uses.Find(Kind);
-	return Use ? FText::Format(LOCTEXT("HintUse", "{0}  [E] {1}"), Name, *Use) : FText::Format(LOCTEXT("HintFurniture", "{0}  [E] meble garażu"), Name);
+	return Use ? FText::Format(LOCTEXT("HintUse", "{0}  [E] {1}   [PPM] schowaj"), Name, *Use)
+		: FText::Format(LOCTEXT("HintFurniture", "{0}  [E] meble garażu   [PPM] schowaj"), Name);
 }
 
 void AFWPlayerController::GarageInteract()
@@ -1821,9 +1865,15 @@ void AFWPlayerController::GarageInteract()
 		OpenStation(Id, Kind);
 		return;
 	}
+	// The delivery pallet is where the market's goods come and go
+	if (Kind == TEXT("furniture_pallet"))
+	{
+		OpenMarket();
+		return;
+	}
 	const int32 Tab = Kind == TEXT("board") ? 2 : Kind == TEXT("furniture_trash_bin") ? 0 : Kind == TEXT("furniture_sorting_machine") ? 1
 		: Kind == TEXT("furniture_wardrobe") ? 3 : 4;
-	OpenGarage();
+	OpenGarage(Kind == TEXT("furniture_trash_bin"));
 	GarageWindow->ShowTab(Tab);
 }
 
@@ -1839,6 +1889,21 @@ void AFWPlayerController::FWGarageStand(float X, float Y, float Yaw, float Pitch
 		GetPawn()->SetActorLocation(GarageRoom->GetActorTransform().TransformPosition(FVector(X, Y, 100.f)), false, nullptr, ETeleportType::TeleportPhysics);
 		SetControlRotation(FRotator(Pitch, Yaw, 0.f));
 	}
+}
+
+void AFWPlayerController::FWGarageLook(const FString& Kind, float Distance)
+{
+	FVector Centre;
+	if (!bInGarage || !GarageRoom || !GetPawn() || !GarageRoom->CentreOf(Kind, Centre))
+	{
+		return;
+	}
+	// From the piece towards the middle of the room, where its user stands
+	const FVector Room = GarageRoom->GetActorLocation();
+	const FVector Feet = Centre + (Room - Centre).GetSafeNormal2D() * Distance;
+	GetPawn()->SetActorLocation(FVector(Feet.X, Feet.Y, Room.Z + 100.f), false, nullptr, ETeleportType::TeleportPhysics);
+	const FVector Eye = GetPawn()->GetPawnViewLocation();
+	SetControlRotation((Centre - Eye).Rotation());
 }
 
 void AFWPlayerController::FWChestNearest()

@@ -36,6 +36,10 @@ public:
 
 	// A piece of furniture's name by its kind, from garage.get
 	FString NameOf(const FString& Kind) const;
+	// The kind of the piece with this id, empty for none
+	FString KindOf(const FString& Id) const;
+	// The middle of the first piece of this kind (its bounds), false for none
+	bool CentreOf(const FString& Kind, FVector& OutCentre) const;
 
 private:
 	UStaticMeshComponent* Piece(const TCHAR* Model, const FTransform& Transform, bool bCollide = true);

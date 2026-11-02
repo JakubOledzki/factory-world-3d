@@ -116,7 +116,14 @@ public:
 	void SetHotbarSlot(int32 Slot, const FString& Item);
 	// The garage (U): sorting trash, the sorting machine, upgrades, the wardrobe, furniture; and the character's look again
 	// after clothes changed
-	void OpenGarage();
+	// The garage's window; bAtBin when opened at the trash bin, the only place where trash is sorted by hand
+	void OpenGarage(bool bAtBin = true);
+	// The garage's furniture the crosshair points at (kind and id, or "door" / "board"), false for nothing
+	bool GetGarageTarget(FString& OutKind, FString& OutId) const { return GarageTarget(OutKind, OutId); }
+	// Puts a piece of the garage's furniture away into the backpack (held right button)
+	void GaragePickup(const FString& Id);
+	// Lays the garage room out again from a garage reply (e.g. after a piece was placed), when the player is in it
+	void RefreshGarageRoom(const TSharedPtr<FJsonObject>& Garage);
 	void RefreshLook();
 	// The garage as a room (U): in and out of it, what E does at the thing looked at, and what it would do
 	void ToggleGarageRoom();
@@ -239,7 +246,7 @@ public:
 	// The garage for tests: a tab; sorting by hand on/off; furniture put in; trash into the sorting machine; an outfit
 	// worn (or saved with Save=1); a piece of clothing hung up
 	UFUNCTION(Exec)
-	void FWGarage(int32 Tab = 0);
+	void FWGarage(int32 Tab = 0, int32 AtBin = 1);
 	UFUNCTION(Exec)
 	void FWGarageSort();
 	// Puts piece Piece of the open bag into Bin (metal, plastic, glass), as dragging it there does
@@ -258,6 +265,9 @@ public:
 	void FWGarageRoom();
 	UFUNCTION(Exec)
 	void FWGarageStand(float X, float Y, float Yaw = 90.f, float Pitch = -10.f);
+	// Stands in front of the garage's first piece of this kind, looking at it (then FWStrike 1 presses E)
+	UFUNCTION(Exec)
+	void FWGarageLook(const FString& Kind, float Distance = 160.f);
 	UFUNCTION(Exec)
 	void FWStoreAt(int32 TileX, int32 TileY);
 	// A train for tests: arrives at the platform in Seconds with Quantity goods (a wagon per 400)
