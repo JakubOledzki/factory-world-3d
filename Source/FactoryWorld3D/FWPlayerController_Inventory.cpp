@@ -381,7 +381,12 @@ UTexture2D* AFWPlayerController::GetIcon(const FString& Item) const
 		return nullptr;
 	}
 	const FString Name = FString::Printf(TEXT("icon_%s"), *Mesh->GetName());
-	return FWArt::Texture(*FString::Printf(TEXT("/Game/External/Icons/%s.%s"), *Name, *Name));
+	if (UTexture2D* Icon = FWArt::Texture(*FString::Printf(TEXT("/Game/External/Icons/%s.%s"), *Name, *Name)))
+	{
+		return Icon;
+	}
+	// A model without its icon rendered yet (Tools/blender/render_icons.py): the crate's, as before it had a model
+	return FWArt::Texture(TEXT("/Game/External/Icons/icon_crate.icon_crate"));
 }
 
 #undef LOCTEXT_NAMESPACE

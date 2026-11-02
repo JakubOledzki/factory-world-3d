@@ -116,6 +116,10 @@ private:
 	// Brings the player back onto the land after falling through it (the screen was all sky from below)
 	void CatchFall(float DeltaSeconds);
 	float FallCheck = 0.f;
+	float LastCatch = -100.f;
+	FVector LastSafe = FVector::ZeroVector;
+	FString LastFloor;
+	bool bHasSafe = false;
 	void UpdateGhost();
 	void UpdateHold(float DeltaSeconds);
 	void UpdateHeadBob(float DeltaSeconds);
@@ -164,6 +168,8 @@ private:
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> Tool;
 	float ToolShown = 0.f;
+	// 1 with nothing in the hands: they are held a little higher, to stay in view
+	float IdleHands = 0.f;
 	// The hotbar item in the hands: a small model of it held up between them (the pickaxe in the right hand);
 	// changing slots lowers the hands and brings the new one up
 	UPROPERTY()

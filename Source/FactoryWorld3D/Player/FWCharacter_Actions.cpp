@@ -94,7 +94,10 @@ void AFWCharacter::Strike()
 			const FRotator Facing = (-Hit.ImpactNormal).Rotation() + FRotator(0.f, 0.f, FMath::FRandRange(0.f, 360.f));
 			if (UDecalComponent* Decal = UGameplayStatics::SpawnDecalAttached(Material, FVector(8.f, 16.f, 16.f), Hit.GetComponent(), NAME_None, Hit.ImpactPoint, Facing, EAttachLocation::KeepWorldPosition, 12.f))
 			{
-				Decal->SetFadeOut(8.f, 4.f);
+				// Not destroying its owner after the fade (the default): the owner is the plot the rock or tree is part
+				// of, and the whole plot (ground, land, everything on it) vanished 12 s after a strike, dropping the
+				// player into the sky-blue void under the map
+				Decal->SetFadeOut(8.f, 4.f, false);
 			}
 		}
 	}
