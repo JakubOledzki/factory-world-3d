@@ -58,9 +58,27 @@ side-by-side comparisons. Console commands for tests are the `UFUNCTION(Exec)` o
 FWGoPlot, FWAimAt, FWStrike, FWDevWorld, fw.Register…).
 
 ## Code map
-- `Source/FactoryWorld3D/FWPlayerController.*`: input, windows, the link to the server; `Player/FWCharacter.*`: walking,
-  first-person arms, striking; `World/FWPlot.*`: the plot (terrain, objects, belts); `UI/`: Slate windows
-  (`FWStyle` look and font, `FWWidgets` frame, cards, buttons; one `SFW*Window` per window); `Net/`: the WebSocket client.
-- `Server/src/Modules/FactoryWorld.Modules.*`: one module per area (World: plots and map, Crafting, Logistics, Power,
-  Recycling: the garage, Market, …), each with its own schema and migrations; `Server/tests`: xUnit against the real
-  server and a real database.
+Big classes are split by topic into files of the same class (C++: `Class_Topic.cpp`; C#: `partial` classes in
+`Class.Topic.cs`, or one file per kind of type: rows, service, handlers, rules). A class's file-local helpers are in
+`<File>Helpers.h`, included after `LOCTEXT_NAMESPACE`: a unity build puts several .cpp files into one translation unit,
+where two helpers of the same name in anonymous namespaces would clash.
+- Client, `Source/FactoryWorld3D/`:
+  - `FWPlayerController.cpp`: start, widgets, tick, sounds; `_Character` (creator, look), `_Plots` (entering, harvesting,
+    placing), `_Inventory` (backpack, hotbar, storages, shops), `_Stations` (workbench, furnace, machines), `_Windows`
+    (opening the other windows), `_Garage`, `_TestCommands` and `_TestWorld` (the `UFUNCTION(Exec)` test commands).
+  - `Player/FWCharacter.cpp`: body, footsteps, tick; `_Arms` (first-person arms, the item held, gestures), `_Input`,
+    `_Actions` (interacting, striking, picking up, aiming).
+  - `World/FWPlot.cpp`: the plot's objects and tiles; `_Terrain`, `_Objects` (models, cables, machine sounds), `_Belts`.
+    `World/FWGarageRoom`: the garage room; `World/FWCharacterStudio`: the creator's stage.
+  - `Game/`: `FWArt` (models and textures from Content/External), `FWGear` (hair, clothes, MetaHuman heads), `FWCatalog`,
+    `FWAudio`.
+  - `UI/`: Slate windows (`FWStyle` look and font, `FWWidgets` frame, cards, buttons; one `SFW*Window` per window, the
+    biggest split by tab: `SFWGarageWindow_*`, `SFWCompanyWindow_*`, `SFWRailWindow_*`, `SFWAdventuresWindow_Puzzles`).
+    `Net/`: the WebSocket client.
+- Server, `Server/src/Modules/FactoryWorld.Modules.*`: one module per area, each with its own schema and migrations. In a
+  module: `*Module.cs` (registration), `*Rows.cs` and `*DbContext.cs` (tables), `*Service.cs` (the logic), `*Handlers.cs`
+  (the client's messages), `*Rules.cs` (numbers and formulas). World: plots (`PlotInterior.cs` holds PlotService,
+  `PlotLayout.cs`, `PlotHandlers.cs`), the map, towns (`Cities.cs`, `CityService*.cs`), rail, export; Crafting
+  (`Processing.cs`, `Machine*.cs`), Logistics, Power, Companies (`CompanyService*.cs`), Recycling (the garage), Market, …
+  `Server/tests`: xUnit against the real server and a real database.
+
