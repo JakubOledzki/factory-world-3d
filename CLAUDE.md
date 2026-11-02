@@ -43,8 +43,10 @@ The client is the editor target (`FactoryWorld3DEditor Win64 Development`); the 
 - Simulation is lazy: each system catches up to "now" when asked. Plots run on their own clock (`IPlotClock`): they stand
   still while their players are away.
 - Developer commands (`dev.world`, `dev.give`, `dev.tool`, `dev.plot`, `dev.machines`; `Server/src/FactoryWorld.Server/DevCommands.cs`)
-  exist only on a Development server with `Dev:Commands` (appsettings.Development.json) and only for connections from
-  this computer. In the game: console `FWDevWorld` (money, backpack, axe and pickaxe, three plots, test machines).
+  exist only on a Development server with `Dev:Commands` (appsettings.Development.json), only for connections from
+  this computer and only for the local test accounts in `Dev:Accounts` (test@gmail.com, the autotest account). In the
+  game: the mod menu (F8, or a button in the Esc menu; `UI/SFWModWindow`) and console `FWDevWorld` (money, backpack,
+  axe and pickaxe, three plots, test machines).
 - Bots (server-run players, module Bots) are off unless `Bots:Enabled` is true; while off, the server removes the bots it
   made before, with all that is theirs, on start (`Bots:RemoveWhenOff`, `BotRemoval`).
 

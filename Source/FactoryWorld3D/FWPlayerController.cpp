@@ -46,6 +46,7 @@
 #include "UI/SFWRailWindow.h"
 #include "Camera/CameraComponent.h"
 #include "UI/SFWBankWindow.h"
+#include "UI/SFWModWindow.h"
 #include "UI/SFWCompanyWindow.h"
 #include "UI/SFWLoginWidget.h"
 #include "World/FWCharacterStudio.h"
@@ -234,6 +235,7 @@ void AFWPlayerController::OnLoggedIn()
 {
 	HideWidget();
 	LoginWidget.Reset();
+	CheckModMenu();
 	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
 	Net()->GetCharacter([WeakThis](const FFWNetReply& Reply)
 	{
@@ -1985,6 +1987,58 @@ void AFWPlayerController::OpenBank()
 {
 	SAssignNew(Bank, SFWBankWindow).Controller(this);
 	ShowWidget(Bank.ToSharedRef(), Bank);
+}
+
+void AFWPlayerController::CheckModMenu()
+{
+	// Only a development server knows "dev.access"; elsewhere it answers unknown_type and the menu stays hidden
+	ModAccess.Reset();
+	TWeakObjectPtr<AFWPlayerController> WeakThis(this);
+	Net()->Request(TEXT("dev.access"), MakeShared<FJsonObject>(), [WeakThis](const FFWNetReply& Reply)
+	{
+		AFWPlayerController* This = WeakThis.Get();
+		bool bAllowed = false;
+		if (This && Reply.Type == TEXT("dev.access") && Reply.Payload.IsValid() && Reply.Payload->TryGetBoolField(TEXT("allowed"), bAllowed) && bAllowed)
+		{
+			This->ModAccess = Reply.Payload;
+			UE_LOG(LogFWGame, Log, TEXT("Mod menu available (F8)"));
+		}
+	});
+}
+
+void AFWPlayerController::OpenModMenu()
+{
+	if (!ModAccess.IsValid())
+	{
+		Toast(LOCTEXT("NoModMenu", "Mod menu jest tylko dla konta testowego na serwerze deweloperskim."), true);
+		return;
+	}
+	SAssignNew(ModWindow, SFWModWindow).Controller(this).Access(ModAccess);
+	ShowWidget(ModWindow.ToSharedRef(), ModWindow);
+}
+
+void AFWPlayerController::FWModMoney(float Dollars)
+{
+	if (!ModWindow.IsValid())
+	{
+		OpenModMenu();
+	}
+	if (ModWindow.IsValid())
+	{
+		ModWindow->GiveMoney(FMath::RoundToDouble(Dollars * 100.0));
+	}
+}
+
+void AFWPlayerController::FWModFilter(const FString& Text)
+{
+	if (!ModWindow.IsValid())
+	{
+		OpenModMenu();
+	}
+	if (ModWindow.IsValid())
+	{
+		ModWindow->SetFilter(Text);
+	}
 }
 
 void AFWPlayerController::FWCompany(int32 Tab)

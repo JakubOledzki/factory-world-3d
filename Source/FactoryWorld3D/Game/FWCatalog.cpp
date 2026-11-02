@@ -165,6 +165,8 @@ namespace FWCatalog
 			{ TEXT("too_far"), LOCTEXT("TooFar", "Za daleko.") },
 			{ TEXT("storm"), LOCTEXT("Storm", "Trwa burza, praca na zewnątrz stoi.") },
 			{ TEXT("unknown_item"), LOCTEXT("UnknownItem", "Nieznany przedmiot.") },
+			{ TEXT("not_test_account"), LOCTEXT("NotTestAccount", "Tylko dla konta testowego na serwerze deweloperskim.") },
+			{ TEXT("no_plot"), LOCTEXT("NoPlot", "W pobliżu nie ma wolnej działki tego terenu.") },
 			{ TEXT("not_owner"), LOCTEXT("NotOwner", "To nie twoja działka.") },
 			{ TEXT("mine_empty"), LOCTEXT("MineEmpty", "Kopalnia jest wyczerpana. Odnowi się za chwilę.") },
 			{ TEXT("too_fast"), LOCTEXT("TooFast", "Za szybko.") },

@@ -90,6 +90,10 @@ public sealed class AccountService(AccountsDbContext db, TimeProvider time)
         return session.AccountId;
     }
 
+    /// <summary>The account's e-mail (lower-cased, trimmed), or null when there is no such account.</summary>
+    public Task<string?> EmailAsync(Guid accountId, CancellationToken cancellationToken) =>
+        db.Accounts.Where(a => a.Id == accountId).Select(a => (string?)a.Email).SingleOrDefaultAsync(cancellationToken);
+
     public async Task LogoutAsync(string token, CancellationToken cancellationToken)
     {
         var hash = HashToken(token);

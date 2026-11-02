@@ -182,9 +182,9 @@ public sealed class GameClient(WebSocket socket) : IDisposable
     }
 
     /// <summary>Registers and creates a character, so the player can earn XP.</summary>
-    public async Task RegisterWithCharacterAsync()
+    public async Task RegisterWithCharacterAsync(string? email = null)
     {
-        await RegisterAsync();
+        await RegisterAsync(email);
         var look = new { skinTone = 0, hairStyle = 0, hairColor = 0, shirtStyle = 0, shirtColor = 0, pantsColor = 0, shoesColor = 0 };
         var reply = await SendAsync("character.create", new { name = "P" + Guid.NewGuid().ToString("N")[..10], appearance = look });
         Assert.Equal("character", reply.Type());
