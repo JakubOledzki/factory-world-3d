@@ -31,6 +31,10 @@ public sealed class ClientContext
     /// account logged in somewhere else (<see cref="OnlinePlayers"/>). Null where there is no socket (bots).</summary>
     public Action<Envelope>? Close { get; set; }
 
+    /// <summary>The connection comes from this computer (loopback; the in-process test server has no address and counts
+    /// too). Developer commands need it.</summary>
+    public bool IsLocal { get; init; }
+
     public Guid RequireAccount() =>
         AccountId ?? throw new GameException("not_logged_in", "Log in first.");
 }

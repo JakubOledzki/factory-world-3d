@@ -72,6 +72,12 @@ foreach (var module in modules)
     module.RegisterServices(builder.Services, builder.Configuration);
 }
 
+// Developer commands (money, tools, plots, test machines) on one's own development server only, never in Production
+if (DevCommands.Enabled(builder.Configuration, builder.Environment))
+{
+    DevCommands.Register(builder.Services);
+}
+
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<MessageDispatcher>();
 builder.Services.AddSingleton<OnlinePlayers>();
