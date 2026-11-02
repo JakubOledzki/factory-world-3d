@@ -160,6 +160,8 @@ void AFWCharacter::CreateBody()
 	Held->SetCastShadow(false);
 	Held->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
 	Held->SetVisibility(false);
+	// The models are Nanite meshes, which the first-person pass drew black: their ordinary meshes instead
+	Held->bDisallowNanite = true;
 	Held->RegisterComponent();
 }
 
@@ -384,6 +386,12 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 	// Hands a little higher and closer in build mode, as if holding something up to set it down
 	BuildRaise = FMath::FInterpTo(BuildRaise, bBuildMode || (Held && Held->IsVisible()) ? 1.f : 0.f, DeltaSeconds, 6.f);
 
+	// The hands come up when there is something to do with them and drop out of view when there is not, as a
+	// player walking with empty hands does not hold them up in front of their eyes
+	const bool bBusy = bBuildMode || (Held && Held->IsVisible()) || Gesture != EGesture::None || Hold != EHold::None || ToolShown > 0.f
+		|| EquipTime >= 0.f;
+	ArmsUp = FMath::FInterpTo(ArmsUp, bBusy ? 1.f : 0.f, DeltaSeconds, bBusy ? 9.f : 3.f);
+
 	// Gestures: offsets of the right (index 1) and left hand over their length
 	FVector Gest[2] = { FVector::ZeroVector, FVector::ZeroVector };
 	float Length = 0.f;
@@ -454,6 +462,8 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 		FVector Hand(Sign * (21.f - 4.f * BuildRaise), 48.f + 4.f * BuildRaise, 146.f + 6.f * BuildRaise);
 		Hand += FVector(StepSway * Sign * 0.3f + ViewLag.X * -0.8f, 0.f, Breath - StepBob - ViewLag.Y * 0.8f);
 		Hand += Gest[Side];
+		// Lowered: down along the body and a little back, swinging gently with the steps
+		Hand += FVector(Sign * 6.f, -16.f + StepSway * Sign * 2.f, -62.f) * (1.f - ArmsUp);
 		// Changing items: the hands dip out of view and come back
 		if (EquipTime >= 0.f)
 		{
@@ -495,9 +505,11 @@ void AFWCharacter::UpdateArms(float DeltaSeconds)
 		const FVector Grip = Arms->GetBoneLocation(TEXT("hand_r")) - Handle * 3.f;
 		Tool->SetWorldLocationAndRotation(Grip, FRotationMatrix::MakeFromZX(Handle, Head).Rotator());
 	}
-	// Relaxed hands, a little more closed in build mode; the right one a fist round the handle
-	CurlFingers(0, 0.25f + 0.15f * BuildRaise);
-	CurlFingers(1, ToolShown > 0.f && Tool ? 1.f : 0.25f + 0.15f * BuildRaise);
+	// Relaxed hands, half closed and breathing a little, more closed in build mode; the right one a fist round the
+	// handle
+	const float Relaxed = 0.45f + 0.04f * FMath::Sin(Time * 0.9f) + 0.1f * BuildRaise;
+	CurlFingers(0, Relaxed);
+	CurlFingers(1, ToolShown > 0.f && Tool ? 1.f : Relaxed);
 	// The jolt of a strike: a few millimetres, gone in a fifth of a second
 	ShakeTime = FMath::Max(0.f, ShakeTime - DeltaSeconds);
 	ShakeOffset = ShakeTime > 0.f ? FMath::VRand() * 0.6f * (ShakeTime / 0.18f) : FVector::ZeroVector;
