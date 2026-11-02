@@ -146,7 +146,7 @@ TSharedRef<SWidget> SFWModWindow::ItemSection()
 		+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 8)[FWUi::Note(LOCTEXT("ItemsAbout", "Do plecaka; co się nie zmieści, przepadnie."), FWStyle::Muted)]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 10)
 		[
-			SNew(SEditableTextBox).Style(&FWStyle::TextBox()).HintText(LOCTEXT("Search", "Szukaj przedmiotu..."))
+			SAssignNew(SearchBox, SEditableTextBox).Style(&FWStyle::TextBox()).HintText(LOCTEXT("Search", "Szukaj przedmiotu..."))
 			.OnTextChanged_Lambda([this](const FText& Text) { SetFilter(Text.ToString()); })
 		]
 		+ SVerticalBox::Slot().FillHeight(1.f)
@@ -162,6 +162,11 @@ TSharedRef<SWidget> SFWModWindow::ItemSection()
 void SFWModWindow::SetFilter(const FString& Text)
 {
 	Filter = Text.TrimStartAndEnd();
+	// A filter from the console shows in the box too (typing there sets the same text, so no loop)
+	if (SearchBox.IsValid() && SearchBox->GetText().ToString() != Text)
+	{
+		SearchBox->SetText(FText::FromString(Text));
+	}
 	RebuildItems();
 }
 

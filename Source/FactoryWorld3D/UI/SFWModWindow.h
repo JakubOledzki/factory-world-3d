@@ -6,6 +6,7 @@
 
 class AFWPlayerController;
 class FFWForm;
+class SEditableTextBox;
 class SVerticalBox;
 struct FFWNetReply;
 
@@ -50,5 +51,6 @@ private:
 	TSharedPtr<FJsonObject> Access;
 	TSharedPtr<FFWForm> Form;
 	TSharedPtr<SVerticalBox> ItemList;
+	TSharedPtr<SEditableTextBox> SearchBox;
 	FString Filter;
 };
