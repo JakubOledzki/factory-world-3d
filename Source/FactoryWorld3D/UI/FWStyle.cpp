@@ -105,9 +105,12 @@ namespace FWStyle
 		FSlateSound UiSound(const TCHAR* Name)
 		{
 			FSlateSound Sound;
-			// Clicks and hovers from Tools/make_audio.py, when they are set up
-			if (UObject* Wave = LoadObject<USoundBase>(nullptr, *FString::Printf(TEXT("/Game/External/Audio/%s.%s"), Name, Name), nullptr, LOAD_NoWarn | LOAD_Quiet))
+			// Clicks and hovers from Tools/make_audio.py, when they are set up. The styles holding them live for the whole run
+			// but are not seen by the garbage collector, so the sound is kept from it; otherwise the first collection (e.g.
+			// when the world loads) frees it and the next hover plays freed memory.
+			if (USoundBase* Wave = LoadObject<USoundBase>(nullptr, *FString::Printf(TEXT("/Game/External/Audio/%s.%s"), Name, Name), nullptr, LOAD_NoWarn | LOAD_Quiet))
 			{
+				Wave->AddToRoot();
 				Sound.SetResourceObject(Wave);
 			}
 			return Sound;
