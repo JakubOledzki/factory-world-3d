@@ -5,6 +5,7 @@
 
 class AActor;
 class USceneComponent;
+class USkeletalMesh;
 class USkeletalMeshComponent;
 class USkinnedMeshComponent;
 class UFWHeadComponent;
@@ -26,10 +27,14 @@ struct FFWLook
 
 /**
  * Dressing the mannequin in the character's hair and clothes (Tools/blender/make_character_gear.py, imported to
- * /Game/External/Character): one skeletal mesh per piece following a leader's pose, coloured per material slot.
+ * /Game/External/Gear): one skeletal mesh per piece following a leader's pose, coloured per material slot.
  */
 namespace FWGear
 {
+	// The body the clothes are made for (the mannequin made an ordinary build, /Game/External/Gear/body), on the
+	// mannequin's skeleton; the mannequin itself when that is not there
+	USkeletalMesh* BodyMesh();
+
 	// The look from a character's "appearance" (indices) and the palettes of "character.options"
 	FFWLook MakeLook(const TSharedPtr<FJsonObject>& Appearance, const TSharedPtr<FJsonObject>& Options);
 

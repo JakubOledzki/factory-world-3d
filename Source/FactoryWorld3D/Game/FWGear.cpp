@@ -60,6 +60,15 @@ namespace FWGear
 		}
 	}
 
+	USkeletalMesh* BodyMesh()
+	{
+		if (USkeletalMesh* Body = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/External/Gear/body.body"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+		{
+			return Body;
+		}
+		return LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	}
+
 	FFWLook MakeLook(const TSharedPtr<FJsonObject>& Appearance, const TSharedPtr<FJsonObject>& Options)
 	{
 		FFWLook Look;
@@ -94,7 +103,7 @@ namespace FWGear
 		TObjectPtr<USkinnedMeshComponent>* Found = Gear.Find(Piece);
 		if (!Found)
 		{
-			USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/External/Character/%s.%s"), *Piece, *Piece), nullptr, LOAD_NoWarn | LOAD_Quiet);
+			USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/External/Gear/%s.%s"), *Piece, *Piece), nullptr, LOAD_NoWarn | LOAD_Quiet);
 			USkeletalMeshComponent* Part = nullptr;
 			if (Mesh)
 			{
@@ -115,7 +124,7 @@ namespace FWGear
 				for (int32 Slot = 0; Slot < Slots.Num(); ++Slot)
 				{
 					const FString Name = FString::Printf(TEXT("MI_%s"), *Slots[Slot].ToString());
-					UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/External/Character/Materials/%s.%s"), *Name, *Name));
+					UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/External/Gear/Materials/%s.%s"), *Name, *Name));
 					UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(Base ? Base : Part->GetMaterial(Slot), Owner);
 					if (bArmsOnly && Base)
 					{
