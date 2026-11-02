@@ -1,0 +1,9 @@
+# Caddy in front of the game's server: a certificate for the domain from Let's Encrypt, renewed by itself, and
+# HTTPS / wss:// passed on to the server (WebSocket upgrades included).
+{$DOMAIN} {
+	# The server's metrics are for us, not the world
+	@metrics path /metrics
+	respond @metrics 404
+
+	reverse_proxy server:5081
+}

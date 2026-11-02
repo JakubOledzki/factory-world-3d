@@ -12,7 +12,9 @@ version of how to work on it.
 - Never change the 2D game's repository.
 - No passwords, keys or tokens in the repository. `Saved/DevLogin.ini` (auto-login) holds a LOCAL TEST account only and
   is not in git; never a real account.
-- Nothing is deployed anywhere but this computer without Jakub's say-so.
+- Nothing is deployed anywhere but this computer without Jakub's say-so. How the server is set up on a VPS, backed up
+  and updated: `deploy/README.md` (Docker, Caddy, secrets only in `deploy/.env` on the server); the game for players:
+  `Tools\dev\package.ps1 -ServerUrl wss://…/ws`. The deploy SSH key is `~/.ssh/factoryworld3d_deploy` (never in git).
 - Pull requests target `main`; no PR based on another PR's branch. A branch may carry an unmerged PR's commits, then the
   PR says "contains #N, merge #N first".
 - Before/after screenshots for every visible change (Tools/dev/autotest.ps1 makes them).
