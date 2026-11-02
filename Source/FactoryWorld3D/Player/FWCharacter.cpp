@@ -1245,7 +1245,7 @@ bool AFWCharacter::GaragePlacement(FIntPoint& OutCell, FTransform& OutTransform,
 		return false;
 	}
 	const FVector Eye = PC->PlayerCameraManager->GetCameraLocation();
-	return Room->Placement(GaragePlacing, BuildRotation & 3, Eye, Eye + PC->PlayerCameraManager->GetCameraRotation().Vector() * 600.f, OutCell, OutTransform, bOutFits);
+	return Room->Placement(GaragePlacing, BuildRotation & 3, Eye, Eye + PC->PlayerCameraManager->GetCameraRotation().Vector() * 600.f, this, OutCell, OutTransform, bOutFits);
 }
 
 bool AFWCharacter::UpdateGarageGhost()
@@ -1277,7 +1277,7 @@ bool AFWCharacter::UpdateGarageGhost()
 	// The ghost's colour is light of its own: the game's exposure is set for daylight (EV100 12.5 at the least,
 	// FWEnvironment), at which a colour of 1 is next to black, so it glows as bright as a lit wall
 	GhostMaterial->SetVectorParameterValue(TEXT("Color"), (bFits ? FLinearColor(0.2f, 1.f, 0.4f) : FLinearColor(1.f, 0.15f, 0.1f)) * GarageGhostGlow);
-	GhostMaterial->SetScalarParameterValue(TEXT("Opacity"), 0.45f);
+	GhostMaterial->SetScalarParameterValue(TEXT("Opacity"), 0.32f);
 	Ghost->SetVisibility(true);
 	return true;
 }

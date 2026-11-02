@@ -49,10 +49,10 @@ public:
 	// The model a piece of this kind is drawn with
 	UStaticMesh* MeshOf(const FString& Kind) const;
 	// Where a piece of this kind, turned by Rotation quarter turns, would stand with its middle where a line from the eye
-	// meets the floor: its front-left cell (as garage.place takes it), where its model goes in the world, and whether it
-	// fits there without touching anything; false when the line does not reach the floor
-	bool Placement(const FString& Kind, int32 Rotation, const FVector& From, const FVector& To, FIntPoint& OutCell, FTransform& OutTransform,
-		bool& bOutFits) const;
+	// meets the floor (or under what it hits first, Ignore aside): its front-left cell (as garage.place takes it), where its
+	// model goes in the world, and whether it fits there without touching anything; false when the line reaches nothing
+	bool Placement(const FString& Kind, int32 Rotation, const FVector& From, const FVector& To, const AActor* Ignore, FIntPoint& OutCell,
+		FTransform& OutTransform, bool& bOutFits) const;
 
 private:
 	UStaticMeshComponent* Piece(const TCHAR* Model, const FTransform& Transform, bool bCollide = true);

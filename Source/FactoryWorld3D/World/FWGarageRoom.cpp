@@ -359,12 +359,26 @@ UStaticMesh* AFWGarageRoom::MeshOf(const FString& Kind) const
 	return Mesh ? Mesh : LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 }
 
-bool AFWGarageRoom::Placement(const FString& Kind, int32 Rotation, const FVector& From, const FVector& To, FIntPoint& OutCell, FTransform& OutTransform,
-	bool& bOutFits) const
+bool AFWGarageRoom::Placement(const FString& Kind, int32 Rotation, const FVector& From, const FVector& To, const AActor* Ignore, FIntPoint& OutCell,
+	FTransform& OutTransform, bool& bOutFits) const
 {
-	// Where the line meets the floor (the room's z = 0), in the room's own space
-	const FVector A = GetActorTransform().InverseTransformPosition(From);
-	const FVector B = GetActorTransform().InverseTransformPosition(To);
+	// Where the line meets the floor (the room's z = 0), in the room's own space; aimed at a piece of furniture or a wall
+	// first, the floor under the spot looked at, so a piece aimed at shows its cells as taken
+	FVector A = GetActorTransform().InverseTransformPosition(From);
+	FVector B = GetActorTransform().InverseTransformPosition(To);
+	FHitResult Hit;
+	FCollisionQueryParams Params(TEXT("FWGaragePlace"), true, Ignore);
+	if (GetWorld() && GetWorld()->LineTraceSingleByChannel(Hit, From, To, ECC_Visibility, Params) && Hit.GetComponent() != Floor.Get())
+	{
+		// Nothing goes on the ceiling
+		if (Hit.ImpactNormal.Z < -0.5f)
+		{
+			return false;
+		}
+		B = GetActorTransform().InverseTransformPosition(Hit.ImpactPoint);
+		A = FVector(B.X, B.Y, FMath::Max(B.Z, 1.f) + 1.f);
+		B.Z = -1.f;
+	}
 	if (A.Z <= 0.f || B.Z >= 0.f)
 	{
 		return false;
