@@ -177,6 +177,11 @@ public:
 
 	// Plot actions; each refreshes what it changes and reports errors as toasts
 	void Mine(int32 MineId, TFunction<void(bool bOk)> Done);
+	// A strike of the axe or pickaxe that does not gather yet (the server counts them: five fell a tree, break a
+	// rock or dig a load); MineId < 0 for a tree or rock on Tile
+	void StrikeHit(int32 MineId, FIntPoint Tile);
+	// The last strike at a tree or rock: gathers it, and on success clears its tile (and those a saw felled with it)
+	void Harvest(FIntPoint Tile, TFunction<void(bool bOk)> Done);
 	void Place(const FString& Kind, FIntPoint Tile, int32 Rotation);
 	// Adventures (Y), as in the 2D game: the holiday, the album, expeditions, puzzles, the mentor, the trophy case
 	void OpenAdventures();
@@ -198,6 +203,9 @@ public:
 	void FWPromptSecondary();
 	UFUNCTION(Exec)
 	void FWGoto(int32 TileX, int32 TileY, float Yaw = 0.f, float Pitch = -30.f);
+	// Stands on a free tile next to the tree or rock ("tree", "rock") nearest the player and looks at it (tests)
+	UFUNCTION(Exec)
+	void FWAimAt(const FString& What);
 	// Stands at a point of the land around the plot: metres from the plot's middle (+X east, +Y south)
 	UFUNCTION(Exec)
 	void FWGotoLand(float EastMeters, float SouthMeters, float Yaw = 0.f, float Pitch = 0.f);

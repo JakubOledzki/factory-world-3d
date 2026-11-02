@@ -55,7 +55,7 @@ public sealed class AchievementTests(ServerFactory factory) : IClassFixture<Serv
         gzip.CopyTo(tiles);
         var i = Array.IndexOf(tiles.ToArray(), (byte)TileObject.Tree);
         factory.Time.Advance(HarvestRules.ChopTime);
-        var chopped = await client.SendAsync("plot.harvest", new { x, y, tileX = i % PlotLayout.Size, tileY = i / PlotLayout.Size });
+        var chopped = await factory.StrikeAsync(client, "plot.harvest", new { x, y, tileX = i % PlotLayout.Size, tileY = i / PlotLayout.Size });
         Assert.Equal("plot.harvested", chopped.Type());
         return (x, y);
     }

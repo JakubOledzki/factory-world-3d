@@ -146,7 +146,16 @@ namespace FWCatalog
 
 	FText ErrorText(const FString& Code, const FString& Fallback)
 	{
+		// The server names the tool it wants ("You need Siekiera in your hand.")
+		if (Code == TEXT("wrong_tool"))
+		{
+			return Fallback.Contains(TEXT("Siekiera")) ? LOCTEXT("WrongToolAxe", "Potrzebujesz siekiery w pasku narzędzi.")
+				: Fallback.Contains(TEXT("Kilof")) ? LOCTEXT("WrongToolPickaxe", "Potrzebujesz kilofa w pasku narzędzi.")
+				: Fallback.Contains(TEXT("opata")) ? LOCTEXT("WrongToolShovel", "Potrzebujesz łopaty w pasku narzędzi.")
+				: LOCTEXT("WrongTool", "Potrzebujesz do tego innego narzędzia w pasku narzędzi.");
+		}
 		static const TMap<FString, FText> Texts = {
+			{ TEXT("not_struck"), LOCTEXT("NotStruck", "Trzeba uderzyć pięć razy.") },
 			{ TEXT("not_enough_money"), LOCTEXT("NotEnoughMoney", "Za mało pieniędzy. Zarób w garażu w Factory World.") },
 			{ TEXT("not_enough_items"), LOCTEXT("NotEnoughItems", "Nie masz tego przedmiotu.") },
 			{ TEXT("inventory_full"), LOCTEXT("InventoryFull", "Ekwipunek jest pełny.") },
@@ -157,7 +166,6 @@ namespace FWCatalog
 			{ TEXT("storm"), LOCTEXT("Storm", "Trwa burza, praca na zewnątrz stoi.") },
 			{ TEXT("unknown_item"), LOCTEXT("UnknownItem", "Nieznany przedmiot.") },
 			{ TEXT("not_owner"), LOCTEXT("NotOwner", "To nie twoja działka.") },
-			{ TEXT("wrong_tool"), LOCTEXT("WrongTool", "Potrzebujesz kilofa w ręku.") },
 			{ TEXT("mine_empty"), LOCTEXT("MineEmpty", "Kopalnia jest wyczerpana. Odnowi się za chwilę.") },
 			{ TEXT("too_fast"), LOCTEXT("TooFast", "Za szybko.") },
 			{ TEXT("plot_tax_due"), LOCTEXT("TaxDue", "Masz zaległy podatek od działek.") },

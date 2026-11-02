@@ -165,7 +165,7 @@ public sealed class TutorialTests(ServerFactory factory) : IClassFixture<ServerF
         foreach (var tree in trees)
         {
             factory.Time.Advance(HarvestRules.ChopTime);
-            var chopped = await client.SendAsync("plot.harvest", new { x = forest.X, y = forest.Y, tileX = tree % PlotLayout.Size, tileY = tree / PlotLayout.Size });
+            var chopped = await factory.StrikeAsync(client, "plot.harvest", new { x = forest.X, y = forest.Y, tileX = tree % PlotLayout.Size, tileY = tree / PlotLayout.Size });
             Assert.Equal("plot.harvested", chopped.Type());
         }
 
